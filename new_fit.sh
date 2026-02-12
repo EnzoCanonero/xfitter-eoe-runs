@@ -1,6 +1,6 @@
 #!/bin/bash
 # Create a new xfitter fit directory.
-# Usage: ./new_fit.sh <name> [template_dir]
+# Usage: ./new_fit.sh <name-or-nested-path> [template_dir]
 #
 # template_dir defaults to the errors-on-errors example.
 
@@ -17,6 +17,11 @@ fi
 
 FITDIR="$BASEDIR/fits/$NAME"
 
+if [ ! -d "$TEMPLATE" ]; then
+    echo "Error: template directory not found: $TEMPLATE"
+    exit 1
+fi
+
 if [ -d "$FITDIR" ]; then
     echo "Error: $FITDIR already exists"
     exit 1
@@ -25,7 +30,7 @@ fi
 echo "Creating fit: $FITDIR"
 echo "Template:     $TEMPLATE"
 
-# Create subdirectories
+# Create subdirectories (also creates nested parents in fits/)
 mkdir -p "$FITDIR/config" "$FITDIR/condor/logs"
 
 # Copy editable config files
@@ -42,8 +47,8 @@ for f in constants.yaml unpolarised.wgt; do
     fi
 done
 
-# Symlink datafiles into fit root
-ln -sf ../../datafiles "$FITDIR/datafiles"
+# Symlink shared datafiles into fit root (absolute works for any depth)
+ln -sfn "$BASEDIR/datafiles" "$FITDIR/datafiles"
 
 # Generate condor/run_fit.sh
 cat > "$FITDIR/condor/run_fit.sh" << RUNEOF

@@ -1,0 +1,13 @@
+# xfitter output (created at runtime)
+fits/*/output/
+fits/*/*/output/
+fits/*/*/*/output/
+
+# Condor logs (recreated each submission)
+fits/*/condor/logs/
+fits/*/*/condor/logs/
+fits/*/*/*/condor/logs/
+
+# Sandbox (personal throwaway fits), keep folder tracked
+fits/sandbox/*
+!fits/sandbox/.gitkeep

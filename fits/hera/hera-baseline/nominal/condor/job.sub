@@ -4,5 +4,5 @@ output              = condor/logs/output.log
 error               = condor/logs/error.log
 log                 = condor/logs/run.log
 should_transfer_files = NO
-initialdir          = /nfs/scratch2/ecanoner/xfitter-eoe-runs/fits/eoe-baseline
+initialdir          = /nfs/scratch2/ecanoner/xfitter-eoe-runs/fits/hera/hera-baseline/nominal
 queue 1

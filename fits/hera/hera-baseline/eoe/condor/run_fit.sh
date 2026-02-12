@@ -1,5 +1,5 @@
 #!/bin/bash
-FITDIR="/nfs/scratch2/ecanoner/xfitter-eoe-runs/fits/eoe-baseline"
+FITDIR="/nfs/scratch2/ecanoner/xfitter-eoe-runs/fits/hera/hera-baseline/eoe"
 source "/nfs/scratch2/ecanoner/xfitter-eoe-runs/setup_env.sh"
 cd "$FITDIR"
 
