@@ -27,17 +27,9 @@ xfitter-eoe-runs/
 # Or from a different template:
 ./new_fit.sh my-fit /path/to/template/dir
 
-# Edit the configuration:
-vim fits/my-fit/config/steering.txt
-vim fits/my-fit/config/parameters.yaml
-
 # Submit to condor:
 cd fits/my-fit
 condor_submit condor/job.sub
-
-# Check results:
-condor_q
-cat fits/my-fit/output/Results.txt
 ```
 
 ## How it works
