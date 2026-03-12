@@ -132,7 +132,8 @@ def create_fit_structure(fit_dir: Path,
 
     # Copy datafiles to config directory (for Condor file transfer)
     # Condor daemon doesn't have NFS access, so files must be local
-    datafiles_source = Path("/nfs/scratch2/ecanoner/xfitter-eoe-runs/datafiles/hera/h1zeusCombined/inclusiveDis/1506.06042")
+    repo_root = Path(__file__).parent.parent.parent
+    datafiles_source = repo_root / "datafiles" / "hera" / "h1zeusCombined" / "inclusiveDis" / "1506.06042"
     for datafile in datafiles:
         src = datafiles_source / datafile
         dst = config_dir / datafile
@@ -214,28 +215,24 @@ def generate_run_script(fit_dir: Path) -> str:
     """
     fit_dir = fit_dir.resolve()  # Ensure absolute path
     config_dir = fit_dir / "config"
+    repo_root = Path(__file__).parent.parent.parent.resolve()
+    setup_env = repo_root / "setup_env.sh"
 
     return f"""#!/bin/bash
-# xFitter fit execution script (CVMFS LCG_105)
+# xFitter fit execution script
 set -e
 
-# --- CVMFS environment (accessible from any worker node) ---
-source /cvmfs/sft.cern.ch/lcg/views/LCG_105/x86_64-el9-gcc13-opt/setup.sh
+CONFIGDIR="{config_dir}"
+source "{setup_env}"
 
-# --- flexiblas shim (RHEL BLAS wrapper not in CVMFS, map to openblas) ---
+# flexiblas shim (condor nodes miss libflexiblas, map to openblas)
 SHIM_DIR=$(mktemp -d)
 trap "rm -rf $SHIM_DIR" EXIT
 ln -s /cvmfs/sft.cern.ch/lcg/views/LCG_105/x86_64-el9-gcc13-opt/lib/libopenblas.so \\
       "$SHIM_DIR/libflexiblas.so.3"
 export LD_LIBRARY_PATH="$SHIM_DIR:$LD_LIBRARY_PATH"
 
-# --- NFS xFitter deps (binary, LHAPDF, QCDNUM, etc.) ---
-XFDIR=/nfs/scratch2/ecanoner/PDF
-export PATH="$XFDIR/xfitter-master/bin:$PATH"
-export LD_LIBRARY_PATH="$XFDIR/deps/qcdnum/lib:$XFDIR/deps/lhapdf/lib:$XFDIR/deps/hoppet/lib:$XFDIR/deps/applgrid/lib:$XFDIR/deps/applwrap/lib:$XFDIR/deps/apfel/lib:$XFDIR/deps/apfelxx/lib:$XFDIR/deps/mela/lib:$XFDIR/deps/dyturbo-1.4.2/lib:$XFDIR/deps/pineappl/lib:$LD_LIBRARY_PATH"
-
-# --- Run xFitter ---
-cd {config_dir}
+cd "$CONFIGDIR"
 xfitter
 """
 

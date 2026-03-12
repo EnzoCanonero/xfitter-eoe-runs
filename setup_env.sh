@@ -13,8 +13,9 @@ LCG_SETUP="/cvmfs/sft.cern.ch/lcg/views/LCG_105/x86_64-el9-gcc13-opt/setup.sh"
 source "$LCG_SETUP" || fail_setup "failed to source $LCG_SETUP"
 
 # Source the xFitter setup from NFS location (accessible to Condor workers)
+# Set XFITTER_ROOT before sourcing this file to override the default install path.
 # Need to cd to the PDF directory first so the setup.sh can read the version file
-XFITTER_SETUP_ROOT="/nfs/scratch2/ecanoner/PDF"
+XFITTER_SETUP_ROOT="${XFITTER_ROOT:-/nfs/scratch2/ecanoner/PDF}"
 XFITTER_SETUP="$XFITTER_SETUP_ROOT/setup.sh"
 [ -r "$XFITTER_SETUP" ] || fail_setup "cannot read $XFITTER_SETUP"
 

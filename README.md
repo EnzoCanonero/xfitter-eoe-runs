@@ -8,7 +8,7 @@ Code/binaries stay in `~/PDF/xfitter-master`; this repo tracks fit configs and r
 ```
 xfitter-eoe-runs/
 ├── setup_env.sh                # environment for xfitter (CVMFS + NFS deps)
-├── datafiles/                  # symlink -> ~/PDF/xfitter-master/datafiles
+├── datafiles/                  # canonical source data (copied into fits by scripts)
 ├── studies/                    # study notes/logbook (one file per study family)
 ├── fits/                       # individual fits (manual)
 │   ├── new_fit.sh
