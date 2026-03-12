@@ -1,8 +1,10 @@
 universe            = vanilla
-executable          = condor/run_fit.sh
-output              = condor/logs/output.log
-error               = condor/logs/error.log
-log                 = condor/logs/run.log
+executable          = /nfs/scratch2/ecanoner/xfitter-eoe-runs/fits/hera/hera-baseline/eoe/condor/run_fit.sh
+output              = /nfs/scratch2/ecanoner/xfitter-eoe-runs/fits/hera/hera-baseline/eoe/condor/logs/output.log
+error               = /nfs/scratch2/ecanoner/xfitter-eoe-runs/fits/hera/hera-baseline/eoe/condor/logs/error.log
+log                 = /nfs/scratch2/ecanoner/xfitter-eoe-runs/fits/hera/hera-baseline/eoe/condor/logs/run.log
 should_transfer_files = NO
-initialdir          = /nfs/scratch2/ecanoner/xfitter-eoe-runs/fits/hera/hera-baseline/eoe
+initialdir          = /nfs/scratch2/ecanoner/xfitter-eoe-runs/fits/hera/hera-baseline/eoe/config
+request_cpus        = 1
+request_memory      = 2GB
 queue 1

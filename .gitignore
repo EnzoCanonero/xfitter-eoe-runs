@@ -1,13 +1,26 @@
 # xfitter output (created at runtime)
-fits/*/output/
-fits/*/*/output/
-fits/*/*/*/output/
+fits/**/output/
 
 # Condor logs (recreated each submission)
-fits/*/condor/logs/
-fits/*/*/condor/logs/
-fits/*/*/*/condor/logs/
+fits/**/condor/logs/
+
+# Data files in config/ (copied by new_fit.sh)
+fits/**/*.dat
 
 # Sandbox (personal throwaway fits), keep folder tracked
 fits/sandbox/*
 !fits/sandbox/.gitkeep
+
+# Scan framework generated files
+scans/fits/lambda-scans/*/fits/
+scans/fits/lambda-scans/*/results/
+scans/fits/lambda-scans/*/plots/
+scans/fits/systematic-ranking/*/fits/
+scans/fits/systematic-ranking/*/results/
+scans/fits/systematic-ranking/*/plots/
+scans/studies/**/runs/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo

@@ -119,3 +119,6 @@ WriteLHAPDF6:
   #Qrange: [1,1000]
   #Xnpoints: 200
   #Qnpoints: 120
+
+# Output directory (absolute path so xfitter writes here regardless of CWD)
+OutputDirectory: "/nfs/scratch2/ecanoner/xfitter-eoe-runs/fits/hera/hera-baseline/eoe-no-bartlett/output"

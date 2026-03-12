@@ -1,19 +1,16 @@
 #!/bin/bash
-FITDIR="/nfs/scratch2/ecanoner/xfitter-eoe-runs/fits/hera/hera-baseline/eoe"
+# xFitter fit execution script
+set -e
+
+CONFIGDIR="/nfs/scratch2/ecanoner/xfitter-eoe-runs/fits/hera/hera-baseline/eoe/config"
 source "/nfs/scratch2/ecanoner/xfitter-eoe-runs/setup_env.sh"
-cd "$FITDIR"
 
-# Stage config files into CWD for xfitter
-for f in config/*; do
-    ln -sf "$f" .
-done
+# flexiblas shim (condor nodes miss libflexiblas, map to openblas)
+SHIM_DIR=$(mktemp -d)
+trap "rm -rf $SHIM_DIR" EXIT
+ln -s /cvmfs/sft.cern.ch/lcg/views/LCG_105/x86_64-el9-gcc13-opt/lib/libopenblas.so \
+      "$SHIM_DIR/libflexiblas.so.3"
+export LD_LIBRARY_PATH="$SHIM_DIR:$LD_LIBRARY_PATH"
 
+cd "$CONFIGDIR"
 xfitter
-rc=$?
-
-# Clean up staged symlinks
-for f in config/*; do
-    rm -f "$(basename "$f")"
-done
-
-exit $rc
