@@ -1,7 +1,9 @@
 # xfitter output (created at runtime)
 fits/**/output/
 
-# Condor logs (recreated each submission)
+# Condor generated files (created by submit.sh)
+fits/**/condor/run_fit.sh
+fits/**/condor/job.sub
 fits/**/condor/logs/
 
 # Data files in config/ (copied by new_fit.sh)

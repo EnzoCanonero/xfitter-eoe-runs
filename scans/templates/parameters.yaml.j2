@@ -124,6 +124,5 @@ WriteLHAPDF6:
   #Xnpoints: 200
   #Qnpoints: 120
 
-# Configure output directory with absolute path for robustness
-# xFitter runs from config/, but we want output in fit_dir/output/
-OutputDirectory: "{{ fit_dir }}/output"
+# Output directory (patched at runtime by run_fit.sh)
+OutputDirectory: "__SET_AT_RUNTIME__"

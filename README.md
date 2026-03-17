@@ -3,6 +3,12 @@
 Collaborative workspace for xFitter runs from scratch space.
 Code/binaries stay in `~/PDF/xfitter-master`; this repo tracks fit configs and run scaffolding.
 
+## Setup
+
+1. Clone the repo to any NFS-accessible location.
+2. Edit `.env` and set `XFITTER_ROOT` to your xFitter install path.
+   The path must be accessible from Condor worker nodes (e.g. on NFS).
+
 ## Layout
 
 ```
@@ -29,7 +35,7 @@ xfitter-eoe-runs/
 
 Each fit directory under `fits/` contains:
 - `config/` — `steering.txt`, `parameters.yaml`, `constants.yaml`, `unpolarised.wgt`, and data files (`*.dat`)
-- `condor/` — `run_fit.sh`, `job.sub`, `logs/`
+- `condor/` — `submit.sh` (generates `run_fit.sh` + `job.sub` and submits)
 - `output/` — xFitter output (gitignored)
 
 xFitter runs from `config/` — all files it needs are there. `run_fit.sh` sources
@@ -48,12 +54,13 @@ cd fits/
 ```
 
 `new_fit.sh` creates the full directory structure, copies data files into `config/`,
-sets `OutputDirectory` in `parameters.yaml`, and generates condor scripts.
+and generates condor scripts. `OutputDirectory` in `parameters.yaml` is set
+automatically at runtime by `run_fit.sh`.
 
 ### Run a fit
 
 ```bash
-condor_submit fits/hera/hera-baseline/eoe/condor/job.sub
+fits/hera/hera-baseline/eoe/condor/submit.sh
 ```
 
 ## Scans

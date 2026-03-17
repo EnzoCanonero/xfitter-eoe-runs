@@ -68,7 +68,7 @@ class TemplateManager:
         Render parameters.yaml from template
 
         Args:
-            fit_dir: Absolute path to fit directory (for OutputDirectory)
+            fit_dir: Path to fit directory (kept for API compatibility, no longer used for OutputDirectory)
             do_errors: Optional doErrors multiline string for MINUIT section
 
         Returns:
@@ -77,7 +77,6 @@ class TemplateManager:
         template = self.env.get_template('parameters.yaml.j2')
 
         context = {
-            'fit_dir': str(fit_dir.resolve()),
             'do_errors': do_errors,
         }
 
@@ -140,100 +139,77 @@ def create_fit_structure(fit_dir: Path,
         if src.exists():
             shutil.copy2(src, dst)
 
-    # Generate Condor submission script
-    condor_script = generate_condor_script(fit_dir)
-    (condor_dir / "job.sub").write_text(condor_script)
-
-    # Generate run script
-    run_script = generate_run_script(fit_dir)
-    run_script_path = condor_dir / "run_fit.sh"
-    run_script_path.write_text(run_script)
-    run_script_path.chmod(0o755)
+    # Generate submit.sh (generates run_fit.sh + job.sub with correct paths, then submits)
+    submit_script = generate_submit_script(fit_dir)
+    submit_script_path = condor_dir / "submit.sh"
+    submit_script_path.write_text(submit_script)
+    submit_script_path.chmod(0o755)
 
 
-def generate_condor_script(fit_dir: Path) -> str:
+def generate_submit_script(fit_dir: Path) -> str:
     """
-    Generate Condor submission script
+    Generate submit.sh that creates run_fit.sh and job.sub with correct
+    absolute paths, then submits to Condor.
 
     Args:
-        fit_dir: Absolute path to fit directory
-
-    Returns:
-        Condor submit file content
-    """
-    fit_dir = fit_dir.resolve()  # Ensure absolute path
-    condor_dir = fit_dir / "condor"
-
-    # HERA datafiles to transfer (copied to config directory during fit generation)
-    config_dir = fit_dir / "config"
-
-    # Use relative paths from condor directory to config directory
-    datafile_names = [
-        "HERA1+2_NCep_920-thexp.dat",
-        "HERA1+2_NCep_820-thexp.dat",
-        "HERA1+2_NCep_575-thexp.dat",
-        "HERA1+2_NCep_460-thexp.dat",
-        "HERA1+2_NCem-thexp.dat",
-        "HERA1+2_CCep-thexp.dat",
-        "HERA1+2_CCem-thexp.dat"
-    ]
-    # Files are in ../config/ relative to condor/
-    transfer_files = ", ".join([f"../config/{df}" for df in datafile_names])
-
-    return f"""# Condor submission file for {fit_dir.name}
-executable = {condor_dir / "run_fit.sh"}
-output = {condor_dir / "job.out"}
-error = {condor_dir / "job.err"}
-log = {condor_dir / "job.log"}
-
-# Run from config directory so transferred files are placed there
-initialdir = {config_dir}
-
-# File transfer (datafiles need to be transferred to worker nodes)
-should_transfer_files = YES
-when_to_transfer_output = ON_EXIT
-transfer_input_files = {transfer_files}
-
-# Requirements
-request_cpus = 1
-request_memory = 2GB
-
-# Submit
-queue
-"""
-
-
-def generate_run_script(fit_dir: Path) -> str:
-    """
-    Generate fit execution script
-
-    Args:
-        fit_dir: Absolute path to fit directory
+        fit_dir: Path to fit directory (unused — paths resolved at runtime)
 
     Returns:
         Bash script content
     """
-    fit_dir = fit_dir.resolve()  # Ensure absolute path
-    config_dir = fit_dir / "config"
-    repo_root = Path(__file__).parent.parent.parent.resolve()
-    setup_env = repo_root / "setup_env.sh"
-
-    return f"""#!/bin/bash
-# xFitter fit execution script
+    return r"""#!/bin/bash
+# Generate condor scripts with correct absolute paths and submit.
 set -e
 
-CONFIGDIR="{config_dir}"
-source "{setup_env}"
+DIR="$(cd "$(dirname "$0")" && pwd)"
+FIT_DIR="$(cd "$DIR/.." && pwd)"
+
+# Find setup_env.sh at the repo root
+REPO_ROOT="$DIR"
+while [ ! -f "$REPO_ROOT/setup_env.sh" ] && [ "$REPO_ROOT" != "/" ]; do
+    REPO_ROOT="$(dirname "$REPO_ROOT")"
+done
+[ -f "$REPO_ROOT/setup_env.sh" ] || { echo "Cannot find setup_env.sh" >&2; exit 1; }
+
+mkdir -p "$DIR/logs" "$FIT_DIR/output"
+
+# ── Generate run_fit.sh ──────────────────────────────────────
+cat > "$DIR/run_fit.sh" << EOF
+#!/bin/bash
+set -e
+source "$REPO_ROOT/setup_env.sh"
 
 # flexiblas shim (condor nodes miss libflexiblas, map to openblas)
-SHIM_DIR=$(mktemp -d)
-trap "rm -rf $SHIM_DIR" EXIT
-ln -s /cvmfs/sft.cern.ch/lcg/views/LCG_105/x86_64-el9-gcc13-opt/lib/libopenblas.so \\
-      "$SHIM_DIR/libflexiblas.so.3"
-export LD_LIBRARY_PATH="$SHIM_DIR:$LD_LIBRARY_PATH"
+SHIM_DIR=\$(mktemp -d)
+trap "rm -rf \$SHIM_DIR" EXIT
+ln -s /cvmfs/sft.cern.ch/lcg/views/LCG_105/x86_64-el9-gcc13-opt/lib/libopenblas.so \
+      "\$SHIM_DIR/libflexiblas.so.3"
+export LD_LIBRARY_PATH="\$SHIM_DIR:\$LD_LIBRARY_PATH"
 
-cd "$CONFIGDIR"
+cd "$FIT_DIR/config"
 xfitter
+EOF
+chmod +x "$DIR/run_fit.sh"
+
+# ── Generate job.sub ─────────────────────────────────────────
+cat > "$DIR/job.sub" << EOF
+universe            = vanilla
+executable          = $DIR/run_fit.sh
+output              = $DIR/logs/output.log
+error               = $DIR/logs/error.log
+log                 = $DIR/logs/run.log
+should_transfer_files = NO
+initialdir          = $FIT_DIR/config
+request_cpus        = 1
+request_memory      = 2GB
+queue 1
+EOF
+
+# ── Set OutputDirectory in parameters.yaml ───────────────────
+sed -i "s|^OutputDirectory:.*|OutputDirectory: \"$FIT_DIR/output\"|" "$FIT_DIR/config/parameters.yaml"
+
+# ── Submit ───────────────────────────────────────────────────
+condor_submit "$DIR/job.sub"
 """
 
 
@@ -269,9 +245,7 @@ echo ""
         script_content += f"""
 # Submit {fit_subdir.name}
 echo "Submitting {fit_subdir.name}..."
-cd {fit_subdir.name}/condor
-condor_submit job.sub
-cd "$SCAN_DIR"
+bash {fit_subdir.name}/condor/submit.sh
 """
 
     script_content += """

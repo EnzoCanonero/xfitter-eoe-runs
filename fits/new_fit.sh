@@ -95,27 +95,44 @@ if [ -f "$CONFIGDIR/steering.txt" ]; then
     sed -i "s|'[^']*\/\([^']*\.dat\)'|'\1'|g" "$CONFIGDIR/steering.txt"
 fi
 
-# ── 6. Add OutputDirectory to parameters.yaml ───────────────
+# ── 6. Add OutputDirectory placeholder to parameters.yaml ───
 if [ -f "$CONFIGDIR/parameters.yaml" ]; then
     # Remove any existing OutputDirectory line
     sed -i '/^OutputDirectory:/d' "$CONFIGDIR/parameters.yaml"
     # Remove any comment line immediately before it
     sed -i '/^# Output directory.*xfitter/d' "$CONFIGDIR/parameters.yaml"
-    cat >> "$CONFIGDIR/parameters.yaml" << EOF
+    cat >> "$CONFIGDIR/parameters.yaml" << 'EOF'
 
-# Output directory (absolute path so xfitter writes here regardless of CWD)
-OutputDirectory: "$FITDIR/output"
+# Output directory (patched at runtime by run_fit.sh)
+OutputDirectory: "__SET_AT_RUNTIME__"
 EOF
 fi
 
-# ── 7. Generate condor/run_fit.sh ───────────────────────────
-cat > "$FITDIR/condor/run_fit.sh" << RUNEOF
+# ── 7. Generate condor/submit.sh ────────────────────────────
+# submit.sh is the single entry point: it generates run_fit.sh
+# and job.sub with correct absolute paths, then submits to Condor.
+cat > "$FITDIR/condor/submit.sh" << 'SUBMITEOF'
 #!/bin/bash
-# xFitter fit execution script
+# Generate condor scripts with correct absolute paths and submit.
 set -e
 
-CONFIGDIR="$CONFIGDIR"
-source "$BASEDIR/setup_env.sh"
+DIR="$(cd "$(dirname "$0")" && pwd)"
+FIT_DIR="$(cd "$DIR/.." && pwd)"
+
+# Find setup_env.sh at the repo root
+REPO_ROOT="$DIR"
+while [ ! -f "$REPO_ROOT/setup_env.sh" ] && [ "$REPO_ROOT" != "/" ]; do
+    REPO_ROOT="$(dirname "$REPO_ROOT")"
+done
+[ -f "$REPO_ROOT/setup_env.sh" ] || { echo "Cannot find setup_env.sh" >&2; exit 1; }
+
+mkdir -p "$DIR/logs" "$FIT_DIR/output"
+
+# ── Generate run_fit.sh ──────────────────────────────────────
+cat > "$DIR/run_fit.sh" << EOF
+#!/bin/bash
+set -e
+source "$REPO_ROOT/setup_env.sh"
 
 # flexiblas shim (condor nodes miss libflexiblas, map to openblas)
 SHIM_DIR=\$(mktemp -d)
@@ -124,33 +141,41 @@ ln -s /cvmfs/sft.cern.ch/lcg/views/LCG_105/x86_64-el9-gcc13-opt/lib/libopenblas.
       "\$SHIM_DIR/libflexiblas.so.3"
 export LD_LIBRARY_PATH="\$SHIM_DIR:\$LD_LIBRARY_PATH"
 
-cd "\$CONFIGDIR"
+cd "$FIT_DIR/config"
 xfitter
-RUNEOF
-chmod +x "$FITDIR/condor/run_fit.sh"
+EOF
+chmod +x "$DIR/run_fit.sh"
 
-# ── 8. Generate condor/job.sub ──────────────────────────────
-cat > "$FITDIR/condor/job.sub" << SUBEOF
+# ── Generate job.sub ─────────────────────────────────────────
+cat > "$DIR/job.sub" << EOF
 universe            = vanilla
-executable          = $FITDIR/condor/run_fit.sh
-output              = $FITDIR/condor/logs/output.log
-error               = $FITDIR/condor/logs/error.log
-log                 = $FITDIR/condor/logs/run.log
+executable          = $DIR/run_fit.sh
+output              = $DIR/logs/output.log
+error               = $DIR/logs/error.log
+log                 = $DIR/logs/run.log
 should_transfer_files = NO
-initialdir          = $CONFIGDIR
+initialdir          = $FIT_DIR/config
 request_cpus        = 1
 request_memory      = 2GB
 queue 1
-SUBEOF
+EOF
+
+# ── Set OutputDirectory in parameters.yaml ───────────────────
+sed -i "s|^OutputDirectory:.*|OutputDirectory: \"$FIT_DIR/output\"|" "$FIT_DIR/config/parameters.yaml"
+
+# ── Submit ───────────────────────────────────────────────────
+condor_submit "$DIR/job.sub"
+SUBMITEOF
+chmod +x "$FITDIR/condor/submit.sh"
 
 echo ""
 echo "Done. Structure:"
 echo "  $FITDIR/"
 echo "    config/    -- steering.txt, parameters.yaml, data symlinks"
-echo "    condor/    -- run_fit.sh, job.sub, logs/"
+echo "    condor/    -- submit.sh (generates run_fit.sh + job.sub)"
 echo "    output/    -- (xfitter writes here)"
 echo ""
 echo "To run:"
-echo "  condor_submit $FITDIR/condor/job.sub"
+echo "  $FITDIR/condor/submit.sh"
 echo ""
 echo "Edit configs in: $CONFIGDIR/"
