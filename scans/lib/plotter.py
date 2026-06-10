@@ -4,6 +4,7 @@ Generates standard plots from scan results
 """
 
 from pathlib import Path
+from typing import Optional
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -35,26 +36,46 @@ def plot_scan(study_dir: Path):
     results_dir = study_dir / "results"
     results_dir.mkdir(exist_ok=True)
 
-    chi2_file = results_dir / "chi2.csv"
-    params_file = results_dir / "parameters.csv"
-
-    if config.scan_type == 'systematic-ranking' and results.get('nominal_chi2'):
-        # Ensure nominal row has same columns/dtypes as chi2_df to avoid FutureWarning
-        chi2_cols = results['chi2'].columns
-        nominal_row = pd.DataFrame([{c: results['nominal_chi2'].get(c) for c in chi2_cols}])
-        chi2_df = pd.concat([nominal_row, results['chi2']], ignore_index=True)
+    if config.scan_type == 'likelihood-scan':
+        # Flatten 1D profiles to a single CSV
+        scan_rows = []
+        for param_name, pdata in results['scan_1d'].items():
+            for sv, chi2, dchi2, conv in zip(
+                    pdata['scan_values'], pdata['chi2'],
+                    pdata['delta_chi2'], pdata['converged']):
+                scan_rows.append({
+                    'parameter': param_name,
+                    'scan_value': float(sv),
+                    'chi2': float(chi2) if not np.isnan(chi2) else None,
+                    'delta_chi2': float(dchi2) if not np.isnan(dchi2) else None,
+                    'converged': bool(conv),
+                    'ref_value': pdata['value_at_minimum'],
+                    'ref_error': pdata['error'],
+                })
+        profiles_file = results_dir / "profiles_1d.csv"
+        pd.DataFrame(scan_rows).to_csv(profiles_file, index=False)
+        print(f"\nResults saved:")
+        print(f"  - {profiles_file}")
     else:
-        chi2_df = results['chi2']
-    chi2_df.to_csv(chi2_file, index=False)
+        chi2_file = results_dir / "chi2.csv"
+        params_file = results_dir / "parameters.csv"
 
-    if config.scan_type == 'systematic-ranking':
-        _save_wide_parameters(results, params_file)
-    else:
-        results['parameters'].to_csv(params_file, index=False)
+        if config.scan_type == 'systematic-ranking' and results.get('nominal_chi2'):
+            chi2_cols = results['chi2'].columns
+            nominal_row = pd.DataFrame([{c: results['nominal_chi2'].get(c) for c in chi2_cols}])
+            chi2_df = pd.concat([nominal_row, results['chi2']], ignore_index=True)
+        else:
+            chi2_df = results['chi2']
+        chi2_df.to_csv(chi2_file, index=False)
 
-    print(f"\nResults saved:")
-    print(f"  - {chi2_file}")
-    print(f"  - {params_file}")
+        if config.scan_type == 'systematic-ranking':
+            _save_wide_parameters(results, params_file)
+        else:
+            results['parameters'].to_csv(params_file, index=False)
+
+        print(f"\nResults saved:")
+        print(f"  - {chi2_file}")
+        print(f"  - {params_file}")
 
     # Generate plots
     plots_dir = study_dir / "plots"
@@ -72,6 +93,8 @@ def plot_scan(study_dir: Path):
         config_order = [s['name'] for s in config.systematics]
         _plot_systematic_ranking(results, plots_dir, results_dir, config_order,
                                  error_label=error_label)
+    elif config.scan_type == 'likelihood-scan':
+        _plot_likelihood_scan(results, plots_dir, results_dir)
 
     print(f"\nPlots saved in: {plots_dir}")
 
@@ -292,6 +315,59 @@ def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
             plt.close(fig)
     print("  ✓ 5_parameter_profiles.pdf")
 
+    # 6. Per-λ parameter-pull pages (syst-ranking style)
+    chi2_by_lam = dict(zip(chi2_df['lambda'], chi2_df['chi2']))
+
+    global_max = float((poi_df['norm_value'].abs() + poi_df['norm_error']).max() or 1.0)
+    xlim = (-global_max * 1.15, global_max * 1.15)
+
+    n_params_all = len(params_list)
+    fig_height = max(5, 0.35 * n_params_all)
+
+    pulls_pdf = plots_dir / "6_parameter_pulls.pdf"
+    n_pages = 0
+    with PdfPages(pulls_pdf) as pdf:
+        for lam in lambdas:
+            data = poi_df[poi_df['lambda'] == lam]
+            if data.empty:
+                continue
+            data = data.reindex(
+                data['norm_value'].abs().sort_values(ascending=False).index
+            )
+            pulls = data['norm_value'].tolist()
+            errs = data['norm_error'].tolist()
+            labels = data['parameter'].tolist()
+            n = len(pulls)
+
+            fig, ax = plt.subplots(figsize=(10, fig_height))
+            y_pos = list(range(n))
+            ax.barh(y_pos, width=[2 * e for e in errs],
+                    left=[p - e for p, e in zip(pulls, errs)],
+                    height=0.6, color='#1f77b4', alpha=0.2, edgecolor='none',
+                    label=r'$\pm\,\sigma(\lambda) / \sigma(0)$')
+            ax.errorbar(pulls, y_pos, xerr=[1] * n,
+                        fmt='none', ecolor='black', elinewidth=0.8, capsize=2,
+                        label=r'$\pm\,1\;\;(\sigma(0))$')
+            ax.plot(pulls, y_pos, 'o', color='#1f77b4', markersize=5, zorder=3,
+                    label=r'$(\mu(\lambda) - \mu(0)) / \sigma(0)$')
+            ax.legend(loc='upper right', fontsize=9, framealpha=0.9)
+            ax.set_yticks(y_pos)
+            ax.set_yticklabels(labels, fontsize=max(7, 11 - n_params_all // 10))
+            ax.axvline(0, color='black', linewidth=0.8)
+            ax.set_xlim(xlim)
+            ax.set_xlabel(r'$(\mu(\lambda) - \mu(0)) \,/\, \sigma(0)$', fontsize=12)
+            chi2_val = chi2_by_lam.get(lam)
+            subtitle = f'$\\chi^2 = {chi2_val:.2f}$' if chi2_val is not None else ''
+            if error_label:
+                subtitle += f'  [errors: {error_label}]'
+            ax.set_title(f'$\\lambda = {lam:.1f}$\n{subtitle}', fontsize=14)
+            ax.grid(axis='x', alpha=0.3)
+            plt.tight_layout()
+            pdf.savefig(fig)
+            plt.close(fig)
+            n_pages += 1
+    print(f"  ✓ 6_parameter_pulls.pdf  ({n_pages} pages)")
+
 
 def _plot_systematic_ranking(results: dict, plots_dir: Path, results_dir: Path,
                              config_order: list, error_label: str = None):
@@ -510,3 +586,187 @@ def _plot_chi2_lollipop(chi2_df, nominal_chi2, plots_dir, config_order):
     print("  ✓ chi2_ranking.pdf")
 
 
+def _plot_likelihood_scan(results: dict, plots_dir: Path, results_dir: Path):
+    """
+    Generate profile likelihood plots for a likelihood-scan study.
+
+    Produces two files:
+      profiles_1d.pdf  — one page per parameter: Δχ² profile + Gaussian reference
+      summary_1d.pdf   — one-page summary: asymmetry and interval width for all params
+    """
+    scan_1d = results['scan_1d']
+    param_names = list(scan_1d.keys())
+    print(f"\nGenerating likelihood-scan plots ({len(param_names)} parameters)...")
+
+    _BLUE = '#1f77b4'
+    _RED  = '#d62728'
+    _GREY = '#999999'
+
+    # ── profiles_1d.pdf ───────────────────────────────────────────────────────
+    profiles_pdf = plots_dir / "profiles_1d.pdf"
+    with PdfPages(profiles_pdf) as pdf:
+        for param_name in param_names:
+            pdata = scan_1d[param_name]
+            x = pdata['scan_values']
+            dchi2 = pdata['delta_chi2']
+            conv = pdata['converged']
+            ref_val = pdata['value_at_minimum']
+            ref_err = pdata['error']
+
+            # Separate converged / failed points
+            x_ok  = x[conv];  dchi2_ok  = dchi2[conv]
+            x_bad = x[~conv]; dchi2_bad = dchi2[~conv]
+
+            # Gaussian reference parabola over the full scan range
+            x_dense = np.linspace(x[0], x[-1], 300)
+            gauss_ref = ((x_dense - ref_val) / ref_err) ** 2
+
+            fig, ax = plt.subplots(figsize=(8, 5))
+
+            # Horizontal reference lines
+            for level, style, label in [(1.0, '--', r'$\Delta\chi^2=1$ (1$\sigma$)'),
+                                         (4.0, ':',  r'$\Delta\chi^2=4$ (2$\sigma$)'),
+                                         (9.0, '-.',  r'$\Delta\chi^2=9$ (3$\sigma$)')]:
+                ax.axhline(level, color=_GREY, linewidth=0.8, linestyle=style, label=label)
+
+            # Gaussian reference
+            ax.plot(x_dense, gauss_ref, color=_RED, linewidth=1.2, linestyle='--',
+                    label='Gaussian reference')
+
+            # Profile points — converged (filled) and failed (open crosses)
+            if len(x_ok):
+                ax.plot(x_ok, dchi2_ok, 'o-', color=_BLUE, linewidth=1.5,
+                        markersize=5, zorder=3, label='converged')
+            if len(x_bad):
+                ax.plot(x_bad, dchi2_bad, 'x', color=_GREY, markersize=7,
+                        markeredgewidth=1.5, zorder=2, label='non-converged')
+
+            # Reference value marker at bottom
+            ax.axvline(ref_val, color='black', linewidth=0.8, linestyle=':',
+                       label=f'ref = {ref_val:.4g}')
+
+            # y-axis: cap at 12 so failures far off minimum don't dominate
+            dchi2_finite = dchi2[np.isfinite(dchi2)]
+            ymax = min(float(np.nanmax(dchi2_finite)) * 1.1, 12.0) if len(dchi2_finite) else 12.0
+            ymax = max(ymax, 10.0)
+            ax.set_ylim(-0.3, ymax)
+
+            ax.set_xlabel(param_name, fontsize=13)
+            ax.set_ylabel(r'$\Delta\chi^2$', fontsize=13)
+            n_fail = int((~conv).sum())
+            title = param_name
+            if n_fail:
+                title += f'  ({n_fail} non-converged pts)'
+            ax.set_title(title, fontsize=14)
+            ax.legend(fontsize=9, loc='upper center', framealpha=0.9, ncol=2)
+            ax.grid(True, alpha=0.25)
+            plt.tight_layout()
+            pdf.savefig(fig)
+            plt.close(fig)
+
+    print(f"  ✓ profiles_1d.pdf  ({len(param_names)} pages)")
+
+    # ── summary_1d.pdf ────────────────────────────────────────────────────────
+    # For each parameter: compute scan 1σ interval (Δχ²=1 crossing) and compare
+    # to MINUIT error. Show asymmetry = (hi - lo) / (2 * ref_err).
+    summary_rows = []
+    for param_name in param_names:
+        pdata = scan_1d[param_name]
+        x = pdata['scan_values']
+        dchi2 = pdata['delta_chi2']
+        conv = pdata['converged']
+        ref_val = pdata['value_at_minimum']
+        ref_err = pdata['error']
+
+        # Use only converged points for interval estimation
+        x_c = x[conv]; d_c = dchi2[conv]
+
+        lo_cross = hi_cross = None
+        if len(x_c) >= 2:
+            # Find Δχ²=1 crossings by linear interpolation between adjacent points
+            lo_cross = _find_crossing(x_c, d_c, level=1.0, side='left',  ref_val=ref_val)
+            hi_cross = _find_crossing(x_c, d_c, level=1.0, side='right', ref_val=ref_val)
+
+        lo_sigma = (ref_val - lo_cross) / ref_err if lo_cross is not None else np.nan
+        hi_sigma = (hi_cross - ref_val) / ref_err if hi_cross is not None else np.nan
+
+        summary_rows.append({
+            'parameter': param_name,
+            'ref_val': ref_val,
+            'ref_err': ref_err,
+            'lo_cross': lo_cross,
+            'hi_cross': hi_cross,
+            'lo_sigma': lo_sigma,
+            'hi_sigma': hi_sigma,
+            'asymmetry': (hi_sigma - lo_sigma) / 2 if not (np.isnan(lo_sigma) or np.isnan(hi_sigma)) else np.nan,
+        })
+
+    n_params = len(summary_rows)
+    fig_height = max(5, 0.45 * n_params + 1.5)
+    fig, axes = plt.subplots(1, 2, figsize=(12, fig_height), sharey=True)
+    fig.subplots_adjust(wspace=0.05)
+
+    labels = [r['parameter'] for r in summary_rows]
+    lo_sigmas = [r['lo_sigma'] for r in summary_rows]
+    hi_sigmas = [r['hi_sigma'] for r in summary_rows]
+    asym = [r['asymmetry'] for r in summary_rows]
+    y_pos = list(range(n_params))
+
+    # Left panel: σ_scan / σ_MINUIT for both sides
+    ax = axes[0]
+    ax.barh(y_pos, lo_sigmas, height=0.4, color=_BLUE, alpha=0.7, label=r'$\sigma_-/\sigma_{\rm MINUIT}$')
+    ax.barh([y + 0.4 for y in y_pos], hi_sigmas, height=0.4, color=_RED, alpha=0.7,
+            label=r'$\sigma_+/\sigma_{\rm MINUIT}$')
+    ax.axvline(1.0, color='black', linewidth=0.8, linestyle='--')
+    ax.set_xlabel(r'$\sigma_{\rm scan} / \sigma_{\rm MINUIT}$', fontsize=12)
+    ax.set_title(r'Interval width  ($\Delta\chi^2=1$ crossing)', fontsize=12)
+    ax.set_yticks([y + 0.2 for y in y_pos])
+    ax.set_yticklabels(labels, fontsize=10)
+    ax.legend(fontsize=9, loc='lower right')
+    ax.grid(axis='x', alpha=0.3)
+
+    # Right panel: asymmetry = (σ+ - σ-) / 2 in units of σ_MINUIT
+    ax = axes[1]
+    colors = [_RED if a > 0 else _BLUE for a in asym]
+    ax.barh(y_pos, asym, height=0.6,
+            color=[_RED if (isinstance(a, float) and not np.isnan(a) and a > 0) else _BLUE
+                   for a in asym],
+            alpha=0.7)
+    ax.axvline(0.0, color='black', linewidth=0.8)
+    ax.set_xlabel(r'$(\sigma_+ - \sigma_-) / (2\,\sigma_{\rm MINUIT})$', fontsize=12)
+    ax.set_title('Asymmetry', fontsize=12)
+    ax.grid(axis='x', alpha=0.3)
+
+    fig.suptitle('1D Profile Likelihood: Interval Summary', fontsize=14)
+    plt.tight_layout()
+    plt.savefig(plots_dir / "summary_1d.pdf")
+    plt.close(fig)
+    print("  ✓ summary_1d.pdf")
+
+
+def _find_crossing(x: np.ndarray, y: np.ndarray, level: float,
+                   side: str, ref_val: float) -> Optional[float]:
+    """
+    Find where profile y(x) crosses `level` on the given side of ref_val.
+    Uses linear interpolation between the two adjacent bracketing points.
+    Returns None if no crossing is found.
+    """
+    # Sort by x ascending
+    order = np.argsort(x)
+    x = x[order]; y = y[order]
+
+    if side == 'left':
+        # Search from ref_val leftward (decreasing x)
+        mask = x <= ref_val
+        xs, ys = x[mask][::-1], y[mask][::-1]
+    else:
+        mask = x >= ref_val
+        xs, ys = x[mask], y[mask]
+
+    for i in range(len(ys) - 1):
+        y0, y1 = ys[i], ys[i + 1]
+        if (y0 - level) * (y1 - level) <= 0 and y0 != y1:
+            frac = (level - y0) / (y1 - y0)
+            return float(xs[i] + frac * (xs[i + 1] - xs[i]))
+
+    return None

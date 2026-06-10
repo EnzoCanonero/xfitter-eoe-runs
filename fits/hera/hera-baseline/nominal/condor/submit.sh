@@ -18,6 +18,7 @@ mkdir -p "$DIR/logs" "$FIT_DIR/output"
 cat > "$DIR/run_fit.sh" << EOF
 #!/bin/bash
 set -e
+export HOME="\${HOME:-/tmp}"
 source "$REPO_ROOT/setup_env.sh"
 
 # flexiblas shim (condor nodes miss libflexiblas, map to openblas)

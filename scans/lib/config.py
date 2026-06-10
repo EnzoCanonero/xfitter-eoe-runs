@@ -155,6 +155,55 @@ class SystematicRankingConfig(StudyConfig):
         return self._expand_systematics(self.data['systematics'])
 
 
+class LikelihoodScanConfig(StudyConfig):
+    """Configuration for likelihood-scan studies (1D; 2D support to be added).
+
+    The scan_type field in config.yaml must be 'likelihood-scan'.
+    Use scan_params_1d to list parameters to scan one at a time.
+    A future scan_params_2d key will enable 2D contour scans.
+    """
+
+    def __init__(self, config_file: Path):
+        super().__init__(config_file)
+
+        if self.scan_type != 'likelihood-scan':
+            raise ValueError(f"Expected scan_type='likelihood-scan', got '{self.scan_type}'")
+
+        if 'reference_fit' not in self.data:
+            raise ValueError("likelihood-scan config missing required field: 'reference_fit'")
+        if 'scan_params_1d' not in self.data:
+            raise ValueError("likelihood-scan config missing required field: 'scan_params_1d'")
+
+    @property
+    def reference_fit(self) -> Path:
+        """Absolute path to reference fit directory (resolved relative to study_dir)."""
+        return (self.study_dir / self.data['reference_fit']).resolve()
+
+    @property
+    def scan_defaults(self) -> dict:
+        return self.data.get('scan_defaults', {'n_sigma': 3, 'npoints': 31})
+
+    @property
+    def scan_params_1d(self) -> List[Dict]:
+        """1D scan specs: [{name, n_sigma?, npoints?, min?, max?}]."""
+        return self.data.get('scan_params_1d', [])
+
+    @property
+    def systematics(self) -> List[Dict]:
+        return self._expand_systematics(self.data.get('systematics', []))
+
+    @property
+    def parameter_overrides(self) -> Dict:
+        """Optional per-parameter overrides: {name: {value?, step?}}.
+
+        Takes precedence over values read from the reference fit.
+        Example in config.yaml:
+            parameter_overrides:
+              DUbar: {value: 1.9, step: 2.5}
+        """
+        return self.data.get('parameter_overrides', {})
+
+
 def load_study_config(study_dir: Path) -> StudyConfig:
     """
     Load study configuration and return appropriate config object
@@ -179,5 +228,7 @@ def load_study_config(study_dir: Path) -> StudyConfig:
         return LambdaScanConfig(config_file)
     elif scan_type == 'systematic-ranking':
         return SystematicRankingConfig(config_file)
+    elif scan_type == 'likelihood-scan':
+        return LikelihoodScanConfig(config_file)
     else:
         raise ValueError(f"Unknown scan_type: {scan_type}")

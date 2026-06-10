@@ -5,7 +5,9 @@ Extracts chi2, parameters, convergence status from fit results
 
 from pathlib import Path
 from typing import Dict, Optional, List
+import json
 import re
+import numpy as np
 import pandas as pd
 
 
@@ -252,6 +254,9 @@ def extract_scan_results(scan_dir: Path, scan_type: str,
     all_parameters = []
     all_shifts = []
 
+    if scan_type == 'likelihood-scan':
+        return _extract_likelihood_scan_results(fits_dir)
+
     # Find all fit subdirectories
     if scan_type == 'lambda-scan':
         fit_dirs = sorted(fits_dir.glob("lambda_*"))
@@ -337,3 +342,74 @@ def extract_scan_results(scan_dir: Path, scan_type: str,
         'nominal_chi2': nominal_chi2,
         'nominal_params': nominal_params,
     }
+
+
+def _extract_likelihood_scan_results(fits_dir: Path) -> Dict:
+    """
+    Extract 1D profile likelihood scan results from scan_manifest.json.
+
+    For each scanned parameter, reads chi2 from each fit's Results.txt and
+    convergence status from minuit.out.txt.
+
+    Returns dict with key 'scan_1d': {param_name: {'scan_values', 'chi2',
+    'delta_chi2', 'converged', 'value_at_minimum', 'error'}}.
+    """
+    manifest_file = fits_dir / "scan_manifest.json"
+    if not manifest_file.exists():
+        raise FileNotFoundError(f"scan_manifest.json not found in {fits_dir}")
+
+    with open(manifest_file) as f:
+        manifest = json.load(f)
+
+    scan_1d = {}
+
+    for param_name, param_info in manifest['scan_1d'].items():
+        scan_values = np.array(param_info['scan_values'])
+        fit_dir_names = param_info['fit_dirs']
+        ref_val = param_info['value_at_minimum']
+        ref_err = param_info['error']
+
+        chi2s = []
+        converged_flags = []
+
+        for fit_name in fit_dir_names:
+            fit_dir = fits_dir / fit_name
+            try:
+                results_file = fit_dir / "output" / "Results.txt"
+                with open(results_file) as f:
+                    content = f.read()
+                m = re.search(r'Chi2 after minimisation\s+([\d.]+)', content)
+                chi2 = float(m.group(1)) if m else np.nan
+
+                minuit_file = fit_dir / "output" / "minuit.out.txt"
+                conv = False
+                if minuit_file.exists():
+                    with open(minuit_file) as f:
+                        mtxt = f.read()
+                    conv = "MIGRAD MINIMIZATION HAS CONVERGED" in mtxt
+                chi2s.append(chi2)
+                converged_flags.append(conv)
+            except Exception:
+                chi2s.append(np.nan)
+                converged_flags.append(False)
+
+        chi2_arr = np.array(chi2s)
+        chi2_min = np.nanmin(chi2_arr)
+        delta_chi2 = chi2_arr - chi2_min
+
+        scan_1d[param_name] = {
+            'scan_values': scan_values,
+            'chi2': chi2_arr,
+            'delta_chi2': delta_chi2,
+            'converged': np.array(converged_flags),
+            'value_at_minimum': ref_val,
+            'error': ref_err,
+        }
+
+        n_conv = sum(converged_flags)
+        n_total = len(fit_dir_names)
+        n_nan = int(np.isnan(chi2_arr).sum())
+        print(f"  {param_name}: {n_conv}/{n_total} converged"
+              + (f", {n_nan} missing" if n_nan else ""))
+
+    return {'scan_1d': scan_1d}

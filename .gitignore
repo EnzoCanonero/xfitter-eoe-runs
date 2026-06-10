@@ -1,5 +1,6 @@
 # xfitter output (created at runtime)
 fits/**/output/
+fits/**/output_OLD/
 
 # Condor generated files (created by submit.sh)
 fits/**/condor/run_fit.sh
@@ -21,6 +22,12 @@ scans/fits/systematic-ranking/*/fits/
 scans/fits/systematic-ranking/*/results/
 scans/fits/systematic-ranking/*/plots/
 scans/studies/**/runs/
+scans/studies/**/plots/
+scans/studies/**/results/
+
+# Shared pipeline symlinks in study folders (point to scans/bin/)
+scans/studies/**/plot
+scans/studies/**/run-scan
 
 # Python cache
 __pycache__/
