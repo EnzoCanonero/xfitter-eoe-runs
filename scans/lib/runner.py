@@ -22,22 +22,25 @@ _PDF_PARAMS = {
 def _patch_parameters(params_file: Path,
                       pdf_params: Dict[str, Dict],
                       scan_fixed_params: Dict[str, float],
-                      e_type_params: Dict[str, Dict]) -> None:
+                      fix_commands: Optional[Dict[str, Tuple[int, float]]] = None) -> None:
     """
     Patch a rendered parameters.yaml in-place for a likelihood scan fit.
 
     - pdf_params: {name: {value, step}} — warm-start values from the reference fit
-    - scan_fixed_params: {name: value} — parameter to fix at this scan point (step → 0)
-    - e_type_params: {name: {value, step}} — E-type nuisances to append before ZERO
+    - scan_fixed_params: {name: value} — PDF parameter to fix at this scan point (step → 0)
+    - fix_commands: {name: (minuit_index, value)} — E-type parameters to fix via
+      MINUIT 'SET PAR N V' + 'FIX N' commands injected into the Commands block.
+      E-type params are never added to the Parameters block; xFitter registers them
+      automatically from the &Systematics steering block.
     """
     content = params_file.read_text()
 
+    # Patch PDF parameter values and steps
     for name, pdata in pdf_params.items():
         val = scan_fixed_params.get(name, pdata['value'])
         step = 0.0 if name in scan_fixed_params else pdata['step']
 
         if name == 'CDbar':
-            # Template uses block format for CDbar; replace entire block with inline.
             content = re.sub(
                 r'  CDbar:.*\n(?:    [^\n]*\n)*',
                 f'  CDbar: [ {val:.8g}, {step:.4g} ]\n',
@@ -51,13 +54,15 @@ def _patch_parameters(params_file: Path,
                 flags=re.MULTILINE,
             )
 
-    if e_type_params:
+    # Inject MINUIT FIX commands for E-type parameters that must be held fixed.
+    # These are prepended to the Commands block so MIGRAD never varies them.
+    if fix_commands:
         lines = []
-        for name, pdata in e_type_params.items():
-            val = scan_fixed_params.get(name, pdata['value'])
-            step = 0.0 if name in scan_fixed_params else pdata['step']
-            lines.append(f'  {name}: [ {val:.8g}, {step:.4g} ]')
-        content = content.replace('  ZERO :', '\n'.join(lines) + '\n  ZERO :', 1)
+        for name, (idx, val) in fix_commands.items():
+            lines.append(f'    SET PAR {idx} {val:.8g}')
+            lines.append(f'    FIX {idx}')
+        fix_block = '\n'.join(lines) + '\n'
+        content = content.replace('    call fcn 1\n', fix_block + '    call fcn 1\n', 1)
 
     params_file.write_text(content)
 
@@ -205,6 +210,26 @@ def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path, dry_run
     print(f"\nCreated {len(lambda_vals)} fits in {fits_dir}")
 
 
+def _apply_custom_template(fit_dir: Path, template_path: Optional[Path]):
+    """Overwrite a fit's parameters.yaml (and sibling constants.yaml) with a
+    custom template, if one is configured.
+
+    create_fit_structure always renders the default parameters template; when a
+    study specifies `template:` we replace it here. OutputDirectory is repointed
+    later by the per-fit submit.sh (it matches on ^OutputDirectory:).
+    """
+    if template_path is None:
+        return
+    import shutil
+    config_dir = fit_dir / "config"
+    shutil.copy(template_path, config_dir / "parameters.yaml")
+    # Pick up the constants.yaml sitting next to the template (e.g. custom
+    # quark masses), overriding the default one copied by create_fit_structure.
+    sibling_constants = template_path.parent / "constants.yaml"
+    if sibling_constants.exists():
+        shutil.copy(sibling_constants, config_dir / "constants.yaml")
+
+
 def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir: Path, dry_run: bool):
     """Generate fits for systematic-ranking"""
 
@@ -213,6 +238,9 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir:
     templates = TemplateManager(template_dir)
 
     systematics = config.systematics
+    custom_template = config.template
+    if custom_template is not None:
+        print(f"Using custom parameters template: {custom_template}")
 
     print(f"\nEpsilon: {config.epsilon}")
     print(f"Number of systematics to test: {len(systematics)}")
@@ -241,6 +269,7 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir:
     )
     create_fit_structure(fits_dir / "nominal", nominal_steering, "", config.datafiles,
                          do_errors=do_errors)
+    _apply_custom_template(fits_dir / "nominal", custom_template)
 
     # Generate fit for each systematic
     for sys in systematics:
@@ -262,6 +291,7 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir:
 
         create_fit_structure(fit_dir, steering, "", config.datafiles,
                              do_errors=do_errors)
+        _apply_custom_template(fit_dir, custom_template)
 
     print(f"\nCreated {len(systematics) + 1} fits in {fits_dir} (including nominal)")
 
@@ -335,7 +365,7 @@ def _build_reference_params(ref_fit_dir: Path,
     result = {}
     for idx, (val, err) in params.items():
         full_name = index_to_fullname.get(idx, defs.get(idx, str(idx)))
-        result[full_name] = {'value': val, 'error': err}
+        result[full_name] = {'value': val, 'error': err, 'index': idx}
 
     return result
 
@@ -383,21 +413,24 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
         if name in initial_params:
             initial_params[name].update(override)
 
-    # E-type nuisance parameters: initial value from reference fit, step = epsilon
-    e_type_params: Dict[str, Dict] = {}
-    for s in systematics:
-        if s['type'] == 'E':
-            sname = s['name']
-            ref_val = ref_params.get(sname, {}).get('value', 0.0)
-            e_type_params[sname] = {'value': ref_val, 'step': max(s['epsilon'], 0.1)}
+    # E-type parameters: registered by xFitter automatically from &Systematics.
+    # We only need their MINUIT index (for fixing via SET PAR / FIX when scanned).
+    e_type_indices: Dict[str, int] = {}
+    for name in e_type_names:
+        if name in ref_params and 'index' in ref_params[name]:
+            e_type_indices[name] = ref_params[name]['index']
+        else:
+            print(f"  WARNING: MINUIT index for '{name}' not found in reference fit — "
+                  f"cannot scan this parameter")
 
     print(f"\nInitial PDF parameter values (from reference fit):")
     for name, pdata in sorted(initial_params.items()):
         print(f"  {name:8s}: value={pdata['value']:+.6f}, step={pdata['step']:.4f}")
-    if e_type_params:
-        print(f"\nE-type nuisance starting values:")
-        for name, pdata in e_type_params.items():
-            print(f"  {name}: value={pdata['value']:+.6f}, step={pdata['step']:.4f}")
+    if e_type_indices:
+        print(f"\nE-type parameters (managed by xFitter via &Systematics):")
+        for name, idx in e_type_indices.items():
+            ref_val = ref_params[name]['value']
+            print(f"  {name}: ref_value={ref_val:+.6f}, MINUIT index={idx}")
 
     defaults = config.scan_defaults
     default_n_sigma = float(defaults.get('n_sigma', 3))
@@ -405,20 +438,30 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
 
     do_errors = config.do_errors_string
 
-    scan_params = config.scan_params_1d
-    print(f"\n1D scan parameters: {len(scan_params)}")
+    # Build a unified scan list with is_systematic flag
+    scan_items = [(p, False) for p in config.scan_params_1d] + \
+                 [(p, True)  for p in config.scan_systematics_1d]
+
+    n_pdf  = len(config.scan_params_1d)
+    n_syst = len(config.scan_systematics_1d)
+    print(f"\n1D scan: {n_pdf} PDF parameter(s), {n_syst} E-type systematic(s)")
     print(f"Defaults: n_sigma={default_n_sigma}, npoints={default_npoints}")
 
     total_fits = 0
     manifest: Dict = {'scan_1d': {}}
     all_fit_dirs: List[Path] = []
 
-    for scan_param in scan_params:
+    for scan_param, is_systematic in scan_items:
         name = scan_param['name']
 
         if name not in ref_params:
             print(f"  WARNING: '{name}' not found in reference fit params — skipping")
             print(f"    Available: {sorted(ref_params.keys())}")
+            continue
+
+        if is_systematic and name not in e_type_indices:
+            print(f"  WARNING: '{name}' listed in scan_systematics_1d but has no MINUIT "
+                  f"index — is it declared as E-type in systematics:? Skipping.")
             continue
 
         ref_val = ref_params[name]['value']
@@ -436,7 +479,8 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
 
         scan_values = np.linspace(lo, hi, npoints)
 
-        print(f"  {name}: [{lo:.4g}, {hi:.4g}] ({npoints} pts, "
+        tag = '[syst]' if is_systematic else '[pdf] '
+        print(f"  {tag} {name}: [{lo:.4g}, {hi:.4g}] ({npoints} pts, "
               f"ref={ref_val:.4g} ± {ref_err:.4g})")
 
         if dry_run:
@@ -458,14 +502,25 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
 
             create_fit_structure(fit_dir, steering, "", config.datafiles,
                                  do_errors=do_errors)
+
+            if is_systematic:
+                # E-type: fixed via MINUIT SET PAR / FIX commands
+                fix_cmds = {name: (e_type_indices[name], v)}
+                pdf_fixed = {}
+            else:
+                # PDF param: fixed via step=0 in Parameters block
+                fix_cmds = {}
+                pdf_fixed = {name: v}
+
             _patch_parameters(
                 fit_dir / "config" / "parameters.yaml",
                 pdf_params=initial_params,
-                scan_fixed_params={name: v},
-                e_type_params=e_type_params,
+                scan_fixed_params=pdf_fixed,
+                fix_commands=fix_cmds,
             )
             fit_names_for_param.append(fit_name)
-            all_fit_dirs.append(fit_dir.resolve())
+            if not (fit_dir / "output" / "Results.txt").exists():
+                all_fit_dirs.append(fit_dir.resolve())
 
         manifest['scan_1d'][name] = {
             'value_at_minimum': ref_val,

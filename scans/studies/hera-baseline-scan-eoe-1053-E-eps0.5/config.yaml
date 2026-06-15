@@ -2,7 +2,7 @@ scan_type: likelihood-scan
 
 # Reference fit: EoE baseline with sysHZComb1053 as a free MINUIT parameter.
 # Run fits/hera/hera-baseline/eoe-sysHZComb1053 first to populate output/minuit.out.txt.
-reference_fit: ../../../fits/hera/hera-baseline/eoe-sysHZComb1053
+reference_fit: ../../../fits/hera/hera-baseline/eoe-sysHZComb1053-eps0.5
 
 scan_defaults:
   n_sigma: 3
@@ -21,7 +21,11 @@ datafiles:
 systematics:
   - {name: sysHZComb1053, type: E, epsilon: 0.5}
 
-# 1D scan: 14 PDF parameters. sysHZComb1053 is free during profiling but not scanned.
+# 1D scan over the E-type systematic: fixed via MINUIT SET PAR / FIX commands.
+scan_systematics_1d:
+  - {name: sysHZComb1053}
+
+# 1D scan: 14 PDF parameters. sysHZComb1053 is free during profiling but not scanned here.
 scan_params_1d:
   - {name: ADbar}
   - {name: Agp}

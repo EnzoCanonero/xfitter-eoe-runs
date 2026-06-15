@@ -394,8 +394,12 @@ def _extract_likelihood_scan_results(fits_dir: Path) -> Dict:
                 converged_flags.append(False)
 
         chi2_arr = np.array(chi2s)
-        chi2_min = np.nanmin(chi2_arr)
-        delta_chi2 = chi2_arr - chi2_min
+        # Normalize to the chi2 at the central scan point (closest value to ref_val).
+        central_idx = int(np.argmin(np.abs(scan_values - ref_val)))
+        chi2_central = chi2_arr[central_idx]
+        if np.isnan(chi2_central):
+            chi2_central = np.nanmin(chi2_arr)
+        delta_chi2 = chi2_arr - chi2_central
 
         scan_1d[param_name] = {
             'scan_values': scan_values,

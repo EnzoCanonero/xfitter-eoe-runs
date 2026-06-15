@@ -4,7 +4,6 @@ Generates standard plots from scan results
 """
 
 from pathlib import Path
-from typing import Optional
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -590,9 +589,11 @@ def _plot_likelihood_scan(results: dict, plots_dir: Path, results_dir: Path):
     """
     Generate profile likelihood plots for a likelihood-scan study.
 
-    Produces two files:
+    Produces one file:
       profiles_1d.pdf  — one page per parameter: Δχ² profile + Gaussian reference
-      summary_1d.pdf   — one-page summary: asymmetry and interval width for all params
+
+    Non-converged points are silently discarded; a terminal message lists them.
+    Δχ² is normalized to the central scan point (closest scan value to ref_val).
     """
     scan_1d = results['scan_1d']
     param_names = list(scan_1d.keys())
@@ -602,7 +603,6 @@ def _plot_likelihood_scan(results: dict, plots_dir: Path, results_dir: Path):
     _RED  = '#d62728'
     _GREY = '#999999'
 
-    # ── profiles_1d.pdf ───────────────────────────────────────────────────────
     profiles_pdf = plots_dir / "profiles_1d.pdf"
     with PdfPages(profiles_pdf) as pdf:
         for param_name in param_names:
@@ -613,51 +613,46 @@ def _plot_likelihood_scan(results: dict, plots_dir: Path, results_dir: Path):
             ref_val = pdata['value_at_minimum']
             ref_err = pdata['error']
 
-            # Separate converged / failed points
-            x_ok  = x[conv];  dchi2_ok  = dchi2[conv]
-            x_bad = x[~conv]; dchi2_bad = dchi2[~conv]
+            n_fail = int((~conv).sum())
+            if n_fail:
+                print(f"  {param_name}: discarding {n_fail} non-converged point(s)")
 
-            # Gaussian reference parabola over the full scan range
+            # Only converged points
+            x_ok    = x[conv]
+            dchi2_ok = dchi2[conv]
+
+            # Parabolic reference over the full scan range
             x_dense = np.linspace(x[0], x[-1], 300)
             gauss_ref = ((x_dense - ref_val) / ref_err) ** 2
 
             fig, ax = plt.subplots(figsize=(8, 5))
 
-            # Horizontal reference lines
             for level, style, label in [(1.0, '--', r'$\Delta\chi^2=1$ (1$\sigma$)'),
                                          (4.0, ':',  r'$\Delta\chi^2=4$ (2$\sigma$)'),
                                          (9.0, '-.',  r'$\Delta\chi^2=9$ (3$\sigma$)')]:
                 ax.axhline(level, color=_GREY, linewidth=0.8, linestyle=style, label=label)
 
-            # Gaussian reference
             ax.plot(x_dense, gauss_ref, color=_RED, linewidth=1.2, linestyle='--',
-                    label='Gaussian reference')
+                    label='Parabolic reference')
 
-            # Profile points — converged (filled) and failed (open crosses)
             if len(x_ok):
                 ax.plot(x_ok, dchi2_ok, 'o-', color=_BLUE, linewidth=1.5,
-                        markersize=5, zorder=3, label='converged')
-            if len(x_bad):
-                ax.plot(x_bad, dchi2_bad, 'x', color=_GREY, markersize=7,
-                        markeredgewidth=1.5, zorder=2, label='non-converged')
+                        markersize=5, zorder=3)
 
-            # Reference value marker at bottom
             ax.axvline(ref_val, color='black', linewidth=0.8, linestyle=':',
                        label=f'ref = {ref_val:.4g}')
 
-            # y-axis: cap at 12 so failures far off minimum don't dominate
-            dchi2_finite = dchi2[np.isfinite(dchi2)]
+            # y-axis: derived from converged data; cap top at 12
+            dchi2_finite = dchi2_ok[np.isfinite(dchi2_ok)]
             ymax = min(float(np.nanmax(dchi2_finite)) * 1.1, 12.0) if len(dchi2_finite) else 12.0
             ymax = max(ymax, 10.0)
-            ax.set_ylim(-0.3, ymax)
+            ymin_data = float(np.nanmin(dchi2_finite)) if len(dchi2_finite) else 0.0
+            ymin = min(ymin_data, 0.0) - 0.3
+            ax.set_ylim(ymin, ymax)
 
             ax.set_xlabel(param_name, fontsize=13)
             ax.set_ylabel(r'$\Delta\chi^2$', fontsize=13)
-            n_fail = int((~conv).sum())
-            title = param_name
-            if n_fail:
-                title += f'  ({n_fail} non-converged pts)'
-            ax.set_title(title, fontsize=14)
+            ax.set_title(param_name, fontsize=14)
             ax.legend(fontsize=9, loc='upper center', framealpha=0.9, ncol=2)
             ax.grid(True, alpha=0.25)
             plt.tight_layout()
@@ -666,107 +661,4 @@ def _plot_likelihood_scan(results: dict, plots_dir: Path, results_dir: Path):
 
     print(f"  ✓ profiles_1d.pdf  ({len(param_names)} pages)")
 
-    # ── summary_1d.pdf ────────────────────────────────────────────────────────
-    # For each parameter: compute scan 1σ interval (Δχ²=1 crossing) and compare
-    # to MINUIT error. Show asymmetry = (hi - lo) / (2 * ref_err).
-    summary_rows = []
-    for param_name in param_names:
-        pdata = scan_1d[param_name]
-        x = pdata['scan_values']
-        dchi2 = pdata['delta_chi2']
-        conv = pdata['converged']
-        ref_val = pdata['value_at_minimum']
-        ref_err = pdata['error']
 
-        # Use only converged points for interval estimation
-        x_c = x[conv]; d_c = dchi2[conv]
-
-        lo_cross = hi_cross = None
-        if len(x_c) >= 2:
-            # Find Δχ²=1 crossings by linear interpolation between adjacent points
-            lo_cross = _find_crossing(x_c, d_c, level=1.0, side='left',  ref_val=ref_val)
-            hi_cross = _find_crossing(x_c, d_c, level=1.0, side='right', ref_val=ref_val)
-
-        lo_sigma = (ref_val - lo_cross) / ref_err if lo_cross is not None else np.nan
-        hi_sigma = (hi_cross - ref_val) / ref_err if hi_cross is not None else np.nan
-
-        summary_rows.append({
-            'parameter': param_name,
-            'ref_val': ref_val,
-            'ref_err': ref_err,
-            'lo_cross': lo_cross,
-            'hi_cross': hi_cross,
-            'lo_sigma': lo_sigma,
-            'hi_sigma': hi_sigma,
-            'asymmetry': (hi_sigma - lo_sigma) / 2 if not (np.isnan(lo_sigma) or np.isnan(hi_sigma)) else np.nan,
-        })
-
-    n_params = len(summary_rows)
-    fig_height = max(5, 0.45 * n_params + 1.5)
-    fig, axes = plt.subplots(1, 2, figsize=(12, fig_height), sharey=True)
-    fig.subplots_adjust(wspace=0.05)
-
-    labels = [r['parameter'] for r in summary_rows]
-    lo_sigmas = [r['lo_sigma'] for r in summary_rows]
-    hi_sigmas = [r['hi_sigma'] for r in summary_rows]
-    asym = [r['asymmetry'] for r in summary_rows]
-    y_pos = list(range(n_params))
-
-    # Left panel: σ_scan / σ_MINUIT for both sides
-    ax = axes[0]
-    ax.barh(y_pos, lo_sigmas, height=0.4, color=_BLUE, alpha=0.7, label=r'$\sigma_-/\sigma_{\rm MINUIT}$')
-    ax.barh([y + 0.4 for y in y_pos], hi_sigmas, height=0.4, color=_RED, alpha=0.7,
-            label=r'$\sigma_+/\sigma_{\rm MINUIT}$')
-    ax.axvline(1.0, color='black', linewidth=0.8, linestyle='--')
-    ax.set_xlabel(r'$\sigma_{\rm scan} / \sigma_{\rm MINUIT}$', fontsize=12)
-    ax.set_title(r'Interval width  ($\Delta\chi^2=1$ crossing)', fontsize=12)
-    ax.set_yticks([y + 0.2 for y in y_pos])
-    ax.set_yticklabels(labels, fontsize=10)
-    ax.legend(fontsize=9, loc='lower right')
-    ax.grid(axis='x', alpha=0.3)
-
-    # Right panel: asymmetry = (σ+ - σ-) / 2 in units of σ_MINUIT
-    ax = axes[1]
-    colors = [_RED if a > 0 else _BLUE for a in asym]
-    ax.barh(y_pos, asym, height=0.6,
-            color=[_RED if (isinstance(a, float) and not np.isnan(a) and a > 0) else _BLUE
-                   for a in asym],
-            alpha=0.7)
-    ax.axvline(0.0, color='black', linewidth=0.8)
-    ax.set_xlabel(r'$(\sigma_+ - \sigma_-) / (2\,\sigma_{\rm MINUIT})$', fontsize=12)
-    ax.set_title('Asymmetry', fontsize=12)
-    ax.grid(axis='x', alpha=0.3)
-
-    fig.suptitle('1D Profile Likelihood: Interval Summary', fontsize=14)
-    plt.tight_layout()
-    plt.savefig(plots_dir / "summary_1d.pdf")
-    plt.close(fig)
-    print("  ✓ summary_1d.pdf")
-
-
-def _find_crossing(x: np.ndarray, y: np.ndarray, level: float,
-                   side: str, ref_val: float) -> Optional[float]:
-    """
-    Find where profile y(x) crosses `level` on the given side of ref_val.
-    Uses linear interpolation between the two adjacent bracketing points.
-    Returns None if no crossing is found.
-    """
-    # Sort by x ascending
-    order = np.argsort(x)
-    x = x[order]; y = y[order]
-
-    if side == 'left':
-        # Search from ref_val leftward (decreasing x)
-        mask = x <= ref_val
-        xs, ys = x[mask][::-1], y[mask][::-1]
-    else:
-        mask = x >= ref_val
-        xs, ys = x[mask], y[mask]
-
-    for i in range(len(ys) - 1):
-        y0, y1 = ys[i], ys[i + 1]
-        if (y0 - level) * (y1 - level) <= 0 and y0 != y1:
-            frac = (level - y0) / (y1 - y0)
-            return float(xs[i] + frac * (xs[i + 1] - xs[i]))
-
-    return None

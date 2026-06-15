@@ -30,8 +30,13 @@ class StudyConfig:
 
     @property
     def template(self) -> Optional[Path]:
+        """Custom parameters.yaml to use instead of the default template.
+
+        Resolved relative to the study directory. The sibling constants.yaml
+        (if present next to the template) is also picked up by the runner.
+        """
         if 'template' in self.data:
-            return Path(self.data['template'])
+            return (self.study_dir / self.data['template']).resolve()
         return None
 
     @property
@@ -171,8 +176,11 @@ class LikelihoodScanConfig(StudyConfig):
 
         if 'reference_fit' not in self.data:
             raise ValueError("likelihood-scan config missing required field: 'reference_fit'")
-        if 'scan_params_1d' not in self.data:
-            raise ValueError("likelihood-scan config missing required field: 'scan_params_1d'")
+        if 'scan_params_1d' not in self.data and 'scan_systematics_1d' not in self.data:
+            raise ValueError(
+                "likelihood-scan config must have 'scan_params_1d', "
+                "'scan_systematics_1d', or both"
+            )
 
     @property
     def reference_fit(self) -> Path:
@@ -185,8 +193,15 @@ class LikelihoodScanConfig(StudyConfig):
 
     @property
     def scan_params_1d(self) -> List[Dict]:
-        """1D scan specs: [{name, n_sigma?, npoints?, min?, max?}]."""
+        """PDF parameters to scan: [{name, n_sigma?, npoints?, min?, max?}].
+        Fixed via step=0 in the Parameters block."""
         return self.data.get('scan_params_1d', [])
+
+    @property
+    def scan_systematics_1d(self) -> List[Dict]:
+        """E-type systematics to scan: [{name, n_sigma?, npoints?, min?, max?}].
+        Fixed via MINUIT SET PAR / FIX commands (xFitter registers them from &Systematics)."""
+        return self.data.get('scan_systematics_1d', [])
 
     @property
     def systematics(self) -> List[Dict]:

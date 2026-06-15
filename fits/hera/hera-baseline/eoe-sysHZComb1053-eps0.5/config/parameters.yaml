@@ -121,4 +121,4 @@ WriteLHAPDF6:
   #Qnpoints: 120
 
 # Output directory (patched at runtime by run_fit.sh)
-OutputDirectory: "/nfs/scratch2/ecanoner/xfitter-eoe-runs/fits/hera/hera-baseline/eoe-sysHZComb1053/output"
+OutputDirectory: "/nfs/scratch2/ecanoner/xfitter-eoe-runs/fits/hera/hera-baseline/eoe-sysHZComb1053-eps0.5/output"
