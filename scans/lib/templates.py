@@ -145,37 +145,19 @@ condor_submit "$DIR/job.sub"
 """
 
 
-def generate_condor_wrapper(fits_dir: Path) -> Path:
-    wrapper_script = fits_dir / "condor_submit_all.sh"
-    fit_subdirs = sorted([d for d in fits_dir.iterdir() if d.is_dir()])
-
-    script_content = """#!/bin/bash
-# Master Condor submission script for scan
-set -e
-SCAN_DIR="$(pwd)"
-echo "Submitting all fits in: $SCAN_DIR"
-echo "Number of fits: {num_fits}"
-echo ""
-""".format(num_fits=len(fit_subdirs))
-
-    for fit_subdir in fit_subdirs:
-        script_content += f"""
-echo "Submitting {fit_subdir.name}..."
-bash {fit_subdir.name}/condor/submit.sh
-"""
-
-    script_content += """
-echo ""
-echo "All fits submitted. Monitor with: condor_q"
-"""
-    wrapper_script.write_text(script_content)
-    wrapper_script.chmod(0o755)
-    return wrapper_script
+def _find_repo_root(start: Path) -> Path:
+    """Walk up from `start` to the directory containing setup_env.sh."""
+    repo_root = start.resolve()
+    while repo_root != repo_root.parent:
+        if (repo_root / "setup_env.sh").exists():
+            return repo_root
+        repo_root = repo_root.parent
+    raise FileNotFoundError(f"setup_env.sh not found above {start}")
 
 
-def generate_batch_submit(fits_dir: Path, fit_dirs: List[Path], repo_root: Path) -> Path:
+def generate_batch_submit(fits_dir: Path, fit_dirs: List[Path]) -> Path:
     """
-    Generate a single-cluster Condor batch submission for a likelihood scan.
+    Generate a single-cluster Condor batch submission for a scan.
 
     Produces:
       runs/batch/fit_dirs.txt      — one absolute fit-dir path per line
@@ -186,6 +168,7 @@ def generate_batch_submit(fits_dir: Path, fit_dirs: List[Path], repo_root: Path)
     Returns:
         Path to runs/submit.sh
     """
+    repo_root = _find_repo_root(fits_dir)
     batch_dir = fits_dir / "batch"
     batch_dir.mkdir(parents=True, exist_ok=True)
 

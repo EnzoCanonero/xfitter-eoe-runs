@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 from .config import load_study_config, LambdaScanConfig, LikelihoodScanConfig, SystematicRankingConfig
 from .templates import (TemplateManager, create_fit_structure,
-                         generate_batch_submit, generate_condor_wrapper)
+                         generate_batch_submit)
 
 # Free PDF parameters that appear in parameters.yaml.j2 (excludes DEPENDENT: Ag, Auv, Adv).
 _PDF_PARAMS = {
@@ -89,9 +89,9 @@ def run_scan(study_dir: Path, dry_run: bool = False, submit: bool = True):
     fits_dir = study_dir / "runs"
 
     if config.scan_type == 'lambda-scan':
-        _generate_lambda_scan_fits(config, fits_dir, dry_run)
+        submit_script = _generate_lambda_scan_fits(config, fits_dir, dry_run)
     elif config.scan_type == 'systematic-ranking':
-        _generate_systematic_ranking_fits(config, fits_dir, dry_run)
+        submit_script = _generate_systematic_ranking_fits(config, fits_dir, dry_run)
     elif config.scan_type == 'likelihood-scan':
         submit_script = _generate_likelihood_scan_fits(config, fits_dir, dry_run)
     else:
@@ -103,48 +103,24 @@ def run_scan(study_dir: Path, dry_run: bool = False, submit: bool = True):
 
     import subprocess
 
-    if config.scan_type == 'likelihood-scan':
-        # Single-cluster batch submission
-        print(f"\nBatch submission script: {submit_script}")
-        if submit:
-            print(f"\nSubmitting {config.scan_type} batch to Condor...")
-            try:
-                result = subprocess.run(
-                    ['bash', str(submit_script)],
-                    capture_output=True, text=True, check=True
-                )
-                print(result.stdout)
-                print("\nBatch submitted successfully!")
-                print("Monitor with: condor_q")
-            except subprocess.CalledProcessError as e:
-                print(f"\nError submitting batch:")
-                print(e.stderr)
-                raise
-        else:
-            print(f"\nTo submit: bash {submit_script}")
+    # Single-cluster batch submission (uniform across all scan types)
+    print(f"\nBatch submission script: {submit_script}")
+    if submit:
+        print(f"\nSubmitting {config.scan_type} batch to Condor...")
+        try:
+            result = subprocess.run(
+                ['bash', str(submit_script)],
+                capture_output=True, text=True, check=True
+            )
+            print(result.stdout)
+            print("\nBatch submitted successfully!")
+            print("Monitor with: condor_q")
+        except subprocess.CalledProcessError as e:
+            print(f"\nError submitting batch:")
+            print(e.stderr)
+            raise
     else:
-        # Per-fit submission (existing behaviour for lambda-scan / systematic-ranking)
-        wrapper = generate_condor_wrapper(fits_dir)
-        print(f"\nMaster submission script: {wrapper}")
-        if submit:
-            print("\nSubmitting all fits to Condor...")
-            try:
-                result = subprocess.run(
-                    ['bash', str(wrapper)],
-                    cwd=fits_dir,
-                    capture_output=True, text=True, check=True
-                )
-                print(result.stdout)
-                print("\nAll fits submitted successfully!")
-                print("Monitor jobs with: condor_q")
-            except subprocess.CalledProcessError as e:
-                print(f"\nError submitting jobs:")
-                print(e.stderr)
-                raise
-        else:
-            print("\nTo submit all fits manually:")
-            print(f"  cd {fits_dir}")
-            print(f"  bash condor_submit_all.sh")
+        print(f"\nTo submit: bash {submit_script}")
 
 
 def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path, dry_run: bool):
@@ -176,7 +152,7 @@ def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path, dry_run
         print("\nLambda values:")
         for lam in lambda_vals:
             print(f"  lambda = {lam:.2f}")
-        return
+        return None
 
     # Create fits directory
     fits_dir.mkdir(parents=True, exist_ok=True)
@@ -184,6 +160,7 @@ def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path, dry_run
     do_errors = config.do_errors_string
 
     # Generate fits for each lambda value
+    all_fit_dirs: List[Path] = []
     for lam in lambda_vals:
         fit_name = f"lambda_{lam:.1f}"
         fit_dir = fits_dir / fit_name
@@ -206,8 +183,10 @@ def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path, dry_run
 
         create_fit_structure(fit_dir, steering, "", config.datafiles,
                              do_errors=do_errors)
+        all_fit_dirs.append(fit_dir.resolve())
 
     print(f"\nCreated {len(lambda_vals)} fits in {fits_dir}")
+    return generate_batch_submit(fits_dir, all_fit_dirs)
 
 
 def _apply_custom_template(fit_dir: Path, template_path: Optional[Path]):
@@ -252,7 +231,7 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir:
 
     if dry_run:
         print(f"\nWill create {len(systematics) + 1} fits ({len(systematics)} systematics + 1 nominal)")
-        return
+        return None
 
     # Create fits directory
     fits_dir.mkdir(parents=True, exist_ok=True)
@@ -270,6 +249,7 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir:
     create_fit_structure(fits_dir / "nominal", nominal_steering, "", config.datafiles,
                          do_errors=do_errors)
     _apply_custom_template(fits_dir / "nominal", custom_template)
+    all_fit_dirs: List[Path] = [(fits_dir / "nominal").resolve()]
 
     # Generate fit for each systematic
     for sys in systematics:
@@ -292,8 +272,10 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir:
         create_fit_structure(fit_dir, steering, "", config.datafiles,
                              do_errors=do_errors)
         _apply_custom_template(fit_dir, custom_template)
+        all_fit_dirs.append(fit_dir.resolve())
 
     print(f"\nCreated {len(systematics) + 1} fits in {fits_dir} (including nominal)")
+    return generate_batch_submit(fits_dir, all_fit_dirs)
 
 
 def _build_reference_params(ref_fit_dir: Path,
@@ -544,15 +526,8 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
     with open(manifest_file, 'w') as f:
         json.dump(manifest, f, indent=2)
 
-    # Locate repo root (contains setup_env.sh)
-    repo_root = Path(__file__).resolve()
-    while repo_root != repo_root.parent:
-        if (repo_root / "setup_env.sh").exists():
-            break
-        repo_root = repo_root.parent
-
     # Generate single-cluster batch submission
-    submit_script = generate_batch_submit(fits_dir, all_fit_dirs, repo_root)
+    submit_script = generate_batch_submit(fits_dir, all_fit_dirs)
 
     print(f"\nCreated {total_fits} fits in {fits_dir}")
     print(f"Scan manifest: {manifest_file}")
