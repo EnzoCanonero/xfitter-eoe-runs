@@ -2,7 +2,7 @@ scan_type: likelihood-scan
 
 # Reference fit: EoE baseline with sysHZComb1053 as a free MINUIT parameter.
 # Run fits/hera/hera-baseline/eoe-sysHZComb1053-eps0.7 first to populate output/minuit.out.txt.
-reference_fit: ../../../fits/hera/hera-baseline/eoe-sysHZComb1053-eps0.7
+reference_fit: ../../../../../fits/hera/hera-baseline/eoe-sysHZComb1053-eps0.7
 
 scan_defaults:
   n_sigma: 3

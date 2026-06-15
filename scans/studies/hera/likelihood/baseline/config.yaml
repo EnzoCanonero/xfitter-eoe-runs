@@ -3,7 +3,7 @@ scan_type: likelihood-scan
 # Reference fit: provides fitted parameter values and errors for scan ranges.
 # PDF parameter values are nearly identical with and without EoE, so the eoe
 # baseline is a valid range source for the Gaussian (no-EoE) variant too.
-reference_fit: ../../../fits/hera/hera-baseline/eoe
+reference_fit: ../../../../../fits/hera/hera-baseline/eoe
 
 # Default scan settings (per-parameter overrides allowed)
 scan_defaults:

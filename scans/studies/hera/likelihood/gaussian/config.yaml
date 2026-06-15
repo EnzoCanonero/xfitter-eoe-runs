@@ -2,7 +2,7 @@ scan_type: likelihood-scan
 
 # Reference fit: Gaussian baseline (no EoE treatment).
 # Run fits/hera/hera-baseline/nominal first to populate output/minuit.out.txt.
-reference_fit: ../../../fits/hera/hera-baseline/nominal
+reference_fit: ../../../../../fits/hera/hera-baseline/nominal
 
 scan_defaults:
   n_sigma: 3      # scan range = ref_value ± n_sigma * ref_error

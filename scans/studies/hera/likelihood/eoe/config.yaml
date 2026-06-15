@@ -1,6 +1,6 @@
 scan_type: likelihood-scan
 
-reference_fit: ../../../fits/hera/hera-baseline/eoe
+reference_fit: ../../../../../fits/hera/hera-baseline/eoe
 
 scan_defaults:
   n_sigma: 3

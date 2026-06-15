@@ -20,4 +20,4 @@ systematics:
   - {name: proc_had, type: E}
 
 # Optional: specify template for parameters
-# template: ../../../fits/hera/hera-baseline/eoe/config/parameters.yaml
+# template: ../../../../../fits/hera/hera-baseline/eoe/config/parameters.yaml

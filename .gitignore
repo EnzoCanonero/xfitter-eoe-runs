@@ -6,15 +6,20 @@ fits/**/output_OLD/
 fits/**/condor/run_fit.sh
 fits/**/condor/job.sub
 fits/**/condor/logs/
+fits/**/batch/*.log
 
 # Data files in config/ (copied by new_fit.sh)
 fits/**/*.dat
+
+# Local one-off study grids
+fits/hera/hera-pumplin-stability-sysHZComb1053/
 
 # Sandbox (personal throwaway fits), keep folder tracked
 fits/sandbox/*
 !fits/sandbox/.gitkeep
 
 # Scan framework generated files
+extra plots/
 scans/fits/lambda-scans/*/fits/
 scans/fits/lambda-scans/*/results/
 scans/fits/lambda-scans/*/plots/
