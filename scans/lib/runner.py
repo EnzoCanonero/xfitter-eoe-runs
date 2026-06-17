@@ -178,7 +178,8 @@ def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path, dry_run
             sources=scaled_sources,
             datafiles=config.datafiles,
             n_iterations=config.get('n_iterations', 2),
-            enable_bartlett=config.get('enable_bartlett', True)
+            enable_bartlett=config.get('enable_bartlett', True),
+            q2_cut=config.get('q2_cut', 3.5)
         )
 
         create_fit_structure(fit_dir, steering, "", config.datafiles,
@@ -220,6 +221,7 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir:
     custom_template = config.template
     if custom_template is not None:
         print(f"Using custom parameters template: {custom_template}")
+    print(f"Q2 cut: {config.get('q2_cut', 3.5)}")
 
     print(f"\nEpsilon: {config.epsilon}")
     print(f"Number of systematics to test: {len(systematics)}")
@@ -244,7 +246,8 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir:
         sources=[],
         datafiles=config.datafiles,
         n_iterations=config.get('n_iterations', 2),
-        enable_bartlett=config.get('enable_bartlett', True)
+        enable_bartlett=config.get('enable_bartlett', True),
+        q2_cut=config.get('q2_cut', 3.5)
     )
     create_fit_structure(fits_dir / "nominal", nominal_steering, "", config.datafiles,
                          do_errors=do_errors)
@@ -266,7 +269,8 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir:
             sources=sources,
             datafiles=config.datafiles,
             n_iterations=config.get('n_iterations', 2),
-            enable_bartlett=config.get('enable_bartlett', True)
+            enable_bartlett=config.get('enable_bartlett', True),
+            q2_cut=config.get('q2_cut', 3.5)
         )
 
         create_fit_structure(fit_dir, steering, "", config.datafiles,
@@ -480,6 +484,7 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
                 datafiles=config.datafiles,
                 n_iterations=config.get('n_iterations', 2),
                 enable_bartlett=config.get('enable_bartlett', True),
+                q2_cut=config.get('q2_cut', 3.5),
             )
 
             create_fit_structure(fit_dir, steering, "", config.datafiles,
