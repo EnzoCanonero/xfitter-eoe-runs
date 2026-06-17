@@ -1,0 +1,127 @@
+Minimizer: MINUIT
+MINUIT:
+  Commands: |
+    call fcn 1
+    set str 2
+    migrad
+    call fcn 3
+{% if do_errors %}
+  doErrors: |
+    {{ do_errors | indent(4) }}
+{% endif %}
+
+# HERAPDF baseline parametrization initialized AT the converged minimum
+# (chi2=1438.51/1171) of fits/hera/Q2cut/q2cut-2.0 (Q2_min=2.0, MIGRAD CONVERGED).
+# value = best-fit central value, step = MINUIT parameter error.
+Parameters:
+  Ag   :  DEPENDENT
+  Bg   : [ -0.019740, 0.064318 ]
+  Cg   : [  5.7962,   0.53618  ]
+  Agp  : [  0.17046,  0.14100  ]  # negative gluon ....
+  Bgp  : [ -0.33972,  0.058162 ]
+  Cgp  : [ 25.0,      0.       ]  # fix C of negative gluon
+  Auv  :  DEPENDENT
+  Buv  : [  0.83728,  0.022737 ]
+  Cuv  : [  4.7912,   0.083943 ]
+  Euv  : [  8.7456,   1.1249   ]
+  Adv  :  DEPENDENT
+  Bdv  : [  1.0816,   0.078467 ]
+  Cdv  : [  5.0498,   0.36172  ]
+  CUbar: [  7.0429,   2.7103   ]
+  DUbar: [  0.77481,  3.2749   ]
+  ADbar: [  0.27847,  0.0086748 ]
+  BDbar: [ -0.12410,  0.0037924 ]
+  CDbar:
+    value: 10.283
+    step: 1.9164
+  ZERO : [ 0. ]          # zero
+  fs   : [ 0.4, 0.0 ]
+  fd   : "=1-fs"
+  AUbar: "=(1-fs)*ADbar"
+
+Parameterisations:
+  par_uv:
+    class: HERAPDF
+    parameters: [Auv,Buv,Cuv,ZERO,Euv]
+  par_dv:
+    class: HERAPDF
+    parameters: [Adv,Bdv,Cdv]
+  par_Ubar: # = ubar
+    class: HERAPDF
+    parameters: [AUbar,BDbar,CUbar,DUbar]
+  par_Dbar: # = dbar + sbar
+    class: HERAPDF
+    parameters: [ADbar,BDbar,CDbar]
+  par_dbar: # = (1-fs) Dbar
+    class: Factor
+    input: par_Dbar
+    factor: fd
+  par_s: # = sbar = fs Dbar
+    class: Factor
+    input: par_Dbar
+    factor: fs
+  par_g:
+    class: NegativeGluon
+    parameters: [Ag,Bg,Cg,ZERO,ZERO,Agp,Bgp,Cgp]
+
+DefaultDecomposition: proton
+Decompositions:
+  proton:
+    class: UvDvUbarDbarS
+    # Note that HERAPDF parameterises Ubar and Dbar,
+    # but this decomposition uses ubar and dbar
+    xuv: par_uv
+    xdv: par_dv
+    xubar: par_Ubar
+    xdbar: par_dbar
+    xs: par_s
+    xg: par_g
+
+DefaultEvolution: proton-QCDNUM
+
+Evolutions:
+  proton-QCDNUM:
+    ? !include evolutions/QCDNUM.yaml
+    decomposition: proton #this could be omitted, as the default decomposition is set
+
+# QCD parameters
+Order: NNLO
+NFlavour: 5
+isFFNS: 0
+Q0 : 1.378404875209 # Initial scale =sqrt(1.9)
+alphas : 0.118
+
+? !include constants.yaml
+
+
+
+byReaction:
+  # RT DIS scheme settings:
+  RT_DISNC:
+    ? !include reactions/RT_DISNC.yaml
+
+# Specify HF scheme used for DIS NC processes:
+hf_scheme_DISNC :
+  defaultValue : 'RT_DISNC'        # global specification
+
+# Specify HF scheme used for DIS CC processes:
+hf_scheme_DISCC :
+  defaultValue : 'BaseDISCC'       # global specification
+
+WriteLHAPDF6:
+  name: "proton"
+  description: "..."
+  authors: "..."
+  reference: "..."
+    # use DefaultEvolution
+  #evolution: proton-QCDNUM
+    # take internal grid
+  preferInternalGrid:
+    # or define grid
+  #Xrange: [1e-4, 1]
+  #Qrange: [1,1000]
+  #Xnpoints: 200
+  #Qnpoints: 120
+
+# Output directory (patched at runtime by run_fit.sh)
+OutputDirectory: "__SET_AT_RUNTIME__"

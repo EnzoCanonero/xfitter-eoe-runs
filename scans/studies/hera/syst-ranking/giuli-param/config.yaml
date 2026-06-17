@@ -12,7 +12,7 @@ datafiles:
   - HERA1+2_CCem-thexp.dat
 
 # Use Giuli parametrization (pure Gaussian, no doErrors)
-template: ../../../../../fits/hera/hera-giuli-param/gaussian/config/parameters.yaml
+template: giuli
 
 systematics:
   - {name: sysHZComb, range: "1001-1162", type: E}
