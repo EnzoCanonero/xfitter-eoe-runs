@@ -36,6 +36,7 @@ class TemplateManager:
             'chi2_extra_param': kwargs.get('chi2_extra_param', 'PoissonCorr'),
             'n_iterations': kwargs.get('n_iterations', 2),
             'enable_bartlett': kwargs.get('enable_bartlett', True),
+            'q2_cut': kwargs.get('q2_cut', 3.5),
             **kwargs
         }
 
