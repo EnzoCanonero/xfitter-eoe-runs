@@ -21,6 +21,9 @@ class StudyConfig:
 
         if 'scan_type' not in self.data:
             raise ValueError("config.yaml must specify 'scan_type'")
+        if 'template' not in self.data:
+            raise ValueError("config.yaml must specify 'template' (a folder name "
+                             "under scans/templates/, e.g. 'hera-baseline' or 'giuli')")
 
         self.scan_type = self.data['scan_type']
 
@@ -29,15 +32,21 @@ class StudyConfig:
         return self.data.get('datafiles', [])
 
     @property
-    def template(self) -> Optional[Path]:
-        """Custom parameters.yaml to use instead of the default template.
+    def template_dir(self) -> Path:
+        """Template folder for this study, selected by name under scans/templates/.
 
-        Resolved relative to the study directory. The sibling constants.yaml
-        (if present next to the template) is also picked up by the runner.
+        Resolved against scans/templates/ (not the study dir) so studies can be
+        moved/reorganized without breaking. Each folder is a self-contained setup:
+        steering.txt.j2, parameters.yaml.j2, constants.yaml, unpolarised.wgt.
         """
-        if 'template' in self.data:
-            return (self.study_dir / self.data['template']).resolve()
-        return None
+        root = Path(__file__).resolve().parent.parent / "templates"
+        d = root / self.data['template']
+        if not d.is_dir():
+            raise FileNotFoundError(
+                f"template folder not found: {d} "
+                f"(available: {[p.name for p in sorted(root.iterdir()) if p.is_dir()]})"
+            )
+        return d
 
     @property
     def epsilon(self) -> Optional[float]:

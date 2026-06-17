@@ -1,9 +1,6 @@
 scan_type: systematic-ranking
+template: giuli-min       # Giuli parametrization initialized at the converged minimum
 epsilon: 0.6
-q2_cut: 2.0
-
-# Use the Q2cut=2.0 PDF parameter configuration as the base fit template.
-template: ../../../../../fits/hera/Q2cut/q2cut-2.0/config/parameters.yaml
 
 # HERA datafiles (all 7 files)
 datafiles:
@@ -15,7 +12,6 @@ datafiles:
   - HERA1+2_CCep-thexp.dat
   - HERA1+2_CCem-thexp.dat
 
-# Systematic sources to test for the Q2cut=2.0 fit.
 systematics:
   - {name: sysHZComb, range: "1001-1162", type: E}
   - {name: proc_nrl, type: E}

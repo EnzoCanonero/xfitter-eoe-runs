@@ -126,8 +126,8 @@ def run_scan(study_dir: Path, dry_run: bool = False, submit: bool = True):
 def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path, dry_run: bool):
     """Generate fits for lambda-scan"""
 
-    # Get template manager
-    template_dir = Path(__file__).parent.parent / "templates"
+    # Template folder selected by the study config's `template:` field
+    template_dir = config.template_dir
     templates = TemplateManager(template_dir)
 
     systematics = config.systematics
@@ -183,44 +183,21 @@ def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path, dry_run
         )
 
         create_fit_structure(fit_dir, steering, "", config.datafiles,
-                             do_errors=do_errors)
+                             template_dir=template_dir, do_errors=do_errors)
         all_fit_dirs.append(fit_dir.resolve())
 
     print(f"\nCreated {len(lambda_vals)} fits in {fits_dir}")
     return generate_batch_submit(fits_dir, all_fit_dirs)
 
 
-def _apply_custom_template(fit_dir: Path, template_path: Optional[Path]):
-    """Overwrite a fit's parameters.yaml (and sibling constants.yaml) with a
-    custom template, if one is configured.
-
-    create_fit_structure always renders the default parameters template; when a
-    study specifies `template:` we replace it here. OutputDirectory is repointed
-    later by the per-fit submit.sh (it matches on ^OutputDirectory:).
-    """
-    if template_path is None:
-        return
-    import shutil
-    config_dir = fit_dir / "config"
-    shutil.copy(template_path, config_dir / "parameters.yaml")
-    # Pick up the constants.yaml sitting next to the template (e.g. custom
-    # quark masses), overriding the default one copied by create_fit_structure.
-    sibling_constants = template_path.parent / "constants.yaml"
-    if sibling_constants.exists():
-        shutil.copy(sibling_constants, config_dir / "constants.yaml")
-
-
 def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir: Path, dry_run: bool):
     """Generate fits for systematic-ranking"""
 
-    # Get template manager
-    template_dir = Path(__file__).parent.parent / "templates"
+    # Template folder selected by the study config's `template:` field
+    template_dir = config.template_dir
     templates = TemplateManager(template_dir)
 
     systematics = config.systematics
-    custom_template = config.template
-    if custom_template is not None:
-        print(f"Using custom parameters template: {custom_template}")
     print(f"Q2 cut: {config.get('q2_cut', 3.5)}")
 
     print(f"\nEpsilon: {config.epsilon}")
@@ -250,8 +227,7 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir:
         q2_cut=config.get('q2_cut', 3.5)
     )
     create_fit_structure(fits_dir / "nominal", nominal_steering, "", config.datafiles,
-                         do_errors=do_errors)
-    _apply_custom_template(fits_dir / "nominal", custom_template)
+                         template_dir=template_dir, do_errors=do_errors)
     all_fit_dirs: List[Path] = [(fits_dir / "nominal").resolve()]
 
     # Generate fit for each systematic
@@ -274,8 +250,7 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir:
         )
 
         create_fit_structure(fit_dir, steering, "", config.datafiles,
-                             do_errors=do_errors)
-        _apply_custom_template(fit_dir, custom_template)
+                             template_dir=template_dir, do_errors=do_errors)
         all_fit_dirs.append(fit_dir.resolve())
 
     print(f"\nCreated {len(systematics) + 1} fits in {fits_dir} (including nominal)")
@@ -374,7 +349,8 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
     Returns:
         Path to runs/submit.sh (None in dry-run mode).
     """
-    template_dir = Path(__file__).parent.parent / "templates"
+    # Template folder selected by the study config's `template:` field
+    template_dir = config.template_dir
     templates = TemplateManager(template_dir)
 
     systematics = config.systematics
@@ -488,7 +464,7 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
             )
 
             create_fit_structure(fit_dir, steering, "", config.datafiles,
-                                 do_errors=do_errors)
+                                 template_dir=template_dir, do_errors=do_errors)
 
             if is_systematic:
                 # E-type: fixed via MINUIT SET PAR / FIX commands

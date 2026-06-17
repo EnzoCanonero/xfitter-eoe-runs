@@ -1,4 +1,5 @@
 scan_type: systematic-ranking
+template: hera-baseline
 epsilon: 0.6
 
 # HERA datafiles (all 7 files)

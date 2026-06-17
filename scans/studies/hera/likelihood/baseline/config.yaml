@@ -1,4 +1,5 @@
 scan_type: likelihood-scan
+template: hera-baseline
 
 # Reference fit: provides fitted parameter values and errors for scan ranges.
 # PDF parameter values are nearly identical with and without EoE, so the eoe

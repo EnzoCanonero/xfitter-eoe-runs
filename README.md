@@ -27,9 +27,20 @@ xfitter-eoe-runs/
 └── scans/                      # systematic scans (automated)
     ├── bin/                    # run-scan, plot
     ├── lib/                    # Python framework
-    ├── templates/              # Jinja2 templates for xFitter config
+    ├── templates/              # named template folders (one per setup)
+    │   ├── hera-baseline/      #   14-param HERAPDF: steering + parameters + constants + weights
+    │   └── giuli/              #   18-param Giuli parametrization (arXiv:1902.11125)
     └── studies/                # scan studies
 ```
+
+### Templates
+
+Each folder under `scans/templates/<name>/` is a self-contained xFitter setup:
+`steering.txt.j2`, `parameters.yaml.j2`, `constants.yaml`, `unpolarised.wgt`.
+Every study `config.yaml` **must** select one by name via a required `template:` field
+(e.g. `template: hera-baseline` or `template: giuli`); it is resolved against
+`scans/templates/`, so studies can be moved without breaking. To add a setup, drop a
+new folder under `scans/templates/` and reference it by name.
 
 ## Fits
 
@@ -86,6 +97,7 @@ mkdir my-scan && cd my-scan
 # Create config.yaml (see examples in existing studies)
 cat > config.yaml << 'EOF'
 scan_type: lambda-scan
+template: hera-baseline       # required: a folder under scans/templates/
 lambda_min: 0.0
 lambda_max: 1.2
 lambda_step: 0.1

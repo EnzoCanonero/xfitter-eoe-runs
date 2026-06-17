@@ -54,8 +54,14 @@ def create_fit_structure(fit_dir: Path,
                          steering_content: str,
                          parameters_content: str,
                          datafiles: List[str],
-                         template_dir: Optional[Path] = None,
+                         template_dir: Path,
                          do_errors: Optional[str] = None):
+    """Create a fit directory from a template folder.
+
+    template_dir is a folder under scans/templates/ (e.g. hera-baseline/, giuli/)
+    holding parameters.yaml.j2, constants.yaml and unpolarised.wgt. It is required —
+    the study config selects it via its `template:` field (config.template_dir).
+    """
     import shutil
 
     fit_dir.mkdir(parents=True, exist_ok=True)
@@ -63,9 +69,6 @@ def create_fit_structure(fit_dir: Path,
     config_dir.mkdir(exist_ok=True)
     (fit_dir / "condor").mkdir(exist_ok=True)
     (fit_dir / "output").mkdir(exist_ok=True)
-
-    if template_dir is None:
-        template_dir = Path(__file__).parent.parent / "templates"
 
     (config_dir / "steering.txt").write_text(steering_content)
 
