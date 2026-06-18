@@ -8,7 +8,8 @@ import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import numpy as np
-from .config import load_study_config, LambdaScanConfig, LikelihoodScanConfig, SystematicRankingConfig
+from .config import (load_study_config, LambdaScanConfig, LikelihoodScanConfig,
+                     SystematicRankingConfig, PumplinStabilityConfig)
 from .templates import (TemplateManager, create_fit_structure,
                          generate_batch_submit)
 
@@ -92,6 +93,8 @@ def run_scan(study_dir: Path, dry_run: bool = False, submit: bool = True):
         submit_script = _generate_lambda_scan_fits(config, fits_dir, dry_run)
     elif config.scan_type == 'systematic-ranking':
         submit_script = _generate_systematic_ranking_fits(config, fits_dir, dry_run)
+    elif config.scan_type == 'pumplin-stability':
+        submit_script = _generate_pumplin_stability_fits(config, fits_dir, dry_run)
     elif config.scan_type == 'likelihood-scan':
         submit_script = _generate_likelihood_scan_fits(config, fits_dir, dry_run)
     else:
@@ -121,6 +124,80 @@ def run_scan(study_dir: Path, dry_run: bool = False, submit: bool = True):
             raise
     else:
         print(f"\nTo submit: bash {submit_script}")
+
+
+def _fmt_eps(x: float) -> str:
+    """Clean numeric formatting for an EoE epsilon in a steering source string."""
+    return f"{x:.10g}"
+
+
+def _pumplin_grid_name(errdef: float, iterate: int) -> str:
+    """Run-dir leaf name, e.g. errdef0p5_iter10 (matches the legacy layout)."""
+    return f"errdef{errdef:.1f}".replace('.', 'p') + f"_iter{int(iterate):02d}"
+
+
+def _generate_pumplin_stability_fits(config: PumplinStabilityConfig, fits_dir: Path, dry_run: bool):
+    """Generate fits for a pumplin-stability scan: lambda x errdef x iterate.
+
+    A Gaussian fit (no &Systematics source) is always added as the lambda_0.0 group.
+    Each non-Gaussian source's epsilon = base eps * lambda. ERRDEF/ITERATE are set
+    per fit via the Pumplin doErrors block.
+    """
+    template_dir = config.template_dir
+    templates = TemplateManager(template_dir)
+
+    systematics = config.systematics
+    lambdas = config.lambdas
+    errdefs = config.errdefs
+    iterates = config.iterates
+    eps = config.eps
+
+    # (lambda_value, source_systematics) — Gaussian first, then each lambda
+    groups = [(0.0, [])] + [(lam, systematics) for lam in lambdas]
+    n_fits = len(groups) * len(errdefs) * len(iterates)
+
+    print(f"\nPumplin-stability grid:")
+    print(f"  lambda (Gaussian + vector): {[0.0] + lambdas}")
+    print(f"  errdef:  {errdefs}")
+    print(f"  iterate: {iterates}")
+    print(f"  base eps: {eps}")
+    print(f"  systematics: {[(s['name'], s['type']) for s in systematics]}")
+    print(f"  total fits: {n_fits}")
+
+    if dry_run:
+        print("\nExample source strings:")
+        for lam in lambdas:
+            for s in systematics[:1]:
+                print(f"  lambda={lam}: '{s['name']}:{s['type']}@eps={_fmt_eps(s['epsilon'] * lam)}'")
+        print("  lambda=0.0: Gaussian (no &Systematics source)")
+        return None
+
+    fits_dir.mkdir(parents=True, exist_ok=True)
+
+    all_fit_dirs: List[Path] = []
+    for lam, syslist in groups:
+        scaled_sources = [
+            (s['name'], s['type'], _fmt_eps(s['epsilon'] * lam)) for s in syslist
+        ]
+        lam_name = f"lambda_{lam:.1f}"
+        print(f"Generating {lam_name} ({len(errdefs) * len(iterates)} fits)...")
+        for errdef in errdefs:
+            for iterate in iterates:
+                fit_dir = fits_dir / lam_name / _pumplin_grid_name(errdef, iterate)
+                do_errors = f"Pumplin\nSET ERRDEF {errdef}\nITERATE {iterate}"
+                steering = templates.render_steering(
+                    sources=scaled_sources,
+                    datafiles=config.datafiles,
+                    n_iterations=config.get('n_iterations', 2),
+                    enable_bartlett=config.get('enable_bartlett', True),
+                    q2_cut=config.get('q2_cut', 3.5),
+                )
+                create_fit_structure(fit_dir, steering, "", config.datafiles,
+                                     template_dir=template_dir, do_errors=do_errors)
+                all_fit_dirs.append(fit_dir.resolve())
+
+    print(f"\nCreated {len(all_fit_dirs)} fits in {fits_dir}")
+    return generate_batch_submit(fits_dir, all_fit_dirs)
 
 
 def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path, dry_run: bool):

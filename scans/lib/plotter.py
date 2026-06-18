@@ -11,7 +11,13 @@ matplotlib.use('Agg')  # Non-interactive backend
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from .config import load_study_config
-from .extract import extract_scan_results
+from .extract import extract_scan_results, extract_pumplin_widths
+
+# PDF parameters shown in pumplin-stability plots (free HERAPDF params, sorted).
+_PUMPLIN_PDF_PARAMS = [
+    "ADbar", "Agp", "BDbar", "Bdv", "Bg", "Bgp", "Buv",
+    "CDbar", "CUbar", "Cdv", "Cg", "Cuv", "DUbar", "Euv",
+]
 
 
 def plot_scan(study_dir: Path):
@@ -26,6 +32,17 @@ def plot_scan(study_dir: Path):
 
     print(f"Extracting results from: {study_dir}")
     print(f"Scan type: {config.scan_type}")
+
+    # Pumplin-stability has its own data model (Pumplin interval widths, not
+    # central/error per fit), so it bypasses the generic extractor entirely.
+    if config.scan_type == 'pumplin-stability':
+        results_dir = study_dir / "results"
+        results_dir.mkdir(exist_ok=True)
+        plots_dir = study_dir / "plots"
+        plots_dir.mkdir(exist_ok=True)
+        _plot_pumplin_stability(study_dir, config, plots_dir, results_dir)
+        print(f"\nPlots saved in: {plots_dir}")
+        return
 
     # Extract results
     results = extract_scan_results(study_dir, config.scan_type,
@@ -661,4 +678,114 @@ def _plot_likelihood_scan(results: dict, plots_dir: Path, results_dir: Path):
 
     print(f"  ✓ profiles_1d.pdf  ({len(param_names)} pages)")
 
+
+def _plot_pumplin_stability(study_dir, config, plots_dir: Path, results_dir: Path):
+    """Pumplin-stability plots: one panel per lambda value, <=4 panels/page.
+
+    Produces two PDFs (per-parameter pages):
+      - pumplin_iteration_convergence.pdf : interval / interval(max ITERATE) vs ITERATE,
+        one line per ERRDEF.
+      - pumplin_errdef_invariance.pdf     : interval / interval(ERRDEF_ref) vs ERRDEF,
+        one line per ITERATE.
+    """
+    params = _PUMPLIN_PDF_PARAMS
+    widths, incomplete = extract_pumplin_widths(study_dir / "runs", set(params))
+    if not widths:
+        raise SystemExit("No completed Pumplin interval blocks found under runs/")
+
+    lambdas = sorted({k[0] for k in widths})
+    errdefs = sorted({k[1] for k in widths})
+    iterates = sorted({k[2] for k in widths})
+    max_iter = max(iterates)
+    errdef_ref = config.errdef_ref
+    if errdef_ref not in errdefs:
+        # fall back to the median available errdef
+        errdef_ref = errdefs[len(errdefs) // 2]
+
+    print(f"\nGenerating pumplin-stability plots...")
+    print(f"  lambdas={lambdas}  errdefs={errdefs}  iterates={iterates}")
+    print(f"  complete interval logs: {len(widths) // len(params)}  incomplete: {len(incomplete)}")
+
+    # Save the raw widths as a tidy CSV for downstream use.
+    rows = [{'lambda': lam, 'errdef': e, 'iterate': it, 'parameter': p, 'width': w}
+            for (lam, e, it, p), w in sorted(widths.items())]
+    pd.DataFrame(rows).to_csv(results_dir / "pumplin_widths.csv", index=False)
+
+    def lam_label(lam):
+        return f"$\\lambda = {lam:.1f}$" + (" (Gaussian)" if lam == 0.0 else "")
+
+    def chunk(seq, n=4):
+        for i in range(0, len(seq), n):
+            yield seq[i:i + n]
+
+    errdef_cmap = plt.cm.viridis(np.linspace(0, 1, max(len(errdefs), 1)))
+    iter_cmap = plt.cm.plasma(np.linspace(0, 0.92, max(len(iterates), 1)))
+
+    def make_pages(pdf, kind):
+        for param in params:
+            # skip a parameter with no data at all
+            if not any((lam, e, it, param) in widths
+                       for lam in lambdas for e in errdefs for it in iterates):
+                continue
+            for page_lams in chunk(lambdas, 4):
+                fig, axes = plt.subplots(2, 2, figsize=(11, 8.5))
+                axes = axes.flatten()
+                for ax in axes[len(page_lams):]:
+                    ax.axis('off')
+                for ax, lam in zip(axes, page_lams):
+                    ax.axhspan(0.9, 1.1, color='#f0f0f0', zorder=0)
+                    ax.axhline(1.0, ls='--', lw=0.8, color='#666666')
+                    if kind == 'convergence':
+                        for ci, e in enumerate(errdefs):
+                            ref = widths.get((lam, e, max_iter, param))
+                            if not ref:
+                                continue
+                            xs, ys = [], []
+                            for it in iterates:
+                                w = widths.get((lam, e, it, param))
+                                if w:
+                                    xs.append(it); ys.append(w / ref)
+                            if xs:
+                                ax.plot(xs, ys, 'o-', ms=3, lw=1.2,
+                                        color=errdef_cmap[ci], label=f"{e:.1f}")
+                        ax.set_xlabel("Pumplin ITERATE")
+                        ax.set_ylabel(f"interval / interval(iter {max_iter})")
+                    else:  # errdef invariance
+                        for ci, it in enumerate(iterates):
+                            xs, ys = [], []
+                            for e in errdefs:
+                                ref = widths.get((lam, errdef_ref, it, param))
+                                w = widths.get((lam, e, it, param))
+                                if ref and w:
+                                    xs.append(e); ys.append(w / ref)
+                            if xs:
+                                ax.plot(xs, ys, 'o-', ms=3, lw=1.2,
+                                        color=iter_cmap[ci], label=f"{it}")
+                        ax.set_xlabel("ERRDEF")
+                        ax.set_ylabel(f"interval / interval(ERRDEF={errdef_ref:.1f})")
+                    ax.set_title(lam_label(lam), fontsize=11)
+                    ax.set_ylim(0.65, 1.45)
+                    ax.grid(True, color='#dddddd', lw=0.6)
+                    leg_title = "ERRDEF" if kind == 'convergence' else "ITERATE"
+                    ax.legend(title=leg_title, fontsize=6, ncol=2, loc='best')
+                if kind == 'convergence':
+                    suptitle = f"{param}: Pumplin iteration convergence (norm. to ITERATE={max_iter})"
+                else:
+                    suptitle = f"{param}: Pumplin ERRDEF stability (norm. to ERRDEF={errdef_ref:.1f})"
+                fig.suptitle(suptitle, fontsize=13)
+                fig.tight_layout(rect=[0, 0, 1, 0.96])
+                pdf.savefig(fig)
+                plt.close(fig)
+
+    conv_pdf = plots_dir / "pumplin_iteration_convergence.pdf"
+    errdef_pdf = plots_dir / "pumplin_errdef_invariance.pdf"
+    with PdfPages(conv_pdf) as pdf:
+        make_pages(pdf, 'convergence')
+    with PdfPages(errdef_pdf) as pdf:
+        make_pages(pdf, 'errdef')
+
+    print(f"  ✓ {conv_pdf.name}")
+    print(f"  ✓ {errdef_pdf.name}")
+    if incomplete:
+        print(f"  ({len(incomplete)} incomplete run(s) skipped)")
 

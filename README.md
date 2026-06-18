@@ -88,6 +88,16 @@ Automated framework for running systematic PDF fitting scans on Condor.
 - Config: `epsilon`, `systematics`, `datafiles`
 - Output: rankings by goodness-of-fit contribution
 
+**Pumplin-stability** — Pumplin uncertainty stability over a `lambda × errdef × iterate` grid:
+- Config: `eps` (base; source eps = `eps * lambda`), `lambda` (vector; a Gaussian
+  fit with no `&Systematics` source is always added as `lambda_0.0`), `errdef` and
+  `iterate` (Pumplin `SET ERRDEF` / `ITERATE` grids set per fit), `errdef_ref`
+  (normalization, default 0.5), `systematics` (each with `type: E` or `N`), `datafiles`.
+- Run dirs: `runs/lambda_<v>/errdef<X>p<Y>_iter<NN>/`.
+- Output: per-parameter pages with **one panel per lambda** (≤4 panels/page, paginates
+  beyond 4) — `pumplin_iteration_convergence.pdf` (interval vs ITERATE, line per ERRDEF)
+  and `pumplin_errdef_invariance.pdf` (interval vs ERRDEF, line per ITERATE).
+
 ### Create and run a scan
 
 ```bash

@@ -417,3 +417,77 @@ def _extract_likelihood_scan_results(fits_dir: Path) -> Dict:
               + (f", {n_nan} missing" if n_nan else ""))
 
     return {'scan_1d': scan_1d}
+
+
+# ── Pumplin-stability interval extraction ───────────────────────────────────
+# Pumplin error analysis prints, per parameter, the allowed up/down displacement
+# (interval half-width) in an "XRANGE: find allowed displacements" block. We parse
+# the half-width per (lambda, errdef, iterate, parameter) across the run grid.
+
+_PUMPLIN_RUN_DIR = re.compile(r"errdef(?P<err>\d+p\d)_iter(?P<it>\d+)")
+_PUMPLIN_PARAM_DEF = re.compile(
+    r"^\s*(\d+)\s+'?([A-Za-z0-9_]+)\s*'?\s+(?:constant|[-+0-9.Ee]+)"
+)
+_PUMPLIN_XRANGE_PARAM = re.compile(
+    r"Par=\s*(\d+)\s+TruePar=\s*(\d+)\s+at\s+([\d.Ee+\-]+)\s+\+/-\s+([\d.Ee+\-]+)"
+)
+
+
+def extract_pumplin_widths(runs_dir: Path, params: set):
+    """Parse completed Pumplin interval widths from a pumplin-stability runs/ tree.
+
+    Expects runs laid out as runs/lambda_<v>/errdef<X>p<Y>_iter<NN>/output/minuit.out.txt.
+
+    Returns (widths, incomplete):
+      widths: {(lambda: float, errdef: float, iterate: int, param: str): half_width}
+      incomplete: [str] run dirs (relative to runs_dir) missing a complete Pumplin block.
+    """
+    import math
+
+    widths: Dict = {}
+    incomplete: List[str] = []
+
+    for minuit_file in sorted(runs_dir.glob("lambda_*/errdef*_iter*/output/minuit.out.txt")):
+        run_dir = minuit_file.parents[1]
+        lam_name = minuit_file.parents[2].name  # lambda_0.5
+        run_match = _PUMPLIN_RUN_DIR.match(run_dir.name)
+        if not lam_name.startswith("lambda_") or not run_match:
+            continue
+        try:
+            lam = float(lam_name.replace("lambda_", ""))
+        except ValueError:
+            continue
+
+        text = minuit_file.read_text(errors="replace")
+        is_complete = (
+            "XRANGE: find allowed displacements" in text
+            and "ERROR MATRIX FROM ITERATE" in text
+        )
+        if not is_complete:
+            incomplete.append(str(run_dir.relative_to(runs_dir)))
+            continue
+
+        names: Dict[int, str] = {}
+        in_definitions = False
+        for line in text.splitlines():
+            if "PARAMETER DEFINITIONS" in line:
+                in_definitions = True
+                continue
+            if in_definitions and line.strip().startswith("**********"):
+                in_definitions = False
+            if in_definitions:
+                m = _PUMPLIN_PARAM_DEF.match(line)
+                if m:
+                    names[int(m.group(1))] = m.group(2)
+
+        errdef = float(run_match.group("err").replace("p", "."))
+        iterate = int(run_match.group("it"))
+        for m in _PUMPLIN_XRANGE_PARAM.finditer(text):
+            name = names.get(int(m.group(2)))
+            if name not in params:
+                continue
+            width = float(m.group(4).replace("D", "E"))
+            if math.isfinite(width) and width > 0:
+                widths[(lam, errdef, iterate, name)] = width
+
+    return widths, incomplete

@@ -169,6 +169,59 @@ class SystematicRankingConfig(StudyConfig):
         return self._expand_systematics(self.data['systematics'])
 
 
+class PumplinStabilityConfig(StudyConfig):
+    """Configuration for pumplin-stability studies.
+
+    Scans a 3-axis grid: lambda (EoE strength) x errdef x iterate. A Gaussian
+    fit (no &Systematics source) is always added as the lambda=0.0 group.
+
+    The base `eps` is multiplied by lambda to form each source's EoE epsilon
+    (same scaling as lambda-scan). `errdef` and `iterate` are the Pumplin
+    SET ERRDEF / ITERATE grids set per fit via doErrors.
+    """
+
+    def __init__(self, config_file: Path):
+        super().__init__(config_file)
+
+        if self.scan_type != 'pumplin-stability':
+            raise ValueError(f"Expected scan_type='pumplin-stability', got '{self.scan_type}'")
+
+        for key in ('eps', 'lambda', 'errdef', 'iterate', 'systematics'):
+            if key not in self.data:
+                raise ValueError(f"pumplin-stability config missing required field: '{key}'")
+
+    @property
+    def epsilon(self) -> Optional[float]:
+        """Base epsilon (named `eps` in this config); reused by _expand_systematics."""
+        return float(self.data['eps'])
+
+    @property
+    def eps(self) -> float:
+        return float(self.data['eps'])
+
+    @property
+    def lambdas(self) -> List[float]:
+        return [float(x) for x in self.data['lambda']]
+
+    @property
+    def errdefs(self) -> List[float]:
+        return [float(x) for x in self.data['errdef']]
+
+    @property
+    def iterates(self) -> List[int]:
+        return [int(x) for x in self.data['iterate']]
+
+    @property
+    def errdef_ref(self) -> float:
+        """Reference ERRDEF for the errdef-invariance plot normalization."""
+        return float(self.data.get('errdef_ref', 0.5))
+
+    @property
+    def systematics(self) -> List[Dict]:
+        """Expanded systematics; each entry's epsilon is the base eps (scaled by lambda at fit time)."""
+        return self._expand_systematics(self.data['systematics'])
+
+
 class LikelihoodScanConfig(StudyConfig):
     """Configuration for likelihood-scan studies (1D; 2D support to be added).
 
@@ -252,6 +305,8 @@ def load_study_config(study_dir: Path) -> StudyConfig:
         return LambdaScanConfig(config_file)
     elif scan_type == 'systematic-ranking':
         return SystematicRankingConfig(config_file)
+    elif scan_type == 'pumplin-stability':
+        return PumplinStabilityConfig(config_file)
     elif scan_type == 'likelihood-scan':
         return LikelihoodScanConfig(config_file)
     else:
