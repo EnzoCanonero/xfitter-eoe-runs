@@ -1,5 +1,5 @@
 scan_type: systematic-ranking
-template: q2cut-2.0-min   # baseline parametrization, Q2cut=2.0, initialized at the converged minimum
+template: q2cut-2.0  # baseline parametrization, Q2cut=2.0, initialized at the converged minimum
 epsilon: 0.6
 
 # HERA datafiles (all 7 files)

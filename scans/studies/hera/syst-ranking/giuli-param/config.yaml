@@ -1,5 +1,5 @@
 scan_type: systematic-ranking
-template: giuli-min       # Giuli parametrization initialized at the converged minimum
+template: giuli-param   # Giuli parametrization initialized at the converged minimum
 epsilon: 0.6
 
 # HERA datafiles (all 7 files)

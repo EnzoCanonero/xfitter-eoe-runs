@@ -29,7 +29,7 @@ xfitter-eoe-runs/
     ├── lib/                    # Python framework
     ├── templates/              # named template folders (one per setup)
     │   ├── hera-baseline/      #   14-param HERAPDF: steering + parameters + constants + weights
-    │   └── giuli/              #   18-param Giuli parametrization (arXiv:1902.11125)
+    │   └── giuli-param/        #   18-param Giuli parametrization (arXiv:1902.11125)
     └── studies/                # scan studies
 ```
 
@@ -38,7 +38,7 @@ xfitter-eoe-runs/
 Each folder under `scans/templates/<name>/` is a self-contained xFitter setup:
 `steering.txt.j2`, `parameters.yaml.j2`, `constants.yaml`, `unpolarised.wgt`.
 Every study `config.yaml` **must** select one by name via a required `template:` field
-(e.g. `template: hera-baseline` or `template: giuli`); it is resolved against
+(e.g. `template: hera-baseline` or `template: giuli-param`); it is resolved against
 `scans/templates/`, so studies can be moved without breaking. To add a setup, drop a
 new folder under `scans/templates/` and reference it by name.
 
