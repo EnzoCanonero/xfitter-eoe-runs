@@ -88,6 +88,18 @@ Automated framework for running systematic PDF fitting scans on Condor.
 - Config: `epsilon`, `systematics`, `datafiles`
 - Output: rankings by goodness-of-fit contribution
 
+**Likelihood-scan** — profile Δχ² scans around a reference fit (1D and/or 2D):
+- Config: `reference_fit`, `systematics`, `datafiles`, `scan_defaults`, and any of
+  `scan_params_1d` / `scan_systematics_1d` (1D) and `scan_params_2d` (2D). A study may
+  contain 1D and 2D scans simultaneously.
+- **1D**: each parameter fixed on a grid (`±n_sigma`, `npoints`), the rest profiled →
+  `profiles_1d.pdf` (Δχ² vs parameter).
+- **2D**: `scan_params_2d: [{pair: [X, Y]}, ...]` jointly fixes a pair on an
+  `npoints_2d × npoints_2d` grid (axes `±n_sigma_2d`), the rest profiled. Contours are
+  drawn at `sigma_levels` (default `[1,2,3]`) using **2-parameter joint** Δχ² levels
+  (1σ=2.30, 2σ=6.18, 3σ=11.83) → `contours_2d.pdf`. Each axis may be a PDF parameter or
+  an E-type systematic (inferred from `systematics`).
+
 **Pumplin-stability** — Pumplin uncertainty stability over a `lambda × errdef × iterate` grid:
 - Config: `eps` (base; source eps = `eps * lambda`), `lambda` (vector; a Gaussian
   fit with no `&Systematics` source is always added as `lambda_0.0`), `errdef` and

@@ -4,6 +4,7 @@ Generates standard plots from scan results
 """
 
 from pathlib import Path
+import math
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -53,25 +54,45 @@ def plot_scan(study_dir: Path):
     results_dir.mkdir(exist_ok=True)
 
     if config.scan_type == 'likelihood-scan':
-        # Flatten 1D profiles to a single CSV
-        scan_rows = []
-        for param_name, pdata in results['scan_1d'].items():
-            for sv, chi2, dchi2, conv in zip(
-                    pdata['scan_values'], pdata['chi2'],
-                    pdata['delta_chi2'], pdata['converged']):
-                scan_rows.append({
-                    'parameter': param_name,
-                    'scan_value': float(sv),
-                    'chi2': float(chi2) if not np.isnan(chi2) else None,
-                    'delta_chi2': float(dchi2) if not np.isnan(dchi2) else None,
-                    'converged': bool(conv),
-                    'ref_value': pdata['value_at_minimum'],
-                    'ref_error': pdata['error'],
-                })
-        profiles_file = results_dir / "profiles_1d.csv"
-        pd.DataFrame(scan_rows).to_csv(profiles_file, index=False)
         print(f"\nResults saved:")
-        print(f"  - {profiles_file}")
+        # Flatten 1D profiles to a single CSV (if any 1D scans present)
+        if results.get('scan_1d'):
+            scan_rows = []
+            for param_name, pdata in results['scan_1d'].items():
+                for sv, chi2, dchi2, conv in zip(
+                        pdata['scan_values'], pdata['chi2'],
+                        pdata['delta_chi2'], pdata['converged']):
+                    scan_rows.append({
+                        'parameter': param_name,
+                        'scan_value': float(sv),
+                        'chi2': float(chi2) if not np.isnan(chi2) else None,
+                        'delta_chi2': float(dchi2) if not np.isnan(dchi2) else None,
+                        'converged': bool(conv),
+                        'ref_value': pdata['value_at_minimum'],
+                        'ref_error': pdata['error'],
+                    })
+            profiles_file = results_dir / "profiles_1d.csv"
+            pd.DataFrame(scan_rows).to_csv(profiles_file, index=False)
+            print(f"  - {profiles_file}")
+        # Flatten 2D grids to a long-format CSV (if any 2D scans present)
+        if results.get('scan_2d'):
+            grid_rows = []
+            for pair_key, pdata in results['scan_2d'].items():
+                xs, ys = pdata['x_values'], pdata['y_values']
+                for i, xv in enumerate(xs):
+                    for j, yv in enumerate(ys):
+                        grid_rows.append({
+                            'pair': pair_key,
+                            'x_name': pdata['x_name'], 'y_name': pdata['y_name'],
+                            'x_value': float(xv), 'y_value': float(yv),
+                            'chi2': float(pdata['chi2'][i, j]) if np.isfinite(pdata['chi2'][i, j]) else None,
+                            'delta_chi2': float(pdata['delta_chi2'][i, j]) if np.isfinite(pdata['delta_chi2'][i, j]) else None,
+                            'converged': bool(pdata['converged'][i, j]),
+                            'status': str(pdata.get('status', np.full_like(pdata['converged'], 'unknown', dtype=object))[i, j]),
+                        })
+            grids_file = results_dir / "grids_2d.csv"
+            pd.DataFrame(grid_rows).to_csv(grids_file, index=False)
+            print(f"  - {grids_file}")
     else:
         chi2_file = results_dir / "chi2.csv"
         params_file = results_dir / "parameters.csv"
@@ -110,7 +131,10 @@ def plot_scan(study_dir: Path):
         _plot_systematic_ranking(results, plots_dir, results_dir, config_order,
                                  error_label=error_label)
     elif config.scan_type == 'likelihood-scan':
-        _plot_likelihood_scan(results, plots_dir, results_dir)
+        if results.get('scan_1d'):
+            _plot_likelihood_scan(results, plots_dir, results_dir)
+        if results.get('scan_2d'):
+            _plot_likelihood_2d(results, plots_dir, results_dir)
 
     print(f"\nPlots saved in: {plots_dir}")
 
@@ -679,6 +703,318 @@ def _plot_likelihood_scan(results: dict, plots_dir: Path, results_dir: Path):
     print(f"  ✓ profiles_1d.pdf  ({len(param_names)} pages)")
 
 
+def _sigma_to_dchi2_2dof(n_sigma: float) -> float:
+    """Δχ² threshold for an n-sigma 2-parameter joint confidence region.
+
+    Coverage P = erf(n/√2); for 2 dof, Δχ² = -2·ln(1 - P)
+    → 1σ=2.30, 2σ=6.18, 3σ=11.83.
+    """
+    p = math.erf(n_sigma / math.sqrt(2.0))
+    return -2.0 * math.log(1.0 - p)
+
+
+def _fit_quadratic_pull_surface(x, y, z):
+    """Fit z = c0 + cx*x + cy*y + cxx*x² + cxy*x*y + cyy*y²."""
+    if len(z) < 6:
+        return None
+    design = np.column_stack([np.ones_like(x), x, y, x * x, x * y, y * y])
+    coeff, *_ = np.linalg.lstsq(design, z, rcond=None)
+    pred = design @ coeff
+    resid = z - pred
+    hxx = 2.0 * coeff[3]
+    hxy = coeff[4]
+    hyy = 2.0 * coeff[5]
+    hess = np.array([[hxx, hxy], [hxy, hyy]], dtype=float)
+    eigvals, eigvecs = np.linalg.eigh(hess)
+    if np.all(np.isfinite(eigvals)) and np.all(eigvals > 0):
+        condition = float(eigvals[-1] / eigvals[0])
+        rho = float(-hxy / math.sqrt(hxx * hyy)) if hxx > 0 and hyy > 0 else np.nan
+        flat_vec = eigvecs[:, 0]
+        angle = float(math.degrees(math.atan2(flat_vec[1], flat_vec[0])))
+    else:
+        condition = np.nan
+        rho = np.nan
+        angle = np.nan
+    return {
+        'coeff': coeff,
+        'hessian': hess,
+        'eigvals': eigvals,
+        'condition': condition,
+        'rho': rho,
+        'angle': angle,
+        'rms': float(np.sqrt(np.mean(resid ** 2))),
+        'max_abs': float(np.max(np.abs(resid))),
+    }
+
+
+def _eval_quadratic_pull_surface(coeff, x, y):
+    return (coeff[0] + coeff[1] * x + coeff[2] * y +
+            coeff[3] * x * x + coeff[4] * x * y + coeff[5] * y * y)
+
+
+def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
+    """2D likelihood diagnostics as status maps and 1D slice profiles.
+
+    The convergence PDF shows every sampled point.  The profile PDF excludes all
+    non-converged/non-finite points and draws the likelihood scan in one
+    direction for every fixed grid value in the other direction.
+    """
+    scan_2d = results['scan_2d']
+    pairs = list(scan_2d.keys())
+    print(f"\nGenerating 2D likelihood convergence/profile plots ({len(pairs)} pair(s))...")
+
+    convergence_pdf = plots_dir / "likelihood_2d_convergence.pdf"
+    profiles_pdf = plots_dir / "likelihood_2d_profiles.pdf"
+    summary_lines = [
+        "# 2D likelihood quadratic-fit summary",
+        "# Coordinates are normalized pulls: (parameter - reference) / sigma.",
+        "# Delta chi2 is normalized to the reference grid point, not the grid minimum.",
+        "# Quadratic fits use converged finite points with Delta chi2 <= 10; if fewer",
+        "# than 12 points pass that cut, all converged finite points are used.",
+        "",
+        (
+            "pair total converged call_limit failed other fit_points "
+            "rho condition flat_angle_deg residual_rms residual_max_abs "
+            "lambda_min lambda_max chi2_ref"
+        ),
+    ]
+
+    prepared = []
+    for pair_key in pairs:
+        d = scan_2d[pair_key]
+        xs = np.asarray(d['x_values'], dtype=float)
+        ys = np.asarray(d['y_values'], dtype=float)
+        dchi2 = np.asarray(d['delta_chi2'], dtype=float)
+        conv = np.asarray(d['converged'], dtype=bool)
+        status = np.asarray(
+            d.get('status', np.where(conv, 'converged', 'unknown')),
+            dtype=object,
+        ).astype(str)
+
+        X, Y = np.meshgrid(xs, ys, indexing='ij')
+        x_ref = d.get('x_ref')
+        y_ref = d.get('y_ref')
+        x_err = d.get('x_err')
+        y_err = d.get('y_err')
+        normalized_axes = all(v is not None for v in (x_ref, y_ref, x_err, y_err))
+        if normalized_axes:
+            x_ref = float(x_ref)
+            y_ref = float(y_ref)
+            x_err = float(x_err)
+            y_err = float(y_err)
+            normalized_axes = x_err > 0.0 and y_err > 0.0
+
+        if normalized_axes:
+            Xfit = (X - x_ref) / x_err
+            Yfit = (Y - y_ref) / y_err
+        else:
+            Xfit, Yfit = X, Y
+            x_ref = y_ref = None
+
+        # Plot in raw parameter coordinates; keep pull coordinates only for the
+        # quadratic summary so users can read the axes directly.
+        Xp, Yp = X, Y
+        x_label = f"{d['x_name']} value"
+        y_label = f"{d['y_name']} value"
+
+        finite = np.isfinite(dchi2)
+        conv_mask = finite & conv
+        call_mask = finite & (~conv) & (status == 'call_limit')
+        failed_mask = finite & (~conv) & (status == 'failed')
+        other_mask = finite & (~conv) & ~(call_mask | failed_mask)
+        missing_mask = ~finite
+        n_total = int(dchi2.size)
+        n_conv = int(conv_mask.sum())
+        n_call = int(call_mask.sum())
+        n_fail = int(failed_mask.sum())
+        n_other = int(other_mask.sum() + missing_mask.sum())
+
+        fit_mask = conv_mask & (dchi2 <= 10.0)
+        if int(fit_mask.sum()) < 12:
+            fit_mask = conv_mask
+        fit_result = None
+        if int(fit_mask.sum()) >= 6:
+            fit_result = _fit_quadratic_pull_surface(
+                Xfit[fit_mask], Yfit[fit_mask], dchi2[fit_mask],
+            )
+
+        chi2_ref = d.get('chi2_reference', np.nan)
+        if fit_result is None:
+            summary_lines.append(
+                f"{pair_key} {n_total} {n_conv} {n_call} {n_fail} {n_other} "
+                f"0 nan nan nan nan nan nan nan {chi2_ref:.8g}"
+            )
+        else:
+            summary_lines.append(
+                f"{pair_key} {n_total} {n_conv} {n_call} {n_fail} {n_other} "
+                f"{int(fit_mask.sum())} {fit_result['rho']:.8g} "
+                f"{fit_result['condition']:.8g} {fit_result['angle']:.8g} "
+                f"{fit_result['rms']:.8g} {fit_result['max_abs']:.8g} "
+                f"{fit_result['eigvals'][0]:.8g} {fit_result['eigvals'][-1]:.8g} "
+                f"{chi2_ref:.8g}"
+            )
+
+        conv_values = dchi2[conv_mask]
+        if conv_values.size:
+            y_low = min(0.0, float(np.nanpercentile(conv_values, 1.0)))
+            y_high = float(np.nanpercentile(conv_values, 98.0))
+            y_high = max(4.0, min(80.0, y_high))
+            if y_high <= y_low:
+                y_high = y_low + 4.0
+        else:
+            y_low, y_high = 0.0, 4.0
+        y_span = y_high - y_low
+        y_limits = (y_low - 0.06 * y_span, y_high + 0.12 * y_span)
+
+        prepared.append({
+            'pair_key': pair_key,
+            'd': d,
+            'Xp': Xp, 'Yp': Yp, 'dchi2': dchi2,
+            'x_ref': x_ref,
+            'y_ref': y_ref,
+            'conv_mask': conv_mask,
+            'call_mask': call_mask,
+            'failed_mask': failed_mask,
+            'other_mask': other_mask | missing_mask,
+            'n_total': n_total,
+            'n_conv': n_conv,
+            'n_call': n_call,
+            'n_fail': n_fail,
+            'n_other': n_other,
+            'x_label': x_label,
+            'y_label': y_label,
+            'y_limits': y_limits,
+        })
+
+    with PdfPages(convergence_pdf) as pdf:
+        for p in prepared:
+            d = p['d']
+            fig, ax = plt.subplots(figsize=(8.5, 7.2))
+            status_styles = [
+                (p['conv_mask'], '#1f77b4', 'o', 'converged'),
+                (p['call_mask'], '#ff9f1c', '^', 'call limit'),
+                (p['failed_mask'], '#d62728', 'x', 'failed'),
+                (p['other_mask'], '#7f7f7f', 's', 'other/missing'),
+            ]
+            for mask, color, marker, label in status_styles:
+                if np.any(mask):
+                    kwargs = {'s': 42, 'marker': marker, 'label': label}
+                    if marker == 'x':
+                        kwargs.update({'linewidths': 1.3, 'color': color})
+                    else:
+                        kwargs.update({'edgecolors': 'black', 'linewidths': 0.25,
+                                       'color': color})
+                    ax.scatter(p['Xp'][mask], p['Yp'][mask], **kwargs)
+            if p['x_ref'] is not None and p['y_ref'] is not None:
+                ax.plot(p['x_ref'], p['y_ref'], marker='+', color='black', ms=13, mew=1.8,
+                        label='reference')
+            ax.set_xlabel(p['x_label'])
+            ax.set_ylabel(p['y_label'])
+            ax.set_title(
+                f"{d['x_name']} vs {d['y_name']}: convergence/status map"
+            )
+            ax.text(
+                0.02, 0.02,
+                f"converged {p['n_conv']}/{p['n_total']}   "
+                f"call-limit {p['n_call']}   failed {p['n_fail']}   "
+                f"other/missing {p['n_other']}",
+                transform=ax.transAxes,
+                fontsize=9,
+                bbox=dict(facecolor='white', alpha=0.84, edgecolor='#cccccc'),
+            )
+            ax.grid(True, alpha=0.22)
+            ax.legend(loc='upper right', fontsize=9, framealpha=0.92)
+            plt.tight_layout()
+            pdf.savefig(fig)
+            plt.close(fig)
+
+    with PdfPages(profiles_pdf) as pdf:
+        for p in prepared:
+            d = p['d']
+            Xp, Yp, dchi2 = p['Xp'], p['Yp'], p['dchi2']
+            conv_mask = p['conv_mask']
+            nx, ny = dchi2.shape
+            fig, axes = plt.subplots(1, 2, figsize=(12.5, 5.8))
+            ax_y, ax_x = axes
+
+            x_fixed = Xp[:, 0]
+            x_colors = plt.cm.viridis(np.linspace(0.05, 0.95, max(nx, 1)))
+            for i in range(nx):
+                mask = conv_mask[i, :] & np.isfinite(dchi2[i, :])
+                if not np.any(mask):
+                    continue
+                order = np.argsort(Yp[i, mask])
+                xvals = Yp[i, mask][order]
+                yvals = dchi2[i, mask][order]
+                ax_y.plot(xvals, yvals, 'o-', ms=2.3, lw=0.8, alpha=0.78,
+                          color=x_colors[i])
+            sm = plt.cm.ScalarMappable(
+                cmap='viridis',
+                norm=plt.Normalize(vmin=float(np.nanmin(x_fixed)),
+                                   vmax=float(np.nanmax(x_fixed))),
+            )
+            sm.set_array([])
+            fig.colorbar(sm, ax=ax_y, fraction=0.046, pad=0.04,
+                         label=f"fixed {d['x_name']} value")
+            if p['y_ref'] is not None:
+                ax_y.axvline(p['y_ref'], color='#555555', lw=0.8, ls=':')
+            ax_y.axhline(0, color='#555555', lw=0.8, ls=':')
+            ax_y.set_xlabel(p['y_label'])
+            ax_y.set_ylabel(r'$\Delta\chi^2$')
+            ax_y.set_ylim(*p['y_limits'])
+            ax_y.set_title(f"Fixed {d['x_name']}; scan {d['y_name']}")
+            ax_y.grid(True, alpha=0.22)
+
+            y_fixed = Yp[0, :]
+            y_colors = plt.cm.plasma(np.linspace(0.05, 0.95, max(ny, 1)))
+            for j in range(ny):
+                mask = conv_mask[:, j] & np.isfinite(dchi2[:, j])
+                if not np.any(mask):
+                    continue
+                order = np.argsort(Xp[mask, j])
+                xvals = Xp[mask, j][order]
+                yvals = dchi2[mask, j][order]
+                ax_x.plot(xvals, yvals, 'o-', ms=2.3, lw=0.8, alpha=0.78,
+                          color=y_colors[j])
+            sm = plt.cm.ScalarMappable(
+                cmap='plasma',
+                norm=plt.Normalize(vmin=float(np.nanmin(y_fixed)),
+                                   vmax=float(np.nanmax(y_fixed))),
+            )
+            sm.set_array([])
+            fig.colorbar(sm, ax=ax_x, fraction=0.046, pad=0.04,
+                         label=f"fixed {d['y_name']} value")
+            if p['x_ref'] is not None:
+                ax_x.axvline(p['x_ref'], color='#555555', lw=0.8, ls=':')
+            ax_x.axhline(0, color='#555555', lw=0.8, ls=':')
+            ax_x.set_xlabel(p['x_label'])
+            ax_x.set_ylabel(r'$\Delta\chi^2$')
+            ax_x.set_ylim(*p['y_limits'])
+            ax_x.set_title(f"Fixed {d['y_name']}; scan {d['x_name']}")
+            ax_x.grid(True, alpha=0.22)
+
+            fig.suptitle(
+                f"{d['x_name']} vs {d['y_name']}: converged profile slices only\n"
+                f"Reference point is treated as the minimum; y-range uses the converged 1-98% band",
+                fontsize=12,
+            )
+            fig.tight_layout(rect=[0, 0, 1, 0.90])
+            pdf.savefig(fig)
+            plt.close(fig)
+
+    summary_path = results_dir / "quadratic_fit_summary.txt"
+    summary_path.write_text("\n".join(summary_lines) + "\n")
+
+    for stale_name in ("contours_2d.pdf", "likelihood_2d_3d.pdf",
+                       "likelihood_2d_diagnostics.pdf"):
+        stale = plots_dir / stale_name
+        if stale.exists():
+            stale.unlink()
+    print(f"  ✓ likelihood_2d_convergence.pdf")
+    print(f"  ✓ likelihood_2d_profiles.pdf")
+    print(f"  ✓ {summary_path}")
+
+
 def _plot_pumplin_stability(study_dir, config, plots_dir: Path, results_dir: Path):
     """Pumplin-stability plots: one panel per lambda value, <=4 panels/page.
 
@@ -788,4 +1124,3 @@ def _plot_pumplin_stability(study_dir, config, plots_dir: Path, results_dir: Pat
     print(f"  ✓ {errdef_pdf.name}")
     if incomplete:
         print(f"  ({len(incomplete)} incomplete run(s) skipped)")
-

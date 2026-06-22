@@ -1,0 +1,42 @@
+scan_type: likelihood-scan
+template: hera-baseline
+
+reference_fit: ../../../../../fits/hera/hera-baseline/eoe
+
+# 2D grid defaults: each pair is npoints_2d x npoints_2d fits, axes spanning
+# ref +/- n_sigma_2d * error (~4 sigma to contain the 3 sigma joint contour).
+scan_defaults:
+  npoints_2d: 21
+  n_sigma_2d: 4
+
+# Joint Delta-chi2 contour levels.
+sigma_levels: [0.5, 1]
+
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+
+systematics:
+  - {name: sysHZComb1053, type: E, epsilon: 0.5}
+
+# 2D contour scans: correlated PDF parameter pairs. Each axis may also be an
+# E-type systematic (inferred from the systematics block above).
+scan_params_2d:
+  - {pair: [Agp, ADbar]}
+  - {pair: [Agp, BDbar]}
+  - {pair: [Agp, Bdv]}
+  - {pair: [Agp, Bg]}
+  - {pair: [Agp, Bgp]}
+  - {pair: [Agp, Buv]}
+  - {pair: [Agp, CDbar]}
+  - {pair: [Agp, CUbar]}
+  - {pair: [Agp, Cdv]}
+  - {pair: [Agp, Cg]}
+  - {pair: [Agp, Cuv]}
+  - {pair: [Agp, DUbar]}
+  - {pair: [Agp, Euv]}

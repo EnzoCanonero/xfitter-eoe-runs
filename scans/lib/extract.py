@@ -363,7 +363,7 @@ def _extract_likelihood_scan_results(fits_dir: Path) -> Dict:
 
     scan_1d = {}
 
-    for param_name, param_info in manifest['scan_1d'].items():
+    for param_name, param_info in manifest.get('scan_1d', {}).items():
         scan_values = np.array(param_info['scan_values'])
         fit_dir_names = param_info['fit_dirs']
         ref_val = param_info['value_at_minimum']
@@ -416,7 +416,88 @@ def _extract_likelihood_scan_results(fits_dir: Path) -> Dict:
         print(f"  {param_name}: {n_conv}/{n_total} converged"
               + (f", {n_nan} missing" if n_nan else ""))
 
-    return {'scan_1d': scan_1d}
+    # ── 2D grid extraction ──────────────────────────────────────────────────
+    def _read_chi2_status(fit_dir: Path):
+        chi2 = np.nan
+        conv = False
+        status = 'missing'
+        final_fcn = np.nan
+        try:
+            m = re.search(r'Chi2 after minimisation\s+([-+0-9.Ee]+)',
+                          (fit_dir / "output" / "Results.txt").read_text())
+            chi2 = float(m.group(1)) if m else np.nan
+        except Exception:
+            chi2 = np.nan
+        try:
+            mf = fit_dir / "output" / "minuit.out.txt"
+            if mf.exists():
+                text = mf.read_text(errors='replace')
+                matches = re.findall(
+                    r'FCN=\s*([-+0-9.Ee]+)\s+FROM MIGRAD\s+STATUS=([A-Z ]+)',
+                    text,
+                )
+                if matches:
+                    final_fcn = float(matches[-1][0])
+                    status = ' '.join(matches[-1][1].split()).lower().replace(' ', '_')
+                    conv = status == 'converged'
+                elif "MIGRAD MINIMIZATION HAS CONVERGED" in text:
+                    status = 'converged_text_only'
+                    conv = True
+                else:
+                    status = 'no_migrad_status'
+                if not np.isfinite(chi2) and np.isfinite(final_fcn):
+                    chi2 = final_fcn
+        except Exception:
+            conv = False
+            status = 'unreadable_minuit'
+        return chi2, conv, status
+
+    scan_2d = {}
+    for pair_key, info in manifest.get('scan_2d', {}).items():
+        xs = np.array(info['x_values'])
+        ys = np.array(info['y_values'])
+        grid = info['fit_grid']  # grid[i][j] -> fit dir name
+        nx, ny = len(xs), len(ys)
+        chi2 = np.full((nx, ny), np.nan)
+        conv = np.zeros((nx, ny), dtype=bool)
+        status = np.full((nx, ny), 'missing', dtype=object)
+        for i in range(nx):
+            for j in range(ny):
+                c, cv, st = _read_chi2_status(fits_dir / grid[i][j])
+                chi2[i, j] = c
+                conv[i, j] = cv
+                status[i, j] = st
+
+        x_ref = info.get('x_ref')
+        y_ref = info.get('y_ref')
+        if x_ref is not None and y_ref is not None:
+            ix_ref = int(np.argmin(np.abs(xs - float(x_ref))))
+            iy_ref = int(np.argmin(np.abs(ys - float(y_ref))))
+            chi2_reference = chi2[ix_ref, iy_ref]
+        else:
+            ix_ref = iy_ref = None
+            chi2_reference = np.nan
+
+        if not np.isfinite(chi2_reference):
+            valid = chi2[conv & np.isfinite(chi2)]
+            chi2_reference = float(np.min(valid)) if valid.size else float(np.nanmin(chi2))
+
+        delta_chi2 = chi2 - chi2_reference
+
+        scan_2d[pair_key] = {
+            'x_name': info['x_name'], 'y_name': info['y_name'],
+            'x_values': xs, 'y_values': ys,
+            'x_ref': x_ref, 'y_ref': y_ref,
+            'x_err': info.get('x_err'), 'y_err': info.get('y_err'),
+            'ix_ref': ix_ref, 'iy_ref': iy_ref,
+            'chi2_reference': chi2_reference,
+            'sigma_levels': info.get('sigma_levels', [1, 2, 3]),
+            'chi2': chi2, 'delta_chi2': delta_chi2,
+            'converged': conv, 'status': status,
+        }
+        print(f"  {pair_key}: {int(conv.sum())}/{nx * ny} converged")
+
+    return {'scan_1d': scan_1d, 'scan_2d': scan_2d}
 
 
 # ── Pumplin-stability interval extraction ───────────────────────────────────

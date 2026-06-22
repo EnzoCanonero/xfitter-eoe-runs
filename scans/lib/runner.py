@@ -487,7 +487,7 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
     print(f"Defaults: n_sigma={default_n_sigma}, npoints={default_npoints}")
 
     total_fits = 0
-    manifest: Dict = {'scan_1d': {}}
+    manifest: Dict = {'scan_1d': {}, 'scan_2d': {}}
     all_fit_dirs: List[Path] = []
 
     for scan_param, is_systematic in scan_items:
@@ -573,6 +573,116 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
             'fit_dirs': fit_names_for_param,
         }
         total_fits += npoints
+
+    # ── 2D contour scans ────────────────────────────────────────────────────
+    scan_pairs = config.scan_params_2d
+    if scan_pairs:
+        sigma_levels = config.sigma_levels
+        default_npoints_2d = int(defaults.get('npoints_2d', 21))
+        default_n_sigma_2d = float(defaults.get('n_sigma_2d',
+                                                int(np.ceil(max(sigma_levels))) + 1))
+
+        def _resolve_axis(axis_name):
+            """Return (kind, ref_value, ref_error, minuit_index) or None."""
+            if axis_name not in ref_params:
+                return None
+            rv = ref_params[axis_name]['value']
+            re_ = ref_params[axis_name]['error']
+            if axis_name in e_type_indices:
+                return ('E', rv, re_, e_type_indices[axis_name])
+            return ('pdf', rv, re_, None)
+
+        print(f"\n2D scan: {len(scan_pairs)} parameter pair(s)")
+        print(f"Defaults: n_sigma_2d={default_n_sigma_2d}, npoints_2d={default_npoints_2d}, "
+              f"sigma_levels={sigma_levels}")
+
+        for pair_cfg in scan_pairs:
+            xname, yname = pair_cfg['pair']
+            npoints = int(pair_cfg.get('npoints', default_npoints_2d))
+            n_sigma = float(pair_cfg.get('n_sigma', default_n_sigma_2d))
+
+            ax, ay = _resolve_axis(xname), _resolve_axis(yname)
+            if ax is None or ay is None:
+                missing = [n for n, a in ((xname, ax), (yname, ay)) if a is None]
+                print(f"  WARNING: pair ({xname}, {yname}) — {missing} not in reference "
+                      f"fit params; skipping")
+                continue
+            for nm, a in ((xname, ax), (yname, ay)):
+                if a[0] == 'E' and nm not in e_type_indices:
+                    print(f"  WARNING: '{nm}' is E-type but has no MINUIT index; skipping pair")
+                    a = None
+            xkind, xref, xerr, xidx = ax
+            ykind, yref, yerr, yidx = ay
+
+            if 'x_range' in pair_cfg:
+                xlo, xhi = (float(v) for v in pair_cfg['x_range'])
+            else:
+                xlo, xhi = xref - n_sigma * xerr, xref + n_sigma * xerr
+            if 'y_range' in pair_cfg:
+                ylo, yhi = (float(v) for v in pair_cfg['y_range'])
+            else:
+                ylo, yhi = yref - n_sigma * yerr, yref + n_sigma * yerr
+
+            xs = np.linspace(xlo, xhi, npoints)
+            ys = np.linspace(ylo, yhi, npoints)
+
+            print(f"  [{xkind}x{ykind}] {xname} x {yname}: "
+                  f"x[{xlo:.4g},{xhi:.4g}] y[{ylo:.4g},{yhi:.4g}] "
+                  f"({npoints}x{npoints} = {npoints * npoints} fits)")
+
+            if dry_run:
+                total_fits += npoints * npoints
+                continue
+
+            fit_grid: List[List[str]] = []
+            for i, xv in enumerate(xs):
+                row = []
+                for j, yv in enumerate(ys):
+                    fit_name = f"2d_{xname}_{yname}_{i:03d}_{j:03d}"
+                    fit_dir = fits_dir / fit_name
+
+                    sources = [(s['name'], s['type'], s['epsilon']) for s in systematics]
+                    steering = templates.render_steering(
+                        sources=sources,
+                        datafiles=config.datafiles,
+                        n_iterations=config.get('n_iterations', 2),
+                        enable_bartlett=config.get('enable_bartlett', True),
+                        q2_cut=config.get('q2_cut', 3.5),
+                    )
+                    create_fit_structure(fit_dir, steering, "", config.datafiles,
+                                         template_dir=template_dir, do_errors=do_errors)
+
+                    pdf_fixed: Dict[str, float] = {}
+                    fix_cmds: Dict[str, Tuple[int, float]] = {}
+                    if xkind == 'pdf':
+                        pdf_fixed[xname] = xv
+                    else:
+                        fix_cmds[xname] = (xidx, xv)
+                    if ykind == 'pdf':
+                        pdf_fixed[yname] = yv
+                    else:
+                        fix_cmds[yname] = (yidx, yv)
+
+                    _patch_parameters(
+                        fit_dir / "config" / "parameters.yaml",
+                        pdf_params=initial_params,
+                        scan_fixed_params=pdf_fixed,
+                        fix_commands=fix_cmds,
+                    )
+                    row.append(fit_name)
+                    if not (fit_dir / "output" / "Results.txt").exists():
+                        all_fit_dirs.append(fit_dir.resolve())
+                fit_grid.append(row)
+
+            manifest['scan_2d'][f"{xname}__{yname}"] = {
+                'x_name': xname, 'y_name': yname,
+                'x_values': xs.tolist(), 'y_values': ys.tolist(),
+                'x_ref': xref, 'y_ref': yref, 'x_err': xerr, 'y_err': yerr,
+                'n_sigma': n_sigma, 'npoints': npoints,
+                'sigma_levels': sigma_levels,
+                'fit_grid': fit_grid,
+            }
+            total_fits += npoints * npoints
 
     if dry_run:
         print(f"\n[DRY RUN] Would generate {total_fits} fits total")

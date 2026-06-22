@@ -238,10 +238,11 @@ class LikelihoodScanConfig(StudyConfig):
 
         if 'reference_fit' not in self.data:
             raise ValueError("likelihood-scan config missing required field: 'reference_fit'")
-        if 'scan_params_1d' not in self.data and 'scan_systematics_1d' not in self.data:
+        if not any(k in self.data for k in
+                   ('scan_params_1d', 'scan_systematics_1d', 'scan_params_2d')):
             raise ValueError(
-                "likelihood-scan config must have 'scan_params_1d', "
-                "'scan_systematics_1d', or both"
+                "likelihood-scan config must have at least one of "
+                "'scan_params_1d', 'scan_systematics_1d', 'scan_params_2d'"
             )
 
     @property
@@ -264,6 +265,21 @@ class LikelihoodScanConfig(StudyConfig):
         """E-type systematics to scan: [{name, n_sigma?, npoints?, min?, max?}].
         Fixed via MINUIT SET PAR / FIX commands (xFitter registers them from &Systematics)."""
         return self.data.get('scan_systematics_1d', [])
+
+    @property
+    def scan_params_2d(self) -> List[Dict]:
+        """Parameter pairs for 2D contour scans:
+        [{pair: [xName, yName], npoints?, n_sigma?, x_range?, y_range?}].
+
+        Each axis name may be a PDF parameter or an E-type systematic; the type is
+        inferred from the systematics block. Both axes are fixed at each grid point
+        (PDF via step=0, E-type via MINUIT SET PAR / FIX) while the rest are profiled."""
+        return self.data.get('scan_params_2d', [])
+
+    @property
+    def sigma_levels(self) -> List[float]:
+        """Sigma levels at which to draw 2D joint contours (default [1, 2, 3])."""
+        return [float(s) for s in self.data.get('sigma_levels', [1, 2, 3])]
 
     @property
     def systematics(self) -> List[Dict]:
