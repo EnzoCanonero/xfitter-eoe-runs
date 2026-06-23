@@ -514,6 +514,14 @@ _PUMPLIN_XRANGE_PARAM = re.compile(
 )
 
 
+def _resolve_pumplin_name(name: str, params: set) -> str:
+    """Map MINUIT-truncated names back to configured full names when unambiguous."""
+    if name in params:
+        return name
+    matches = [p for p in params if p[:10] == name]
+    return matches[0] if len(matches) == 1 else name
+
+
 def extract_pumplin_widths(runs_dir: Path, params: set):
     """Parse completed Pumplin interval widths from a pumplin-stability runs/ tree.
 
@@ -559,7 +567,7 @@ def extract_pumplin_widths(runs_dir: Path, params: set):
             if in_definitions:
                 m = _PUMPLIN_PARAM_DEF.match(line)
                 if m:
-                    names[int(m.group(1))] = m.group(2)
+                    names[int(m.group(1))] = _resolve_pumplin_name(m.group(2), params)
 
         errdef = float(run_match.group("err").replace("p", "."))
         iterate = int(run_match.group("it"))

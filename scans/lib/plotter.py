@@ -5,6 +5,7 @@ Generates standard plots from scan results
 
 from pathlib import Path
 import math
+import re
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -19,6 +20,14 @@ _PUMPLIN_PDF_PARAMS = [
     "ADbar", "Agp", "BDbar", "Bdv", "Bg", "Bgp", "Buv",
     "CDbar", "CUbar", "Cdv", "Cg", "Cuv", "DUbar", "Euv",
 ]
+
+
+def _pumplin_plot_params(config) -> list:
+    params = list(_PUMPLIN_PDF_PARAMS)
+    for syst in getattr(config, 'systematics', []):
+        if syst.get('type') == 'E' and syst.get('name') not in params:
+            params.append(syst['name'])
+    return params
 
 
 def plot_scan(study_dir: Path):
@@ -1015,6 +1024,452 @@ def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
     print(f"  ✓ {summary_path}")
 
 
+_MINUIT_FLOAT_RE = re.compile(
+    r'[-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[Ee][-+]?\d+)?'
+)
+_PUMPLIN_RUN_NAME = re.compile(r"errdef(?P<int>\d+)p(?P<frac>\d+)_iter(?P<it>\d+)")
+
+
+def _parse_pumplin_run_key(minuit_file: Path):
+    """Return (lambda, errdef, iterate) for a Pumplin minuit.out.txt path."""
+    run_name = minuit_file.parents[1].name
+    lambda_name = minuit_file.parents[2].name
+    m = _PUMPLIN_RUN_NAME.match(run_name)
+    if not m or not lambda_name.startswith("lambda_"):
+        return None
+    try:
+        lam = float(lambda_name.replace("lambda_", ""))
+        errdef = float(f"{m.group('int')}.{m.group('frac')}")
+        iterate = int(m.group('it'))
+    except ValueError:
+        return None
+    return lam, errdef, iterate
+
+
+def _resolve_minuit_name(name: str, target_names) -> str:
+    """Map MINUIT-truncated names to configured full names when unambiguous."""
+    if name in target_names:
+        return name
+    matches = [target for target in target_names if target[:10] == name]
+    return matches[0] if len(matches) == 1 else name
+
+
+def _parse_active_minuit_names(text: str, target_names):
+    """Parse active MINUIT parameter names in covariance-matrix order."""
+    definitions = {
+        int(m.group(1)): _resolve_minuit_name(m.group(2).strip(), target_names)
+        for m in re.finditer(r"^\s*(\d+)\s+'([^']*?)\s*'", text, re.MULTILINE)
+    }
+    lines = text.splitlines()
+    start = None
+    for i, line in enumerate(lines):
+        if "PARAMETER  CORRELATION COEFFICIENTS" in line:
+            start = i
+    if start is None or start + 1 >= len(lines):
+        return []
+    active_ids = [int(v) for v in re.findall(r"\d+", lines[start + 1])]
+    return [definitions.get(idx, str(idx)) for idx in active_ids]
+
+
+def _parse_iterate_error_matrix(text: str, n_params: int):
+    """Parse the lower-triangular 'ERROR MATRIX FROM ITERATE' block."""
+    marker = "ERROR MATRIX FROM ITERATE"
+    pos = text.rfind(marker)
+    if pos < 0:
+        return None
+    needed = n_params * (n_params + 1) // 2
+    values = []
+    for line in text[pos + len(marker):].splitlines():
+        if line.strip().startswith("**********") and values:
+            break
+        values.extend(float(v) for v in _MINUIT_FLOAT_RE.findall(line))
+        if len(values) >= needed:
+            break
+    if len(values) < needed:
+        return None
+
+    matrix = np.zeros((n_params, n_params), dtype=float)
+    k = 0
+    for i in range(n_params):
+        for j in range(i + 1):
+            matrix[i, j] = matrix[j, i] = values[k]
+            k += 1
+    return 0.5 * (matrix + matrix.T)
+
+
+def _decompose_covariance(names, matrix):
+    """Eigen-decompose covariance matrix in numpy's stable ascending order."""
+    eigenvalues, eigenvectors = np.linalg.eigh(matrix)
+
+    positive = np.clip(eigenvalues, 0.0, None)
+    weighted = (eigenvectors ** 2) * positive[None, :]
+    denom = weighted.sum(axis=1)
+    contributions = np.full_like(weighted, np.nan, dtype=float)
+    valid = denom > 0
+    contributions[valid, :] = weighted[valid, :] / denom[valid, None]
+
+    neff = {}
+    for i, name in enumerate(names):
+        row = contributions[i]
+        finite = row[np.isfinite(row)]
+        neff[name] = float(1.0 / np.sum(finite ** 2)) if finite.size else np.nan
+
+    return {
+        'names': names,
+        'name_to_idx': {name: i for i, name in enumerate(names)},
+        'matrix': matrix,
+        'eigenvalues': eigenvalues,
+        'eigenvectors': eigenvectors,
+        'contributions': contributions,
+        'neff': neff,
+        'negative_eigenvalues': int(np.sum(eigenvalues < -1e-10)),
+        'min_eigenvalue': float(np.min(eigenvalues)) if eigenvalues.size else np.nan,
+    }
+
+
+def _collect_pumplin_eigen_records(runs_dir: Path, target_names):
+    """Collect covariance eigenmode records from completed Pumplin runs."""
+    records = {}
+    skipped = []
+    for minuit_file in sorted(runs_dir.glob("lambda_*/errdef*_iter*/output/minuit.out.txt")):
+        key = _parse_pumplin_run_key(minuit_file)
+        if key is None:
+            continue
+        try:
+            text = minuit_file.read_text(errors="replace")
+            names = _parse_active_minuit_names(text, target_names)
+            if not names:
+                skipped.append((str(minuit_file), "missing correlation block"))
+                continue
+            matrix = _parse_iterate_error_matrix(text, len(names))
+            if matrix is None:
+                skipped.append((str(minuit_file), "missing iterate error matrix"))
+                continue
+            rec = _decompose_covariance(names, matrix)
+            rec.update({
+                'lambda': key[0],
+                'errdef': key[1],
+                'iterate': key[2],
+                'path': minuit_file,
+            })
+            records[key] = rec
+        except Exception as exc:
+            skipped.append((str(minuit_file), str(exc)))
+    return records, skipped
+
+
+def _align_eigenvectors_to_reference(record, reference):
+    """Align one run's eigenvectors to a fixed reference eigenbasis."""
+    common = [name for name in reference['names'] if name in record['name_to_idx']]
+    if not common:
+        return None
+    i_ref = [reference['name_to_idx'][name] for name in common]
+    i_rec = [record['name_to_idx'][name] for name in common]
+    n_modes = min(reference['eigenvectors'].shape[1], record['eigenvectors'].shape[1])
+    ref_vecs = reference['eigenvectors'][i_ref, :n_modes].copy()
+    rec_vecs = record['eigenvectors'][i_rec, :n_modes].copy()
+
+    ref_norm = np.linalg.norm(ref_vecs, axis=0)
+    rec_norm = np.linalg.norm(rec_vecs, axis=0)
+    valid = (ref_norm > 0) & (rec_norm > 0)
+    ref_vecs[:, valid] /= ref_norm[valid]
+    rec_vecs[:, valid] /= rec_norm[valid]
+    overlap = np.abs(ref_vecs.T @ rec_vecs)
+
+    assignments = []
+    used_ref = set()
+    used_rec = set()
+    for flat_idx in np.argsort(overlap.ravel())[::-1]:
+        i, j = np.unravel_index(flat_idx, overlap.shape)
+        if i in used_ref or j in used_rec:
+            continue
+        assignments.append((i, j, overlap[i, j]))
+        used_ref.add(i)
+        used_rec.add(j)
+        if len(assignments) == n_modes:
+            break
+    assignments.sort(key=lambda item: item[0])
+    if len(assignments) != n_modes:
+        return None
+
+    rec_order = [j for _, j, _ in assignments]
+    signs = []
+    for i_ref_mode, i_rec_mode, _ in assignments:
+        dot = float(ref_vecs[:, i_ref_mode] @ rec_vecs[:, i_rec_mode])
+        signs.append(1.0 if dot >= 0.0 else -1.0)
+
+    aligned_vectors = record['eigenvectors'][:, rec_order].copy()
+    aligned_vectors *= np.asarray(signs)[None, :]
+    aligned_eigenvalues = record['eigenvalues'][rec_order]
+    return aligned_eigenvalues, aligned_vectors, np.asarray([ov for _, _, ov in assignments])
+
+
+def _aligned_variance_contributions(record, reference):
+    aligned = _align_eigenvectors_to_reference(record, reference)
+    if aligned is None:
+        return None
+    eigenvalues, eigenvectors, overlaps = aligned
+    positive = np.clip(eigenvalues, 0.0, None)
+    weighted = (eigenvectors ** 2) * positive[None, :]
+    denom = weighted.sum(axis=1)
+    contributions = np.full_like(weighted, np.nan, dtype=float)
+    valid = denom > 0
+    contributions[valid, :] = weighted[valid, :] / denom[valid, None]
+    neff = np.full(contributions.shape[0], np.nan)
+    for i, row in enumerate(contributions):
+        finite = row[np.isfinite(row)]
+        if finite.size:
+            neff[i] = 1.0 / np.sum(finite ** 2)
+    return {
+        'eigenvalues': eigenvalues,
+        'contributions': contributions,
+        'neff': neff,
+        'overlaps': overlaps,
+    }
+
+
+def _plot_pumplin_eigenmode_diagnostics(
+        study_dir: Path, params, widths, lambdas, errdefs, iterates,
+        errdef_ref, max_iter, plots_dir: Path, results_dir: Path):
+    """Aligned eigenmode-contribution diagnostics from Pumplin MINUIT outputs."""
+    records, skipped = _collect_pumplin_eigen_records(study_dir / "runs", set(params))
+    if not records:
+        print("  ! No Pumplin covariance eigenmode records found")
+        return
+
+    out_dir = plots_dir / "pumplin_eigenmode_contributions"
+    mode_out_dir = plots_dir / "pumplin_eigenmode_contributions_by_mode"
+    out_dir.mkdir(exist_ok=True)
+    mode_out_dir.mkdir(exist_ok=True)
+    for old_pdf in mode_out_dir.glob("mode_*.pdf"):
+        old_pdf.unlink()
+
+    stale_files = [
+        plots_dir / "pumplin_eigenmode_contributions.pdf",
+        plots_dir / "pumplin_eigenvector_overlaps.pdf",
+        plots_dir / "pumplin_projection_change_vs_instability.pdf",
+        results_dir / "pumplin_projection_sensitivity.csv",
+        results_dir / "pumplin_projection_sensitivity_summary.csv",
+    ]
+    for stale in stale_files:
+        if stale.exists():
+            stale.unlink()
+
+    reference_by_lambda = {
+        lam: records[(lam, errdef_ref, max_iter)]
+        for lam in lambdas
+        if (lam, errdef_ref, max_iter) in records
+    }
+    if not reference_by_lambda:
+        print("  ! No reference eigenbasis records found")
+        return
+
+    aligned = {}
+    contribution_rows = []
+    for key, rec in sorted(records.items()):
+        lam, errdef, iterate = key
+        reference = reference_by_lambda.get(lam)
+        if reference is None:
+            continue
+        aligned_rec = _aligned_variance_contributions(rec, reference)
+        if aligned_rec is None:
+            skipped.append((str(rec['path']), "could not align to reference eigenbasis"))
+            continue
+        aligned[key] = aligned_rec
+        for param in params:
+            idx = rec['name_to_idx'].get(param)
+            if idx is None:
+                continue
+            for mode_idx, frac in enumerate(aligned_rec['contributions'][idx], start=1):
+                contribution_rows.append({
+                    'lambda': lam,
+                    'errdef': errdef,
+                    'iterate': iterate,
+                    'parameter': param,
+                    'aligned_mode': mode_idx,
+                    'reference_errdef': errdef_ref,
+                    'reference_iterate': max_iter,
+                    'aligned_eigenvalue': aligned_rec['eigenvalues'][mode_idx - 1],
+                    'variance_fraction': frac,
+                    'effective_modes': aligned_rec['neff'][idx],
+                    'alignment_overlap': aligned_rec['overlaps'][mode_idx - 1],
+                    'negative_eigenvalues': rec['negative_eigenvalues'],
+                    'min_eigenvalue': rec['min_eigenvalue'],
+                })
+
+    contrib_csv = results_dir / "pumplin_eigenmode_contributions.csv"
+    pd.DataFrame(contribution_rows).to_csv(contrib_csv, index=False)
+
+    def lam_label(lam):
+        return f"$\\lambda = {lam:.1f}$" + (" (Gaussian)" if lam == 0.0 else "")
+
+    errdef_colors = {
+        errdef: plt.cm.viridis(i / max(len(errdefs) - 1, 1))
+        for i, errdef in enumerate(errdefs)
+    }
+
+    def _plot_parameter(param):
+        pdf_path = out_dir / f"{param}.pdf"
+        has_data = False
+        with PdfPages(pdf_path) as pdf:
+            for lam in lambdas:
+                reference = reference_by_lambda.get(lam)
+                if reference is None or param not in reference['name_to_idx']:
+                    continue
+                n_modes = reference['eigenvectors'].shape[1]
+                ncols = 4
+                nrows = int(math.ceil(n_modes / ncols))
+                fig, axes = plt.subplots(nrows, ncols, figsize=(13, 10.2),
+                                         sharex=True, sharey=True)
+                axes = np.asarray(axes).reshape(-1)
+                for ax in axes[n_modes:]:
+                    ax.axis('off')
+
+                for mode_idx in range(n_modes):
+                    ax = axes[mode_idx]
+                    for errdef in errdefs:
+                        xs, ys = [], []
+                        for iterate in iterates:
+                            key = (lam, errdef, iterate)
+                            rec = records.get(key)
+                            aligned_rec = aligned.get(key)
+                            if rec is None or aligned_rec is None:
+                                continue
+                            pidx = rec['name_to_idx'].get(param)
+                            if pidx is None:
+                                continue
+                            frac = aligned_rec['contributions'][pidx, mode_idx]
+                            if not np.isfinite(frac):
+                                continue
+                            xs.append(iterate)
+                            ys.append(frac)
+                        if xs:
+                            ax.plot(xs, ys, 'o-', ms=2.4, lw=1.0,
+                                    color=errdef_colors[errdef],
+                                    label=f"{errdef:.1f}")
+                    ax.set_title(
+                        f"mode {mode_idx + 1}",
+                        fontsize=8,
+                    )
+                    ax.grid(True, color='#dddddd', lw=0.5)
+                    ax.set_ylim(-0.03, 1.03)
+
+                for ax in axes[-ncols:]:
+                    ax.set_xlabel("Pumplin ITERATE")
+                for ax in axes[::ncols]:
+                    ax.set_ylabel("variance fraction")
+
+                handles, legend_labels = axes[0].get_legend_handles_labels()
+                if handles:
+                    fig.legend(handles, legend_labels, title="ERRDEF", ncol=5,
+                               fontsize=8, title_fontsize=9, loc='lower center')
+                fig.suptitle(
+                    f"{param}: aligned eigenmode variance fractions, {lam_label(lam)}\n"
+                    f"Reference basis: ERRDEF={errdef_ref:.1f}, ITERATE={max_iter}; "
+                    "mode numbering is fixed to the reference eigenbasis",
+                    fontsize=12,
+                )
+                fig.tight_layout(rect=[0, 0.06, 1, 0.93])
+                pdf.savefig(fig)
+                plt.close(fig)
+                has_data = True
+        if not has_data:
+            pdf_path.unlink(missing_ok=True)
+            return None
+        return pdf_path
+
+    def _plot_mode(mode_idx):
+        pdf_path = mode_out_dir / f"mode_{mode_idx + 1:02d}.pdf"
+        has_data = False
+        ncols = 4
+        nrows = int(math.ceil(len(params) / ncols))
+        with PdfPages(pdf_path) as pdf:
+            for lam in lambdas:
+                reference = reference_by_lambda.get(lam)
+                if reference is None or mode_idx >= reference['eigenvectors'].shape[1]:
+                    continue
+                fig, axes = plt.subplots(nrows, ncols, figsize=(13, 10.2),
+                                         sharex=True, sharey=True)
+                axes = np.asarray(axes).reshape(-1)
+                for ax in axes[len(params):]:
+                    ax.axis('off')
+
+                for ax, param in zip(axes, params):
+                    has_lines = False
+                    for errdef in errdefs:
+                        xs, ys = [], []
+                        for iterate in iterates:
+                            key = (lam, errdef, iterate)
+                            rec = records.get(key)
+                            aligned_rec = aligned.get(key)
+                            if rec is None or aligned_rec is None:
+                                continue
+                            pidx = rec['name_to_idx'].get(param)
+                            if pidx is None or mode_idx >= aligned_rec['contributions'].shape[1]:
+                                continue
+                            frac = aligned_rec['contributions'][pidx, mode_idx]
+                            if not np.isfinite(frac):
+                                continue
+                            xs.append(iterate)
+                            ys.append(frac)
+                        if xs:
+                            ax.plot(xs, ys, 'o-', ms=2.4, lw=1.0,
+                                    color=errdef_colors[errdef],
+                                    label=f"{errdef:.1f}")
+                            has_lines = True
+                    ax.set_title(param, fontsize=8)
+                    ax.grid(True, color='#dddddd', lw=0.5)
+                    ax.set_ylim(-0.03, 1.03)
+                    if not has_lines:
+                        ax.text(0.5, 0.5, "not active", transform=ax.transAxes,
+                                ha='center', va='center', fontsize=8,
+                                color='#777777')
+
+                for ax in axes[-ncols:]:
+                    ax.set_xlabel("Pumplin ITERATE")
+                for ax in axes[::ncols]:
+                    ax.set_ylabel("variance fraction")
+
+                handles, legend_labels = axes[0].get_legend_handles_labels()
+                if handles:
+                    fig.legend(handles, legend_labels, title="ERRDEF", ncol=5,
+                               fontsize=8, title_fontsize=9, loc='lower center')
+                fig.suptitle(
+                    f"mode {mode_idx + 1}: aligned eigenmode variance fractions, "
+                    f"{lam_label(lam)}\n"
+                    f"Reference basis: ERRDEF={errdef_ref:.1f}, ITERATE={max_iter}; "
+                    "parameter panels share the same mode numbering",
+                    fontsize=12,
+                )
+                fig.tight_layout(rect=[0, 0.06, 1, 0.93])
+                pdf.savefig(fig)
+                plt.close(fig)
+                has_data = True
+        if not has_data:
+            pdf_path.unlink(missing_ok=True)
+            return None
+        return pdf_path
+
+    written = []
+    for param in params:
+        path = _plot_parameter(param)
+        if path is not None:
+            written.append(path)
+
+    max_modes = max(ref['eigenvectors'].shape[1] for ref in reference_by_lambda.values())
+    written_modes = []
+    for mode_idx in range(max_modes):
+        path = _plot_mode(mode_idx)
+        if path is not None:
+            written_modes.append(path)
+
+    print(f"  ✓ {out_dir.relative_to(plots_dir)}/*.pdf ({len(written)} parameter file(s))")
+    print(f"  ✓ {mode_out_dir.relative_to(plots_dir)}/*.pdf ({len(written_modes)} mode file(s))")
+    print(f"  ✓ {contrib_csv.name}")
+    if skipped:
+        print(f"  ({len(skipped)} covariance record(s) skipped)")
+
+
 def _plot_pumplin_stability(study_dir, config, plots_dir: Path, results_dir: Path):
     """Pumplin-stability plots: one panel per lambda value, <=4 panels/page.
 
@@ -1024,7 +1479,7 @@ def _plot_pumplin_stability(study_dir, config, plots_dir: Path, results_dir: Pat
       - pumplin_errdef_invariance.pdf     : interval / interval(ERRDEF_ref) vs ERRDEF,
         one line per ITERATE.
     """
-    params = _PUMPLIN_PDF_PARAMS
+    params = _pumplin_plot_params(config)
     widths, incomplete = extract_pumplin_widths(study_dir / "runs", set(params))
     if not widths:
         raise SystemExit("No completed Pumplin interval blocks found under runs/")
@@ -1038,9 +1493,10 @@ def _plot_pumplin_stability(study_dir, config, plots_dir: Path, results_dir: Pat
         # fall back to the median available errdef
         errdef_ref = errdefs[len(errdefs) // 2]
 
+    complete_run_keys = {(lam, e, it) for (lam, e, it, _) in widths}
     print(f"\nGenerating pumplin-stability plots...")
     print(f"  lambdas={lambdas}  errdefs={errdefs}  iterates={iterates}")
-    print(f"  complete interval logs: {len(widths) // len(params)}  incomplete: {len(incomplete)}")
+    print(f"  complete interval logs: {len(complete_run_keys)}  incomplete: {len(incomplete)}")
 
     # Save the raw widths as a tidy CSV for downstream use.
     rows = [{'lambda': lam, 'errdef': e, 'iterate': it, 'parameter': p, 'width': w}
@@ -1071,6 +1527,7 @@ def _plot_pumplin_stability(study_dir, config, plots_dir: Path, results_dir: Pat
                 for ax, lam in zip(axes, page_lams):
                     ax.axhspan(0.9, 1.1, color='#f0f0f0', zorder=0)
                     ax.axhline(1.0, ls='--', lw=0.8, color='#666666')
+                    has_lines = False
                     if kind == 'convergence':
                         for ci, e in enumerate(errdefs):
                             ref = widths.get((lam, e, max_iter, param))
@@ -1084,6 +1541,7 @@ def _plot_pumplin_stability(study_dir, config, plots_dir: Path, results_dir: Pat
                             if xs:
                                 ax.plot(xs, ys, 'o-', ms=3, lw=1.2,
                                         color=errdef_cmap[ci], label=f"{e:.1f}")
+                                has_lines = True
                         ax.set_xlabel("Pumplin ITERATE")
                         ax.set_ylabel(f"interval / interval(iter {max_iter})")
                     else:  # errdef invariance
@@ -1097,13 +1555,19 @@ def _plot_pumplin_stability(study_dir, config, plots_dir: Path, results_dir: Pat
                             if xs:
                                 ax.plot(xs, ys, 'o-', ms=3, lw=1.2,
                                         color=iter_cmap[ci], label=f"{it}")
+                                has_lines = True
                         ax.set_xlabel("ERRDEF")
                         ax.set_ylabel(f"interval / interval(ERRDEF={errdef_ref:.1f})")
                     ax.set_title(lam_label(lam), fontsize=11)
                     ax.set_ylim(0.65, 1.45)
                     ax.grid(True, color='#dddddd', lw=0.6)
                     leg_title = "ERRDEF" if kind == 'convergence' else "ITERATE"
-                    ax.legend(title=leg_title, fontsize=6, ncol=2, loc='best')
+                    if has_lines:
+                        ax.legend(title=leg_title, fontsize=6, ncol=2, loc='best')
+                    else:
+                        ax.text(0.5, 0.5, "not active", transform=ax.transAxes,
+                                ha='center', va='center', fontsize=10,
+                                color='#777777')
                 if kind == 'convergence':
                     suptitle = f"{param}: Pumplin iteration convergence (norm. to ITERATE={max_iter})"
                 else:
@@ -1122,5 +1586,9 @@ def _plot_pumplin_stability(study_dir, config, plots_dir: Path, results_dir: Pat
 
     print(f"  ✓ {conv_pdf.name}")
     print(f"  ✓ {errdef_pdf.name}")
+    _plot_pumplin_eigenmode_diagnostics(
+        study_dir, params, widths, lambdas, errdefs, iterates,
+        errdef_ref, max_iter, plots_dir, results_dir,
+    )
     if incomplete:
         print(f"  ({len(incomplete)} incomplete run(s) skipped)")
