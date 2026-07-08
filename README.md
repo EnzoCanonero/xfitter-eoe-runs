@@ -23,6 +23,10 @@ xfitter-eoe-runs/
 │   │       ├── eoe/
 │   │       ├── nominal/
 │   │       └── eoe-no-bartlett/
+│   ├── compare/                # PDF-comparison tool (overlay fits' PDFs)
+│   │   ├── bin/                #   plot
+│   │   ├── lib/                #   Python framework
+│   │   └── studies/            #   comparison studies (config.yaml)
 │   └── sandbox/                # throwaway work (gitignored)
 └── scans/                      # systematic scans (automated)
     ├── bin/                    # run-scan, plot
@@ -145,6 +149,46 @@ ln -s ../../bin/plot .
 ```
 
 Each study is self-contained: `config.yaml`, `runs/`, `results/`, `plots/`.
+
+## Comparing fits (PDF plots)
+
+`fits/compare/` overlays the parton distributions of an arbitrary number of **individual
+fits** into one multi-page PDF (one page per observable), with a 2-panel layout: central
+distributions + uncertainty band on the left, ratio-to-reference on the right. Each fit is
+read from its own LHAPDF set at `<fit>/output/<set>` (default set `proton`).
+
+It is config-driven, mirroring the scans UX (`cd <study> && plot`).
+
+### Create and run a comparison
+
+```bash
+cd fits/compare/studies/
+mkdir my-comparison && cd my-comparison
+
+cat > config.yaml << 'EOF'
+type: pdf-comparison
+Q2: 10.0                      # observables evaluated at Q = sqrt(Q2) [GeV]
+x_min: 1.0e-4
+x_max: 0.9
+observables: [uv, dv, gluon, sea]
+error_type: asymmetric        # symmetric | asymmetric (used only when a set carries errors)
+ratio_reference: 0            # ratio-panel denominator: fit index or label
+fits:
+  - {label: "Q2 > 2.0", path: ../../../hera/Q2cut/q2cut-2.0}
+  - {label: "Q2 > 5.0", path: ../../../hera/Q2cut/q2cut-5.0}
+  # An installed LHAPDF set can be overlaid instead of a fit dir:
+  # - {label: "HERAPDF2.0 NNLO", lhapdf_set: HERAPDF20_NNLO_EIG}
+EOF
+
+ln -s ../../bin/plot .
+./plot                        # writes plots/pdf_comparison.pdf
+```
+
+Each fit entry uses either `path` (a local fit dir, relative to the study) or
+`lhapdf_set` (an installed set); optional `set`, `color`, `linestyle`, `label`.
+Uncertainty bands are **auto-detected**: a set with `1+2N` members gets a Hessian band
+(via `PDFSet.uncertainty`, honouring its `ErrorType`); a single-member set is drawn as a
+central line only. Comparisons may freely mix the two.
 
 ## Git workflow
 

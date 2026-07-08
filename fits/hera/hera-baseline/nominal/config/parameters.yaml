@@ -5,6 +5,10 @@ MINUIT:
     call fcn 1
     migrad
     call fcn 3
+  doErrors: |
+    Pumplin
+    SET ERRDEF 0.5
+    ITERATE 10
 
 Parameters:
   Ag   :  DEPENDENT

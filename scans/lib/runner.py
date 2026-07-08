@@ -68,6 +68,68 @@ def _patch_parameters(params_file: Path,
     params_file.write_text(content)
 
 
+def _eoe_param_indices(parameters_yaml_text: str,
+                       e_source_names: List[str]) -> Dict[str, int]:
+    """Map each E-type EoE source to its 1-based MINUIT parameter number.
+
+    xfitter registers every key in the `Parameters:` block (including DEPENDENT,
+    constant and derived ones) as parameters 1..Np, then appends each `:E`
+    systematic in **ListOfSources declaration order** (verified against MINUIT
+    output: 22 PDF params, then sysHZComb1053 = #23, proc_tb21 = #24 for
+    ListOfSources = '…1053', '…tb21'). We replicate that so `set par <N>` can
+    target a source without needing a prior fit to read indices.
+
+    Args:
+        parameters_yaml_text: rendered parameters.yaml content for the fit.
+        e_source_names: the fit's :E source names, in ListOfSources order.
+
+    Returns:
+        {source_name: minuit_index}.
+    """
+    m = re.search(r'^Parameters:\s*$(.*?)^Parameterisations:',
+                  parameters_yaml_text, re.MULTILINE | re.DOTALL)
+    block = m.group(1) if m else parameters_yaml_text
+    # Top-level keys are exactly two-space indented (nested CDbar value/step are deeper).
+    n_pdf = len(re.findall(r'^  (\w+)\s*:', block, re.MULTILINE))
+    return {name: n_pdf + i + 1 for i, name in enumerate(e_source_names)}
+
+
+def _inject_init_commands(params_file: Path, init_by_index: Dict[int, float]) -> None:
+    """Warm-start E-type EoE nuisances via MINUIT `set par <idx> <val>` commands.
+
+    Lines are inserted before the `    call fcn 1\n` anchor in the Commands block
+    (same mechanism as _patch_parameters, but without FIX). Zero/None values are
+    skipped, so an unset/explicit-0 init is a no-op (xfitter's default).
+    """
+    cmds = {idx: val for idx, val in init_by_index.items() if val}
+    if not cmds:
+        return
+    content = params_file.read_text()
+    block = ''.join(f'    set par {idx} {val:.8g}\n' for idx, val in sorted(cmds.items()))
+    content = content.replace('    call fcn 1\n', block + '    call fcn 1\n', 1)
+    params_file.write_text(content)
+
+
+def _apply_source_inits(fit_dir: Path, sources: List[Dict]) -> None:
+    """Inject init `set par` commands for a fit's E-type sources that carry an init.
+
+    `sources` are expanded systematics dicts ({name, type, epsilon, init}). No-op
+    when none have a non-zero init. Used by the from-scratch generators (systematic
+    -ranking, lambda-scan, pumplin-stability), which have no reference fit to read
+    MINUIT indices from.
+    """
+    e_sources = [s['name'] for s in sources if s.get('type') == 'E']
+    e_init = {s['name']: s['init'] for s in sources
+              if s.get('type') == 'E' and s.get('init')}
+    if not e_init:
+        return
+    params_file = fit_dir / "config" / "parameters.yaml"
+    # Index must be computed over ALL :E sources in the fit (their MINUIT numbers
+    # depend on the full set), then we set par only for the init-bearing ones.
+    idx = _eoe_param_indices(params_file.read_text(), e_sources)
+    _inject_init_commands(params_file, {idx[n]: e_init[n] for n in e_init})
+
+
 def run_scan(study_dir: Path, dry_run: bool = False, submit: bool = True):
     """
     Generate fits for a scan study and optionally submit to Condor
@@ -194,6 +256,7 @@ def _generate_pumplin_stability_fits(config: PumplinStabilityConfig, fits_dir: P
                 )
                 create_fit_structure(fit_dir, steering, "", config.datafiles,
                                      template_dir=template_dir, do_errors=do_errors)
+                _apply_source_inits(fit_dir, syslist)
                 all_fit_dirs.append(fit_dir.resolve())
 
     print(f"\nCreated {len(all_fit_dirs)} fits in {fits_dir}")
@@ -261,6 +324,7 @@ def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path, dry_run
 
         create_fit_structure(fit_dir, steering, "", config.datafiles,
                              template_dir=template_dir, do_errors=do_errors)
+        _apply_source_inits(fit_dir, systematics)
         all_fit_dirs.append(fit_dir.resolve())
 
     print(f"\nCreated {len(lambda_vals)} fits in {fits_dir}")
@@ -275,9 +339,14 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir:
     templates = TemplateManager(template_dir)
 
     systematics = config.systematics
+    base = config.base_systematics
+    base_sources = [(s['name'], s['type'], s['epsilon']) for s in base]
     print(f"Q2 cut: {config.get('q2_cut', 3.5)}")
 
     print(f"\nEpsilon: {config.epsilon}")
+    if base:
+        print(f"Base EoE sources (held on in every fit): "
+              f"{[(s['name'], s['epsilon'], s['init']) for s in base]}")
     print(f"Number of systematics to test: {len(systematics)}")
     print(f"\nSystematics:")
     for sys in systematics[:10]:
@@ -294,40 +363,36 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir:
 
     do_errors = config.do_errors_string
 
-    # Generate nominal fit first (no systematics — used as baseline for shift/uncertainty plots)
+    def _render(sources):
+        return templates.render_steering(
+            sources=sources,
+            datafiles=config.datafiles,
+            n_iterations=config.get('n_iterations', 2),
+            enable_bartlett=config.get('enable_bartlett', True),
+            q2_cut=config.get('q2_cut', 3.5),
+        )
+
+    # Nominal/reference fit = base sources only (no candidate). With an empty base
+    # this is the usual Gaussian nominal; with a base set it is the lower-order fit.
     print(f"Generating nominal...")
-    nominal_steering = templates.render_steering(
-        sources=[],
-        datafiles=config.datafiles,
-        n_iterations=config.get('n_iterations', 2),
-        enable_bartlett=config.get('enable_bartlett', True),
-        q2_cut=config.get('q2_cut', 3.5)
-    )
-    create_fit_structure(fits_dir / "nominal", nominal_steering, "", config.datafiles,
+    create_fit_structure(fits_dir / "nominal", _render(base_sources), "", config.datafiles,
                          template_dir=template_dir, do_errors=do_errors)
+    _apply_source_inits(fits_dir / "nominal", base)
     all_fit_dirs: List[Path] = [(fits_dir / "nominal").resolve()]
 
-    # Generate fit for each systematic
+    # Generate fit for each candidate systematic, on top of the base sources.
     for sys in systematics:
         fit_name = sys['name']
         fit_dir = fits_dir / fit_name
 
         print(f"Generating {fit_name}...")
 
-        # Single-source list with resolved epsilon
-        sources = [(sys['name'], sys['type'], sys['epsilon'])]
+        fit_systematics = base + [sys]
+        sources = [(s['name'], s['type'], s['epsilon']) for s in fit_systematics]
 
-        # Render steering file
-        steering = templates.render_steering(
-            sources=sources,
-            datafiles=config.datafiles,
-            n_iterations=config.get('n_iterations', 2),
-            enable_bartlett=config.get('enable_bartlett', True),
-            q2_cut=config.get('q2_cut', 3.5)
-        )
-
-        create_fit_structure(fit_dir, steering, "", config.datafiles,
+        create_fit_structure(fit_dir, _render(sources), "", config.datafiles,
                              template_dir=template_dir, do_errors=do_errors)
+        _apply_source_inits(fit_dir, fit_systematics)
         all_fit_dirs.append(fit_dir.resolve())
 
     print(f"\nCreated {len(systematics) + 1} fits in {fits_dir} (including nominal)")
@@ -439,15 +504,16 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
     # Read fitted values and errors from reference fit
     ref_params = _build_reference_params(config.reference_fit, e_type_names)
 
-    # Build initial MINUIT starting values from reference fit (override with config)
+    # Build initial MINUIT starting values from reference fit (override with config).
+    # PDF params are every fitted (variable) parameter in the reference fit that is
+    # not an E-type systematic — read dynamically so this works for any
+    # parametrisation (HERAPDF, giuli, ...), not just the hardcoded HERAPDF set.
     initial_params: Dict[str, Dict] = {}
-    for name in _PDF_PARAMS:
-        if name in ref_params:
-            val = ref_params[name]['value']
-            err = ref_params[name]['error']
-            initial_params[name] = {'value': val, 'step': max(abs(err), 1e-4)}
-        else:
-            print(f"  WARNING: '{name}' not in reference fit output — template default used")
+    for name, pdata in ref_params.items():
+        if name in e_type_names:
+            continue  # E-type nuisances are fixed via MINUIT index, not the Parameters block
+        initial_params[name] = {'value': pdata['value'],
+                                'step': max(abs(pdata['error']), 1e-4)}
     for name, override in config.parameter_overrides.items():
         if name in initial_params:
             initial_params[name].update(override)
@@ -558,6 +624,15 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
                 scan_fixed_params=pdf_fixed,
                 fix_commands=fix_cmds,
             )
+            # Warm-start E-type sources carrying an `init`, except the one being
+            # scanned (its grid value is fixed via fix_commands above, and runs after).
+            init_by_index = {
+                e_type_indices[s['name']]: s['init']
+                for s in systematics
+                if s.get('type') == 'E' and s.get('init')
+                and s['name'] in e_type_indices and s['name'] != name
+            }
+            _inject_init_commands(fit_dir / "config" / "parameters.yaml", init_by_index)
             fit_names_for_param.append(fit_name)
             if not (fit_dir / "output" / "Results.txt").exists():
                 all_fit_dirs.append(fit_dir.resolve())

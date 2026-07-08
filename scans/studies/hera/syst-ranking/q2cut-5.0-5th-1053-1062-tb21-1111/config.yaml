@@ -1,0 +1,29 @@
+scan_type: systematic-ranking
+template: q2cut-5.0
+epsilon: 0.6
+
+# Fifth-order forward-selection scan (Q2cut = 5.0, baseline parametrization).
+# Run by explicit request, beyond the dchi2>2 stop rule (next source 1111 had dchi2 = 1.02).
+# Base held ON in every fit (eps 0.6), warm-started at the JOINT converged values from the
+# 4th-order {1053,1062,proc_tb21,1111} fit (q2cut-5.0-4th-.../runs/sysHZComb1111).
+base_systematics:
+  - {name: sysHZComb1053, type: E, init: -17.4378}
+  - {name: sysHZComb1062, type: E, init: -6.7373}
+  - {name: proc_tb21,     type: E, init: -3.5850}
+  - {name: sysHZComb1111, type: E, init: -2.3875}
+
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+
+systematics:
+  - {name: sysHZComb, range: "1001-1162", type: E}
+  - {name: proc_nrl, type: E}
+  - {name: proc_tb, range: "21-24", type: E}
+  - {name: proc_gp, type: E}
+  - {name: proc_had, type: E}

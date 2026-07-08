@@ -6,7 +6,10 @@ MINUIT:
     migrad 100000
     call fcn 3
 
-  doErrors: None
+  doErrors: |
+    Pumplin
+    SET ERRDEF 0.5
+    ITERATE 10
 
 # Starting values: arXiv:1902.11125 Table 5, NNLO global-minimum column
 # (value, step=published uncertainty). Gluon Bg<0 selects the global minimum.
@@ -87,6 +90,13 @@ hf_scheme_DISNC:
 
 hf_scheme_DISCC:
   defaultValue: 'BaseDISCC'
+
+WriteLHAPDF6:
+  name: "proton"
+  description: "..."
+  authors: "..."
+  reference: "..."
+  preferInternalGrid:
 
 OutputDirectory: "/nfs/scratch2/ecanoner/xfitter-eoe-runs/fits/hera/hera-giuli-param/gaussian/output"
 

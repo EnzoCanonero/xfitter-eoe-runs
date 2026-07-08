@@ -78,7 +78,12 @@ class StudyConfig:
     def _expand_systematics(self, entries) -> List[Dict]:
         """Expand ranges and resolve epsilon per-entry (override) or global (fallback).
 
-        Each returned dict has keys: name, type, epsilon.
+        Each returned dict has keys: name, type, epsilon, init.
+
+        `init` is an optional MINUIT warm-start value for the source's nuisance
+        parameter (emitted as a `set par` command at fit generation). It is valid
+        only for E-type sources and only on single-source entries; it defaults to
+        None (xfitter's default of 0, i.e. no command is emitted).
         """
         global_eps = self.epsilon
         result = []
@@ -92,13 +97,30 @@ class StudyConfig:
                 raise ValueError(
                     f"Systematic '{entry['name']}' has no epsilon and no global epsilon defined"
                 )
+
+            init = entry.get('init')
+            if init is not None:
+                if entry.get('type') != 'E':
+                    raise ValueError(
+                        f"Systematic '{entry['name']}': 'init' is only valid for type 'E' "
+                        f"(got type '{entry.get('type')}')"
+                    )
+                if 'range' in entry:
+                    raise ValueError(
+                        f"Systematic '{entry['name']}': 'init' is only allowed on "
+                        f"single-source entries, not on 'range' entries"
+                    )
+                init = float(init)
+
             if 'range' in entry:
                 prefix, sys_type = entry['name'], entry['type']
                 start, end = entry['range'].split('-')
                 for i in range(int(start), int(end) + 1):
-                    result.append({'name': f"{prefix}{i}", 'type': sys_type, 'epsilon': eps})
+                    result.append({'name': f"{prefix}{i}", 'type': sys_type,
+                                   'epsilon': eps, 'init': None})
             else:
-                result.append({'name': entry['name'], 'type': entry['type'], 'epsilon': eps})
+                result.append({'name': entry['name'], 'type': entry['type'],
+                               'epsilon': eps, 'init': init})
         return result
 
     def get(self, key: str, default=None):
@@ -164,9 +186,27 @@ class SystematicRankingConfig(StudyConfig):
             )
 
     @property
+    def base_systematics(self) -> List[Dict]:
+        """EoE sources held on in *every* fit (including the nominal/reference fit).
+
+        Used for higher-order forward-selection scans: e.g. set
+        `base_systematics: [{name: sysHZComb1053, type: E, init: -17.38}]` to rank
+        all remaining systematics on top of an already-active 1053. Expanded like
+        `systematics` ({name, type, epsilon, init}); empty by default.
+        """
+        return self._expand_systematics(self.data.get('base_systematics', []))
+
+    @property
     def systematics(self) -> List[Dict]:
-        """Get expanded systematics with resolved epsilon."""
-        return self._expand_systematics(self.data['systematics'])
+        """Candidate systematics to rank (expanded, with resolved epsilon).
+
+        Any source already present in `base_systematics` is removed — a base source
+        is on in every fit, so it is never also a ranked candidate (this also lets a
+        broad `range:` candidate entry overlap the base without manual exclusion).
+        """
+        base_names = {s['name'] for s in self.base_systematics}
+        return [s for s in self._expand_systematics(self.data['systematics'])
+                if s['name'] not in base_names]
 
 
 class PumplinStabilityConfig(StudyConfig):

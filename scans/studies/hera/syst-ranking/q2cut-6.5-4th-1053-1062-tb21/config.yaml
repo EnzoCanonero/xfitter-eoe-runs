@@ -1,0 +1,28 @@
+scan_type: systematic-ranking
+template: q2cut-6.5
+epsilon: 0.6
+
+# Fourth-order forward-selection scan (Q2cut = 6.5, baseline parametrization), threshold dchi2 > 1
+# (next source proc_tb21 had dchi2 = 1.91). Base held ON in every fit (eps 0.6), warm-started at
+# the JOINT converged values from the 3rd-order {1053,1062,proc_tb21} fit
+# (q2cut-6.5-3rd-1053-1062/runs/proc_tb21).
+base_systematics:
+  - {name: sysHZComb1053, type: E, init: -17.3037}
+  - {name: sysHZComb1062, type: E, init: -6.6492}
+  - {name: proc_tb21,     type: E, init: -3.4381}
+
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+
+systematics:
+  - {name: sysHZComb, range: "1001-1162", type: E}
+  - {name: proc_nrl, type: E}
+  - {name: proc_tb, range: "21-24", type: E}
+  - {name: proc_gp, type: E}
+  - {name: proc_had, type: E}

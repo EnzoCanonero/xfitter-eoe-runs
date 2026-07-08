@@ -1,6 +1,11 @@
-# xfitter output (created at runtime)
+# xfitter output (created at runtime), including backups
 fits/**/output/
 fits/**/output_OLD/
+fits/**/output_bkp*/
+fits/**/bkpref/
+
+# PDF-comparison plot outputs
+fits/compare/**/plots/
 
 # Condor generated files (created by submit.sh)
 fits/**/condor/run_fit.sh

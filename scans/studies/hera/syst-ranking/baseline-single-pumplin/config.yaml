@@ -1,0 +1,34 @@
+scan_type: systematic-ranking
+template: hera-baseline
+epsilon: 0.6
+
+# SINGLE result fit (not a scan). Forward-selected baseline EoE configuration obtained so far,
+# INCLUDING 1113: {1053,proc_tb21,1064,1114,1144,1111,1113}, all eps 0.6, Bartlett-corrected,
+# with Pumplin PDF uncertainties (SET ERRDEF 0.5, ITERATE 10). EoE nuisances warm-started at
+# their current joint minimum (from baseline-7th-.../runs/sysHZComb1113) to simplify convergence.
+# systematics: [] => the generator produces only the base-only fit (runs/nominal).
+doErrors:
+  method: Pumplin
+  errdef: 0.5
+  iterate: 10
+
+base_systematics:
+  - {name: sysHZComb1053, type: E, init: -16.4095}
+  - {name: proc_tb21,     type: E, init: -6.3118}
+  - {name: sysHZComb1064, type: E, init: 9.9370}
+  - {name: sysHZComb1114, type: E, init: 4.2443}
+  - {name: sysHZComb1144, type: E, init: 4.0798}
+  - {name: sysHZComb1111, type: E, init: -2.5331}
+  - {name: sysHZComb1113, type: E, init: 3.8119}
+
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+
+# No candidates: this is a single fixed-configuration fit.
+systematics: []

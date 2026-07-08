@@ -1,0 +1,31 @@
+scan_type: systematic-ranking
+template: q2cut-2.0
+epsilon: 0.6
+
+# Third-order forward-selection scan at Q2cut = 2.0 (baseline parametrization).
+# Base = {sysHZComb1053, sysHZComb1037}, both held ON (eps 0.6) and warm-started at
+# their JOINT converged values from the 2nd-order {1053,1037} fit
+# (1053 = -17.9209, 1037 = +12.3664). Every remaining candidate is ranked by its
+# marginal impact on top of {1053,1037}. The nominal fit is the {1053,1037} fit.
+# Both base sources are auto-excluded from the candidate list.
+base_systematics:
+  - {name: sysHZComb1053, type: E, init: -17.9209}
+  - {name: sysHZComb1037, type: E, init: 12.3664}
+
+# HERA datafiles (all 7 files)
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+
+# Candidate systematic sources to rank (1053 and 1037 removed automatically as base sources).
+systematics:
+  - {name: sysHZComb, range: "1001-1162", type: E}
+  - {name: proc_nrl, type: E}
+  - {name: proc_tb, range: "21-24", type: E}
+  - {name: proc_gp, type: E}
+  - {name: proc_had, type: E}
