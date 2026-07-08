@@ -2,17 +2,17 @@
 # Create a new xfitter fit directory.
 # Usage: ./new_fit.sh <path> [template_dir]
 #
-# path:         Nested path under fits/ (e.g. hera/my-study/variant-a)
+# path:         Nested path under fits/ (e.g. hera-baseline/my-study/variant-a)
 # template_dir: Directory containing steering.txt and parameters.yaml.
 #               Can be an existing fit's config/ dir or an xfitter example dir.
-#               Defaults to hera/hera-baseline/eoe/config/ (relative to fits/).
+#               Defaults to hera-baseline/eoe/config/ (relative to fits/).
 
 set -e
 
 FITSDIR="$(cd "$(dirname "$0")" && pwd)"
 BASEDIR="$(dirname "$FITSDIR")"
 NAME="$1"
-TEMPLATE="${2:-$FITSDIR/hera/hera-baseline/eoe/config}"
+TEMPLATE="${2:-$FITSDIR/hera-baseline/eoe/config}"
 
 # Resolve relative template paths against FITSDIR
 if [ "${TEMPLATE:0:1}" != "/" ]; then
@@ -22,12 +22,12 @@ fi
 if [ -z "$NAME" ]; then
     echo "Usage: $0 <path> [template_dir]"
     echo ""
-    echo "  path:         Nested path under fits/ (e.g. hera/my-study/variant-a)"
+    echo "  path:         Nested path under fits/ (e.g. hera-baseline/my-study/variant-a)"
     echo "  template_dir: Directory with steering.txt + parameters.yaml (default: eoe config)"
     echo ""
     echo "Examples:"
-    echo "  $0 hera/my-study/variant-a"
-    echo "  $0 hera/my-study/variant-b hera/hera-baseline/nominal/config"
+    echo "  $0 hera-baseline/my-study/variant-a"
+    echo "  $0 hera-baseline/my-study/variant-b hera-baseline/nominal/config"
     exit 1
 fi
 
@@ -74,9 +74,9 @@ done
 DATAROOT="$BASEDIR/datafiles"
 if [ -f "$CONFIGDIR/steering.txt" ]; then
     while IFS= read -r line; do
-        # Extract filename between single quotes ending in .dat
-        fname=$(echo "$line" | grep -oP "'\K[^']*\.dat" || true)
-        if [ -n "$fname" ]; then
+        # Extract each filename between single quotes ending in .dat.
+        while IFS= read -r fname; do
+            [ -n "$fname" ] || continue
             base=$(basename "$fname")
             # Find the file in datafiles/
             src=$(find -L "$DATAROOT" -name "$base" -type f 2>/dev/null | head -1)
@@ -85,7 +85,7 @@ if [ -f "$CONFIGDIR/steering.txt" ]; then
             else
                 echo "Warning: data file not found in datafiles/: $base"
             fi
-        fi
+        done < <(echo "$line" | grep -oP "'\K[^']*\.dat" || true)
     done < "$CONFIGDIR/steering.txt"
 fi
 

@@ -18,11 +18,9 @@ xfitter-eoe-runs/
 ├── studies/                    # study notes/logbook (one file per study family)
 ├── fits/                       # individual fits (manual)
 │   ├── new_fit.sh
-│   ├── hera/
-│   │   └── hera-baseline/
-│   │       ├── eoe/
-│   │       ├── nominal/
-│   │       └── eoe-no-bartlett/
+│   ├── hera-baseline/          # HERAPDF baseline fits
+│   ├── hera-giuli-param/       # Giuli-parametrization fits
+│   ├── Q2cut/                  # Q2-cut variation fits
 │   ├── compare/                # PDF-comparison tool (overlay fits' PDFs)
 │   │   ├── bin/                #   plot
 │   │   ├── lib/                #   Python framework
@@ -34,7 +32,7 @@ xfitter-eoe-runs/
     ├── templates/              # named template folders (one per setup)
     │   ├── hera-baseline/      #   14-param HERAPDF: steering + parameters + constants + weights
     │   └── giuli-param/        #   18-param Giuli parametrization (arXiv:1902.11125)
-    └── studies/                # scan studies
+    └── studies/                # scan studies: <scan-family>/<setup>/<study>/
 ```
 
 ### Templates
@@ -62,10 +60,10 @@ xFitter runs from `config/` — all files it needs are there. `run_fit.sh` sourc
 cd fits/
 
 # From default template (eoe)
-./new_fit.sh hera/my-study/variant-a
+./new_fit.sh hera-baseline/my-study/variant-a
 
 # Clone from another existing fit
-./new_fit.sh hera/my-study/variant-b hera/hera-baseline/nominal/config
+./new_fit.sh hera-baseline/my-study/variant-b hera-baseline/nominal/config
 ```
 
 `new_fit.sh` creates the full directory structure, copies data files into `config/`,
@@ -75,7 +73,7 @@ automatically at runtime by `run_fit.sh`.
 ### Run a fit
 
 ```bash
-fits/hera/hera-baseline/eoe/condor/submit.sh
+fits/hera-baseline/eoe/condor/submit.sh
 ```
 
 ## Scans
@@ -85,7 +83,7 @@ Automated framework for running systematic PDF fitting scans on Condor.
 ### Scan types
 
 **Lambda-scan** — tests different global epsilon scaling factors (λ):
-- Config: `lambda_min`, `lambda_max`, `lambda_step`, `base_epsilon`, `sources`, `datafiles`
+- Config: `lambda: {min, max, step}`, `epsilon` or per-source `epsilon`, `systematics`, `datafiles`
 - Output: chi2-vs-lambda plots, parameter heatmaps, convergence charts
 
 **Systematic-ranking** — tests each systematic source individually:
@@ -117,28 +115,26 @@ Automated framework for running systematic PDF fitting scans on Condor.
 ### Create and run a scan
 
 ```bash
-cd scans/studies/
-mkdir my-scan && cd my-scan
+mkdir -p scans/studies/lambda/hera-baseline/my-scan
+cd scans/studies/lambda/hera-baseline/my-scan
 
 # Create config.yaml (see examples in existing studies)
 cat > config.yaml << 'EOF'
 scan_type: lambda-scan
 template: hera-baseline       # required: a folder under scans/templates/
-lambda_min: 0.0
-lambda_max: 1.2
-lambda_step: 0.1
-base_epsilon: 0.5
+epsilon: 0.5
+lambda: {min: 0.0, max: 1.2, step: 0.1}
 datafiles:
   - HERA1+2_NCep_920-thexp.dat
   - HERA1+2_CCep-thexp.dat
-sources:
+systematics:
   - {name: sysHZComb1042, type: N}
   - {name: proc_tb21, type: E}
 EOF
 
 # Create symlinks to commands
-ln -s ../../bin/run-scan .
-ln -s ../../bin/plot .
+ln -s ../../../../bin/run-scan .
+ln -s ../../../../bin/plot .
 
 # Preview, then generate and submit
 ./run-scan --dry-run
@@ -174,8 +170,8 @@ observables: [uv, dv, gluon, sea]
 error_type: asymmetric        # symmetric | asymmetric (used only when a set carries errors)
 ratio_reference: 0            # ratio-panel denominator: fit index or label
 fits:
-  - {label: "Q2 > 2.0", path: ../../../hera/Q2cut/q2cut-2.0}
-  - {label: "Q2 > 5.0", path: ../../../hera/Q2cut/q2cut-5.0}
+  - {label: "Q2 > 2.0", path: ../../../Q2cut/q2cut-2.0}
+  - {label: "Q2 > 5.0", path: ../../../Q2cut/q2cut-5.0}
   # An installed LHAPDF set can be overlaid instead of a fit dir:
   # - {label: "HERAPDF2.0 NNLO", lhapdf_set: HERAPDF20_NNLO_EIG}
 EOF

@@ -19,6 +19,9 @@ fits/**/*.dat
 # Local one-off study grids
 fits/hera/hera-pumplin-stability-sysHZComb1053/
 
+# Local repair helper
+fits/fix_lhapdf_info.sh
+
 # Sandbox (personal throwaway fits), keep folder tracked
 fits/sandbox/*
 !fits/sandbox/.gitkeep

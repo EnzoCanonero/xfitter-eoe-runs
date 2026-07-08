@@ -11,8 +11,8 @@ ratio_reference: 0             # denominator for the ratio panel (index or label
 
 fits:
   - label: "Q2 > 2.0"
-    path: ../../../hera/Q2cut/q2cut-2.0
+    path: ../../../Q2cut/q2cut-2.0
   - label: "Q2 > 5.0"
-    path: ../../../hera/Q2cut/q2cut-5.0
+    path: ../../../Q2cut/q2cut-5.0
   - label: "Q2 > 8.0"
-    path: ../../../hera/Q2cut/q2cut-8.0
+    path: ../../../Q2cut/q2cut-8.0

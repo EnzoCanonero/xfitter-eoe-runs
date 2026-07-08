@@ -5,5 +5,5 @@ error_type: symmetric
 observables: [uv, dv, gluon, sea]
 ratio_reference: 0
 fits:
-  - {label: "7-sources (all E)",   path: ../../../hera/hera-baseline/baseline-7-sources}
-  - {label: "2E-5N (1053,tb21 E)", path: ../../../hera/hera-baseline/baseline-2E5N}
+  - {label: "7-sources (all E)",   path: ../../../hera-baseline/baseline-7-sources}
+  - {label: "2E-5N (1053,tb21 E)", path: ../../../hera-baseline/baseline-2E5N}

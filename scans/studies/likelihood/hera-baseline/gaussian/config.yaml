@@ -1,0 +1,44 @@
+scan_type: likelihood-scan
+template: hera-baseline
+
+# Reference fit: Gaussian baseline (no EoE treatment).
+# Run fits/hera-baseline/nominal first to populate output/minuit.out.txt.
+reference_fit: ../../../../../fits/hera-baseline/nominal
+
+scan_defaults:
+  n_sigma: 3      # scan range = ref_value ± n_sigma * ref_error
+  npoints: 31
+
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+
+# No EoE systematics — all analytically profiled by xFitter internally.
+systematics: []
+
+# 1D scan: 14 free PDF parameters only.
+scan_params_1d:
+  - {name: ADbar}
+  - {name: Agp}
+  - {name: BDbar}
+  - {name: Bdv}
+  - {name: Bg}
+  - {name: Bgp}
+  - {name: Buv}
+  - {name: CDbar}
+  - {name: CUbar}
+  - {name: Cdv}
+  - {name: Cg}
+  - {name: Cuv}
+  - {name: DUbar}
+  - {name: Euv}
+
+# Optional per-parameter overrides for initial MINUIT value/step.
+# If absent, values are read automatically from reference_fit/output/minuit.out.txt.
+# parameter_overrides:
+#   DUbar: {step: 2.5}

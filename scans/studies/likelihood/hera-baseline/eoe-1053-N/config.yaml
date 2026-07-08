@@ -1,0 +1,43 @@
+scan_type: likelihood-scan
+template: hera-baseline
+
+# Reference fit: sysHZComb1053 treated analytically (type N, profiled by xFitter).
+# Run fits/hera-baseline/n-sysHZComb1053 first to populate output/minuit.out.txt.
+reference_fit: ../../../../../fits/hera-baseline/n-sysHZComb1053
+
+scan_defaults:
+  n_sigma: 3
+  npoints: 31
+
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+
+# sysHZComb1053 analytically profiled (type N): appears in steering.txt but not in MINUIT.
+systematics:
+  - {name: sysHZComb1053, type: N, epsilon: 0.5}
+
+# 1D scan: 14 PDF parameters only.
+scan_params_1d:
+  - {name: ADbar}
+  - {name: Agp}
+  - {name: BDbar}
+  - {name: Bdv}
+  - {name: Bg}
+  - {name: Bgp}
+  - {name: Buv}
+  - {name: CDbar}
+  - {name: CUbar}
+  - {name: Cdv}
+  - {name: Cg}
+  - {name: Cuv}
+  - {name: DUbar}
+  - {name: Euv}
+
+# parameter_overrides:
+#   DUbar: {step: 2.5}

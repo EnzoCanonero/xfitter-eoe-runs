@@ -1,0 +1,49 @@
+scan_type: likelihood-scan
+template: hera-baseline
+
+# Reference fit: provides fitted parameter values and errors for scan ranges.
+# PDF parameter values are nearly identical with and without EoE, so the eoe
+# baseline is a valid range source for the Gaussian (no-EoE) variant too.
+reference_fit: ../../../../../fits/hera-baseline/eoe
+
+# Default scan settings (per-parameter overrides allowed)
+scan_defaults:
+  n_sigma: 3      # scan range = ref_value ± n_sigma * ref_error
+  npoints: 31     # number of scan points per parameter
+
+# HERA datafiles
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+
+# Systematics configuration — full Gaussian variant (no EoE).
+# Empty: no systematics enter the steering file; correlations handled outside EoE framework.
+systematics: []
+
+# 1D scan parameters — PDF parameters only (no free nuisances with all-N systematics).
+# Each entry can override n_sigma, npoints, or set explicit min/max.
+scan_params_1d:
+  - {name: ADbar}
+  - {name: Agp}
+  - {name: BDbar}
+  - {name: Bdv}
+  - {name: Bg}
+  - {name: Bgp}
+  - {name: Buv}
+  - {name: CDbar}
+  - {name: CUbar}
+  - {name: Cdv}
+  - {name: Cg}
+  - {name: Cuv}
+  - {name: DUbar}
+  - {name: Euv}
+
+# 2D contour scans — reserved for future use
+# scan_params_2d:
+#   - [ADbar, Bg]
+#   - [Cg, Cuv]

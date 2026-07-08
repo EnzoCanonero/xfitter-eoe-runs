@@ -1,0 +1,45 @@
+# likelihood-1d: all PDF params + E-type external nuisances for hera7
+scan_type: likelihood-scan
+template: hera-baseline
+reference_fit: ../../../../../fits/hera-baseline/baseline-7-sources
+epsilon: 0.6
+scan_defaults: {n_sigma: 3, npoints: 21}
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+systematics:
+  - {name: sysHZComb1053, type: E}
+  - {name: proc_tb21, type: E}
+  - {name: sysHZComb1064, type: E}
+  - {name: sysHZComb1114, type: E}
+  - {name: sysHZComb1144, type: E}
+  - {name: sysHZComb1111, type: E}
+  - {name: sysHZComb1113, type: E}
+scan_params_1d:
+  - {name: Bg}
+  - {name: Cg}
+  - {name: Agp}
+  - {name: Bgp}
+  - {name: Buv}
+  - {name: Cuv}
+  - {name: Euv}
+  - {name: Bdv}
+  - {name: Cdv}
+  - {name: CUbar}
+  - {name: DUbar}
+  - {name: ADbar}
+  - {name: BDbar}
+  - {name: CDbar}
+scan_systematics_1d:
+  - {name: sysHZComb1053}
+  - {name: proc_tb21}
+  - {name: sysHZComb1064}
+  - {name: sysHZComb1114}
+  - {name: sysHZComb1144}
+  - {name: sysHZComb1111}
+  - {name: sysHZComb1113}
