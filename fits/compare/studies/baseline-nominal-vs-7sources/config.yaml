@@ -1,0 +1,12 @@
+# Effect of errors-on-errors (baseline, Pumplin bands): standard fit with no EoE
+# (nominal) vs the 7-source all-External EoE fit. Ratio reference (fit 0) is the
+# nominal fit, so the EoE curve shows the central shift and the uncertainty
+# inflation that switching EoE on produces.
+type: pdf-comparison
+Q2: 10.0
+error_type: symmetric
+observables: [uv, dv, gluon, sea]
+ratio_reference: 0
+fits:
+  - {label: "nominal (no EoE)",       path: ../../../hera-baseline/nominal-bartlett2-pumplin}
+  - {label: "7-sources (EoE, all E)", path: ../../../hera-baseline/baseline-7-sources-bartlett2-pumplin}
