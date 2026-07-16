@@ -1,0 +1,14 @@
+# BAND-METHOD comparison on the SAME fit (no EoE anywhere): HERA baseline
+# nominal, Pumplin/ITERATE (Delta-chi2=1 excursion, HERAPDF standard) vs
+# Hesse (MNEMAT local curvature). Identical central values by construction;
+# any band difference is purely the method. Reference (fit 0) = Pumplin.
+# NB: the Pumplin entry points at output_bkp_20260713_prebandfix via symlink
+# (the Jul-13 pumplin rerun died before the band scan).
+type: pdf-comparison
+Q2: 10.0
+error_type: symmetric
+observables: [uv, dv, gluon, sea]
+ratio_reference: 0
+fits:
+  - {label: "nominal, Pumplin bands", path: bkp_pumplin}
+  - {label: "nominal, Hesse bands",   path: ../../../hera-baseline/nominal-bartlett2-hesse}

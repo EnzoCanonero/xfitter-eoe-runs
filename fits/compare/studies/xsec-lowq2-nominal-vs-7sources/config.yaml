@@ -1,0 +1,23 @@
+# Low-Q2 tension region, Fig.2-style (1902.11125): reduced cross sections of the
+# no-EoE nominal fit vs the 7-source all-External EoE fit, NC e+p 920 GeV.
+# All Fig.2 elements on; flip any toggle below to change your mind later.
+type: xsec-comparison
+dataset: "HERA1+2 NCep 920"
+q2bins: [3.5, 4.5, 6.5, 8.5]
+fits:
+  - {label: "nominal",  path: ../../../hera-baseline/nominal-bartlett2-hesse}
+  - {label: "EoE-7src", path: ../../../hera-baseline/baseline-7-sources-bartlett2-hesse}
+
+# element toggles (defaults shown; all optional)
+therr: true            # theory uncertainty bands (Bartlett-scaled post-P11)
+shifts: true           # dashed Theory+shifts
+uncorr_ticks: true     # delta-uncorrelated inner ticks
+logo: true             # xFitter logo
+upband: true           # band also in the upper sigma_red panel
+# layout/style
+ratio_to_theory: false
+ratiorange: null       # e.g. "0.9:1.2"
+xrange: null
+plots_per_page: null   # default 4 -> one Fig.2-style page for these 4 bins
+filledbands: false
+extra_options: []

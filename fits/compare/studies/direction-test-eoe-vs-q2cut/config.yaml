@@ -1,0 +1,14 @@
+# DIRECTION TEST: does EoE act like a soft Q2 cut?
+# If the EoE central (full data) tracks the q2cut-8 central (low-Q2 data removed)
+# relative to nominal, EoE is de-weighting the low-Q2 subset like the cut does.
+# NB: nominal/EoE point at output_bkp_20260713_prebandfix via symlinks (the live
+# output/ dirs are being rewritten by the Jul-13 rerun jobs).
+type: pdf-comparison
+Q2: 10.0
+error_type: symmetric
+observables: [uv, dv, gluon, sea]
+ratio_reference: 0
+fits:
+  - {label: "nominal (Q2>3.5)",       path: bkp_nominal}
+  - {label: "EoE 7-sources (Q2>3.5)", path: bkp_7src}
+  - {label: "nominal (Q2>8, cut)",    path: ../../../Q2cut/q2cut-8.0}

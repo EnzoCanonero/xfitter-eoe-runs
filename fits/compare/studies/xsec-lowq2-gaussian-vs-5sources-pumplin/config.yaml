@@ -1,0 +1,8 @@
+# Low-Q2 tension region, Fig.2-style, PUMPLIN bands (HERAPDF-standard Delta-chi2=1).
+type: xsec-comparison
+dataset: "HERA1+2 NCep 920"
+q2bins: [3.5, 4.5, 6.5, 8.5]
+fits:
+  - {label: "gaussian (no EoE)", path: ../../../hera-giuli-param/gaussian-bartlett2-pumplin}
+  - {label: "EoE-5src", path: ../../../hera-giuli-param/giuli-5-sources-bartlett2-pumplin}
+therr: true
