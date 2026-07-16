@@ -1,5 +1,6 @@
 # likelihood-1d: all PDF params + E-type external nuisances for hera7
 scan_type: likelihood-scan
+xfitter_tree: xfitter-bartlett-fixes
 template: hera-baseline
 reference_fit: ../../../../../fits/hera-baseline/baseline-7-sources
 epsilon: 0.6

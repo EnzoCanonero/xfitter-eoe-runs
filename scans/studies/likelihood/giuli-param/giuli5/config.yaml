@@ -1,5 +1,6 @@
 # likelihood-1d: all PDF params + E-type external nuisances for giuli5
 scan_type: likelihood-scan
+xfitter_tree: xfitter-bartlett-fixes
 template: giuli-param
 reference_fit: ../../../../../fits/hera-giuli-param/giuli-5-sources/bkpref
 epsilon: 0.6

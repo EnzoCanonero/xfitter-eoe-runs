@@ -1,4 +1,5 @@
 scan_type: likelihood-scan
+xfitter_tree: xfitter-bartlett-fixes
 template: hera-baseline
 
 reference_fit: ../../../../../fits/hera-baseline/eoe

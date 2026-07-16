@@ -1,4 +1,5 @@
 scan_type: pumplin-stability
+xfitter_tree: xfitter-bartlett-fixes
 template: hera-baseline   # 14-param HERAPDF baseline, Q2cut=3.5 (matches the original fits)
 
 # EoE strength: a Gaussian fit (no &Systematics source) is always added as lambda_0.0.

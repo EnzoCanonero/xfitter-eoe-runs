@@ -1,4 +1,5 @@
 scan_type: systematic-ranking
+xfitter_tree: xfitter-bartlett-fixes
 template: q2cut-5.0
 epsilon: 0.6
 

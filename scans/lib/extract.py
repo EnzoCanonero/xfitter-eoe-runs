@@ -232,6 +232,28 @@ def extract_fit_results(fit_dir: Path, do_errors: Optional[Dict] = None) -> Dict
     return results
 
 
+def _corrected_chi2(results: Dict):
+    """Bartlett-corrected goodness-of-fit chi2 = chi2 * c_chi2.
+
+    This is what xfitter itself prints as 'Corrected Chi2'
+    (chi2out_print = chi2out * c_bart_chi2 in fcn.f). We recompute it from the
+    raw chi2 and the printed factor rather than parsing that line, because the
+    line is only written when errors-on-errors are active: for a Gaussian fit
+    the factor is absent, and falling back to 1.0 makes the nominal and the EoE
+    fits directly comparable.
+
+    Only meaningful where the chi2 IS a goodness-of-fit, i.e. for the
+    systematic-ranking and lambda scans. Likelihood scans report a delta-chi2
+    profile, which is a confidence-interval statistic corrected by b_mu (the
+    c_CI factor), not by b_q -- they must keep the minimized chi2.
+    """
+    chi2 = results.get('chi2')
+    if chi2 is None or (isinstance(chi2, float) and np.isnan(chi2)):
+        return chi2
+    factor = results.get('bartlett', {}).get('chi2_bartlett')
+    return chi2 * (factor if factor else 1.0)
+
+
 def extract_scan_results(scan_dir: Path, scan_type: str,
                          do_errors: Optional[Dict] = None) -> Dict[str, pd.DataFrame]:
     """
@@ -279,6 +301,7 @@ def extract_scan_results(scan_dir: Path, scan_type: str,
             nominal_chi2 = {
                 'systematic': 'nominal',
                 'chi2': nominal_results['chi2'],
+                'chi2_corrected': _corrected_chi2(nominal_results),
                 'ndf': nominal_results['ndf'],
                 'converged': nominal_results['convergence'] == 'converged',
                 'chi2_bartlett': nominal_results['bartlett'].get('chi2_bartlett'),
@@ -303,6 +326,7 @@ def extract_scan_results(scan_dir: Path, scan_type: str,
             all_chi2.append({
                 key_name: key_value,
                 'chi2': results['chi2'],
+                'chi2_corrected': _corrected_chi2(results),
                 'ndf': results['ndf'],
                 'converged': results['convergence'] == 'converged',
                 'chi2_bartlett': results['bartlett'].get('chi2_bartlett'),
@@ -369,6 +393,11 @@ def _extract_likelihood_scan_results(fits_dir: Path) -> Dict:
         ref_val = param_info['value_at_minimum']
         ref_err = param_info['error']
 
+        # NB: deliberately the MINIMIZED chi2, not the Bartlett-corrected one.
+        # A likelihood scan measures a delta-chi2 profile, i.e. a
+        # profile-likelihood ratio used for confidence intervals; the GVM
+        # corrects that with b_mu (the c_CI factor), not with the
+        # goodness-of-fit b_q. Applying c_chi2 here would be wrong.
         chi2s = []
         converged_flags = []
 
@@ -418,6 +447,9 @@ def _extract_likelihood_scan_results(fits_dir: Path) -> Dict:
 
     # ── 2D grid extraction ──────────────────────────────────────────────────
     def _read_chi2_status(fit_dir: Path):
+        # As above: the MINIMIZED chi2 by design. This feeds a 2D delta-chi2
+        # contour (a confidence region), which the GVM corrects with b_mu, not
+        # with the goodness-of-fit b_q.
         chi2 = np.nan
         conv = False
         status = 'missing'

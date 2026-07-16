@@ -1,0 +1,16 @@
+#!/bin/bash
+# greedy-next command
+# Ranks a finished round by Bartlett-corrected dchi2 and writes the next round
+# Sources LCG_106 from CVMFS for pandas/numpy/yaml only if needed
+
+LCG_SETUP=${LCG_SETUP:-/cvmfs/sft.cern.ch/lcg/views/LCG_106/x86_64-el9-gcc13-opt/setup.sh}
+
+# Only source CVMFS if pandas/yaml are not already available
+if ! python3 -c "import pandas, numpy, yaml" 2>/dev/null; then
+    source "$LCG_SETUP"
+fi
+
+# Resolve the directory containing this script (handles symlinks)
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+
+exec python3 "$SCRIPT_DIR/greedy-next.py" "$@"

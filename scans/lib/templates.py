@@ -50,12 +50,25 @@ class TemplateManager:
         return template.render({'do_errors': do_errors})
 
 
+def _xfitter_tree_export(xfitter_tree: Optional[str]) -> str:
+    """`export XFITTER_TREE=...` line for a generated run script, or ''.
+
+    setup_env.sh honours XFITTER_TREE to pick the build under $XFITTER_ROOT, but
+    the condor job does not inherit the submitting shell's environment, so the
+    export has to be written into the script itself. Without it a scan silently
+    uses whatever .env defaults to -- which is how scans were run against the
+    pre-Bartlett-fix build.
+    """
+    return f'export XFITTER_TREE={xfitter_tree}\n' if xfitter_tree else ''
+
+
 def create_fit_structure(fit_dir: Path,
                          steering_content: str,
                          parameters_content: str,
                          datafiles: List[str],
                          template_dir: Path,
-                         do_errors: Optional[str] = None):
+                         do_errors: Optional[str] = None,
+                         xfitter_tree: Optional[str] = None):
     """Create a fit directory from a template folder.
 
     template_dir is a folder under scans/templates/ (e.g. hera-baseline/, giuli/)
@@ -87,11 +100,11 @@ def create_fit_structure(fit_dir: Path,
             shutil.copy2(src, config_dir / datafile)
 
     submit_script_path = fit_dir / "condor" / "submit.sh"
-    submit_script_path.write_text(generate_submit_script(fit_dir))
+    submit_script_path.write_text(generate_submit_script(fit_dir, xfitter_tree))
     submit_script_path.chmod(0o755)
 
 
-def generate_submit_script(fit_dir: Path) -> str:
+def generate_submit_script(fit_dir: Path, xfitter_tree: Optional[str] = None) -> str:
     return r"""#!/bin/bash
 # Generate condor scripts with correct absolute paths and submit.
 set -e
@@ -113,7 +126,7 @@ cat > "$DIR/run_fit.sh" << EOF
 #!/bin/bash
 set -e
 export HOME="\${HOME:-/tmp}"
-source "$REPO_ROOT/setup_env.sh"
+""" + _xfitter_tree_export(xfitter_tree) + r"""source "$REPO_ROOT/setup_env.sh"
 
 # flexiblas shim (condor nodes miss libflexiblas, map to openblas)
 SHIM_DIR=\$(mktemp -d)
@@ -159,7 +172,8 @@ def _find_repo_root(start: Path) -> Path:
     raise FileNotFoundError(f"setup_env.sh not found above {start}")
 
 
-def generate_batch_submit(fits_dir: Path, fit_dirs: List[Path]) -> Path:
+def generate_batch_submit(fits_dir: Path, fit_dirs: List[Path],
+                          xfitter_tree: Optional[str] = None) -> Path:
     """
     Generate a single-cluster Condor batch submission for a scan.
 
@@ -173,6 +187,7 @@ def generate_batch_submit(fits_dir: Path, fit_dirs: List[Path]) -> Path:
         Path to runs/submit.sh
     """
     repo_root = _find_repo_root(fits_dir)
+    tree_export = _xfitter_tree_export(xfitter_tree)
     batch_dir = fits_dir / "batch"
     batch_dir.mkdir(parents=True, exist_ok=True)
 
@@ -185,7 +200,7 @@ def generate_batch_submit(fits_dir: Path, fit_dirs: List[Path]) -> Path:
 set -e
 FIT_DIR="$1"
 export HOME="${{HOME:-/tmp}}"
-source "{repo_root}/setup_env.sh"
+{tree_export}source "{repo_root}/setup_env.sh"
 
 SHIM_DIR=$(mktemp -d)
 trap "rm -rf $SHIM_DIR" EXIT

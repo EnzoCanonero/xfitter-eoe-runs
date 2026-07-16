@@ -56,6 +56,16 @@ class StudyConfig:
         return None
 
     @property
+    def xfitter_tree(self) -> Optional[str]:
+        """Build tree under $XFITTER_ROOT to run this study against (optional).
+
+        Written into the generated run scripts as `export XFITTER_TREE=...`.
+        Condor jobs do not inherit the submitting shell's environment, so
+        without this a study silently runs against whatever .env defaults to.
+        """
+        return self.data.get('xfitter_tree')
+
+    @property
     def do_errors(self) -> Optional[Dict]:
         """doErrors namespace (optional). Returns dict with method, errdef, iterate."""
         return self.data.get('doErrors')

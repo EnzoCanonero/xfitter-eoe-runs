@@ -255,12 +255,13 @@ def _generate_pumplin_stability_fits(config: PumplinStabilityConfig, fits_dir: P
                     q2_cut=config.get('q2_cut', 3.5),
                 )
                 create_fit_structure(fit_dir, steering, "", config.datafiles,
-                                     template_dir=template_dir, do_errors=do_errors)
+                                     template_dir=template_dir, do_errors=do_errors,
+                             xfitter_tree=config.xfitter_tree)
                 _apply_source_inits(fit_dir, syslist)
                 all_fit_dirs.append(fit_dir.resolve())
 
     print(f"\nCreated {len(all_fit_dirs)} fits in {fits_dir}")
-    return generate_batch_submit(fits_dir, all_fit_dirs)
+    return generate_batch_submit(fits_dir, all_fit_dirs, config.xfitter_tree)
 
 
 def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path, dry_run: bool):
@@ -323,12 +324,13 @@ def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path, dry_run
         )
 
         create_fit_structure(fit_dir, steering, "", config.datafiles,
-                             template_dir=template_dir, do_errors=do_errors)
+                             template_dir=template_dir, do_errors=do_errors,
+                             xfitter_tree=config.xfitter_tree)
         _apply_source_inits(fit_dir, systematics)
         all_fit_dirs.append(fit_dir.resolve())
 
     print(f"\nCreated {len(lambda_vals)} fits in {fits_dir}")
-    return generate_batch_submit(fits_dir, all_fit_dirs)
+    return generate_batch_submit(fits_dir, all_fit_dirs, config.xfitter_tree)
 
 
 def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir: Path, dry_run: bool):
@@ -376,7 +378,8 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir:
     # this is the usual Gaussian nominal; with a base set it is the lower-order fit.
     print(f"Generating nominal...")
     create_fit_structure(fits_dir / "nominal", _render(base_sources), "", config.datafiles,
-                         template_dir=template_dir, do_errors=do_errors)
+                         template_dir=template_dir, do_errors=do_errors,
+                             xfitter_tree=config.xfitter_tree)
     _apply_source_inits(fits_dir / "nominal", base)
     all_fit_dirs: List[Path] = [(fits_dir / "nominal").resolve()]
 
@@ -391,12 +394,13 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir:
         sources = [(s['name'], s['type'], s['epsilon']) for s in fit_systematics]
 
         create_fit_structure(fit_dir, _render(sources), "", config.datafiles,
-                             template_dir=template_dir, do_errors=do_errors)
+                             template_dir=template_dir, do_errors=do_errors,
+                             xfitter_tree=config.xfitter_tree)
         _apply_source_inits(fit_dir, fit_systematics)
         all_fit_dirs.append(fit_dir.resolve())
 
     print(f"\nCreated {len(systematics) + 1} fits in {fits_dir} (including nominal)")
-    return generate_batch_submit(fits_dir, all_fit_dirs)
+    return generate_batch_submit(fits_dir, all_fit_dirs, config.xfitter_tree)
 
 
 def _build_reference_params(ref_fit_dir: Path,
@@ -607,7 +611,8 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
             )
 
             create_fit_structure(fit_dir, steering, "", config.datafiles,
-                                 template_dir=template_dir, do_errors=do_errors)
+                                 template_dir=template_dir, do_errors=do_errors,
+                             xfitter_tree=config.xfitter_tree)
 
             if is_systematic:
                 # E-type: fixed via MINUIT SET PAR / FIX commands
@@ -725,7 +730,8 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
                         q2_cut=config.get('q2_cut', 3.5),
                     )
                     create_fit_structure(fit_dir, steering, "", config.datafiles,
-                                         template_dir=template_dir, do_errors=do_errors)
+                                         template_dir=template_dir, do_errors=do_errors,
+                             xfitter_tree=config.xfitter_tree)
 
                     pdf_fixed: Dict[str, float] = {}
                     fix_cmds: Dict[str, Tuple[int, float]] = {}
@@ -770,7 +776,7 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
         json.dump(manifest, f, indent=2)
 
     # Generate single-cluster batch submission
-    submit_script = generate_batch_submit(fits_dir, all_fit_dirs)
+    submit_script = generate_batch_submit(fits_dir, all_fit_dirs, config.xfitter_tree)
 
     print(f"\nCreated {total_fits} fits in {fits_dir}")
     print(f"Scan manifest: {manifest_file}")

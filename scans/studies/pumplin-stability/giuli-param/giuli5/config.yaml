@@ -1,5 +1,6 @@
 # pumplin-stability: lambda x errdef x iterate for giuli5
 scan_type: pumplin-stability
+xfitter_tree: xfitter-bartlett-fixes
 template: giuli-param
 eps: 0.6
 lambda: [0.5, 1.0]

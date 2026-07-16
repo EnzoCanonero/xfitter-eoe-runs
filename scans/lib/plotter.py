@@ -222,10 +222,12 @@ def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
 
     # 1. Chi2 vs lambda
     plt.figure(figsize=(10, 6))
-    plt.plot(chi2_df['lambda'], chi2_df['chi2'], 'o-', linewidth=2, markersize=8)
-    plt.xlabel('Lambda', fontsize=14)
-    plt.ylabel('Chi²', fontsize=14)
-    plt.title('Chi² vs Lambda', fontsize=16)
+    # Bartlett-corrected chi2: the goodness-of-fit statistic that follows a
+    # chi2 distribution, so that points at different lambda are comparable.
+    plt.plot(chi2_df['lambda'], chi2_df['chi2_corrected'], 'o-', linewidth=2, markersize=8)
+    plt.xlabel(r'$\lambda$', fontsize=14)
+    plt.ylabel(r'Bartlett-corrected $\chi^2$', fontsize=14)
+    plt.title(r'Bartlett-corrected $\chi^2$ vs $\lambda$', fontsize=16)
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.savefig(plots_dir / "1_chi2_vs_lambda.pdf")
@@ -365,7 +367,7 @@ def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
     print("  ✓ 5_parameter_profiles.pdf")
 
     # 6. Per-λ parameter-pull pages (syst-ranking style)
-    chi2_by_lam = dict(zip(chi2_df['lambda'], chi2_df['chi2']))
+    chi2_by_lam = dict(zip(chi2_df['lambda'], chi2_df['chi2_corrected']))
 
     global_max = float((poi_df['norm_value'].abs() + poi_df['norm_error']).max() or 1.0)
     xlim = (-global_max * 1.15, global_max * 1.15)
@@ -406,7 +408,8 @@ def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
             ax.set_xlim(xlim)
             ax.set_xlabel(r'$(\mu(\lambda) - \mu(0)) \,/\, \sigma(0)$', fontsize=12)
             chi2_val = chi2_by_lam.get(lam)
-            subtitle = f'$\\chi^2 = {chi2_val:.2f}$' if chi2_val is not None else ''
+            subtitle = (f'$\\chi^2_{{\\rm B}} = {chi2_val:.2f}$'
+                        if chi2_val is not None else '')
             if error_label:
                 subtitle += f'  [errors: {error_label}]'
             ax.set_title(f'$\\lambda = {lam:.1f}$\n{subtitle}', fontsize=14)
@@ -429,7 +432,12 @@ def _plot_systematic_ranking(results: dict, plots_dir: Path, results_dir: Path,
 
     print("\nGenerating systematic-ranking plots...")
 
-    # --- Rankings CSV (GoF-based, kept for reference) ---
+    # Reference point for the corrected dchi2: the nominal (Gaussian) fit, whose
+    # Bartlett factor is absent/1 so its corrected chi2 equals its raw chi2.
+    nominal_chi2 = results.get('nominal_chi2') or {}
+    nom_chi2_corr = nominal_chi2.get('chi2_corrected')
+
+    # --- Rankings CSV (ranked by Bartlett-corrected dchi2) ---
     ranked_rows = []
     for systematic in chi2_df['systematic'].unique():
         chi2_row = chi2_df[chi2_df['systematic'] == systematic].iloc[0]
@@ -437,11 +445,22 @@ def _plot_systematic_ranking(results: dict, plots_dir: Path, results_dir: Path,
             (shifts_df['systematic'] == systematic) &
             (shifts_df['sys_name'] == systematic)
         ]
+        # dchi2 on the Bartlett-corrected scale: the corrected chi2 is the
+        # statistic that follows a chi2 distribution, so it is the endpoint the
+        # greedy selection compares. Note this is NOT just a shifted copy of the
+        # raw dchi2: each source's own gof_contrib (3 eps^2 - b_mutheta) enters
+        # its correction, which both offsets and re-orders the candidates.
+        dchi2_corr = None
+        if nom_chi2_corr is not None and chi2_row.get('chi2_corrected') is not None:
+            dchi2_corr = nom_chi2_corr - chi2_row['chi2_corrected']
+
         if not fit_shifts.empty:
             s = fit_shifts.iloc[0]
             ranked_rows.append({
                 'systematic': systematic,
                 'chi2': chi2_row['chi2'],
+                'chi2_corrected': chi2_row.get('chi2_corrected'),
+                'dchi2_corrected': dchi2_corr,
                 'ndf': chi2_row['ndf'],
                 'converged': chi2_row['converged'],
                 'shift': s['shift'],
@@ -455,6 +474,8 @@ def _plot_systematic_ranking(results: dict, plots_dir: Path, results_dir: Path,
             ranked_rows.append({
                 'systematic': systematic,
                 'chi2': chi2_row['chi2'],
+                'chi2_corrected': chi2_row.get('chi2_corrected'),
+                'dchi2_corrected': dchi2_corr,
                 'ndf': chi2_row['ndf'],
                 'converged': chi2_row['converged'],
                 'shift': None, 'error': None, 'corr_err': None,
@@ -462,14 +483,16 @@ def _plot_systematic_ranking(results: dict, plots_dir: Path, results_dir: Path,
             })
 
     ranked = pd.DataFrame(ranked_rows)
-    ranked = ranked.sort_values('gof_contrib', ascending=False, na_position='last').reset_index(drop=True)
+    ranked = ranked.sort_values('dchi2_corrected', ascending=False,
+                                na_position='last').reset_index(drop=True)
     ranked['rank'] = ranked.index + 1
     rankings_file = results_dir / "rankings.csv"
     ranked.to_csv(rankings_file, index=False)
     print(f"  ✓ Rankings saved to: {rankings_file}")
 
-    print(f"\nTop systematics by GoF contribution:")
-    display_cols = ['rank', 'systematic', 'chi2', 'shift', 'error', 'b_theta', 'gof_contrib', 'converged']
+    print(f"\nTop systematics by Bartlett-corrected dchi2:")
+    display_cols = ['rank', 'systematic', 'chi2', 'chi2_corrected', 'dchi2_corrected',
+                    'shift', 'error', 'b_theta', 'gof_contrib', 'converged']
     display_cols = [c for c in display_cols if c in ranked.columns]
     print(ranked[display_cols].head(10).to_string(index=False))
 
@@ -480,7 +503,7 @@ def _plot_systematic_ranking(results: dict, plots_dir: Path, results_dir: Path,
         return
 
     # Sort systematics by chi2 ascending (most impactful first)
-    chi2_map = dict(zip(chi2_df['systematic'], chi2_df['chi2']))
+    chi2_map = dict(zip(chi2_df['systematic'], chi2_df['chi2_corrected']))
     # Bartlett CI correction per fit (1.0 when Bartlett disabled)
     ci_bart_map = dict(zip(chi2_df['systematic'],
                            chi2_df['ci_bartlett'].fillna(1.0)))
@@ -572,7 +595,8 @@ def _plot_systematic_ranking(results: dict, plots_dir: Path, results_dir: Path,
             ax.set_xlim(xlim)
             ax.set_xlabel(r'$(\mu - \mu_{\rm nom}) \,/\, \sigma_{\rm nom}$', fontsize=12)
             chi2_val = chi2_map.get(sys, None)
-            subtitle = f'$\\chi^2 = {chi2_val:.2f}$' if chi2_val is not None else ''
+            subtitle = (f'$\\chi^2_{{\\rm B}} = {chi2_val:.2f}$'
+                        if chi2_val is not None else '')
             if error_label:
                 subtitle += f'  [errors: {error_label}]'
             ax.set_title(f'{sys}\n{subtitle}', fontsize=14)
@@ -590,8 +614,12 @@ def _plot_systematic_ranking(results: dict, plots_dir: Path, results_dir: Path,
 
 
 def _plot_chi2_lollipop(chi2_df, nominal_chi2, plots_dir, config_order):
-    """Lollipop chart: systematics in config-file order, stem from nominal reference."""
-    nom_chi2 = nominal_chi2.get('chi2')
+    """Lollipop chart: systematics in config-file order, stem from nominal reference.
+
+    Uses the Bartlett-corrected chi2 -- the statistic that follows a chi2
+    distribution, and the one the greedy selection compares.
+    """
+    nom_chi2 = nominal_chi2.get('chi2_corrected')
     if nom_chi2 is None:
         print("  (skipping chi2_ranking.pdf — no nominal chi2)")
         return
@@ -602,8 +630,8 @@ def _plot_chi2_lollipop(chi2_df, nominal_chi2, plots_dir, config_order):
         return
 
     # Use config-file order (reversed so first in config appears at top)
-    chi2_map = dict(zip(df['systematic'], df['chi2']))
-    ordered = [s for s in config_order if s in chi2_map]
+    chi2_map = dict(zip(df['systematic'], df['chi2_corrected']))
+    ordered = [s for s in config_order if s in chi2_map and chi2_map[s] is not None]
     labels = list(reversed(ordered))
     chi2_vals = [chi2_map[s] for s in labels]
 
@@ -624,8 +652,8 @@ def _plot_chi2_lollipop(chi2_df, nominal_chi2, plots_dir, config_order):
 
     ax.set_yticks(y_pos)
     ax.set_yticklabels(labels, fontsize=max(7, 11 - n // 10))
-    ax.set_xlabel(r'$\chi^2$', fontsize=12)
-    ax.set_title(r'$\chi^2$ by systematic', fontsize=14)
+    ax.set_xlabel(r'Bartlett-corrected $\chi^2$', fontsize=12)
+    ax.set_title(r'Bartlett-corrected $\chi^2$ by systematic', fontsize=14)
     ax.legend(loc='upper right', fontsize=9, framealpha=0.9,
               bbox_to_anchor=(1.0, -0.06))
     ax.grid(axis='x', alpha=0.3)

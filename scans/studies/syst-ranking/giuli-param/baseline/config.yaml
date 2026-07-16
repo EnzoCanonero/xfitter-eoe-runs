@@ -1,4 +1,5 @@
 scan_type: systematic-ranking
+xfitter_tree: xfitter-bartlett-fixes
 template: giuli-param   # Giuli parametrization initialized at the converged minimum
 epsilon: 0.6
 
