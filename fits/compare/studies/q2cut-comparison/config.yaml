@@ -2,7 +2,7 @@
 # Run from this directory:  ../../bin/plot   (or:  ln -s ../../bin/plot . && ./plot)
 type: pdf-comparison
 
-Q2: 10.0                       # observables evaluated at Q = sqrt(Q2) [GeV]
+Q2: 4.0                        # observables evaluated at Q = sqrt(Q2) [GeV]
 x_min: 1.0e-4
 x_max: 0.9
 observables: [uv, dv, gluon, sea]

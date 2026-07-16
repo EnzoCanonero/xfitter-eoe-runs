@@ -3,7 +3,7 @@
 # uncertainties from the LHAPDF library? Reference (fit 0) = official set, so the
 # ratio panel reads our-fit / HERAPDF2.0.
 type: pdf-comparison
-Q2: 10.0
+Q2: 4.0
 error_type: symmetric
 observables: [uv, dv, gluon, sea]
 ratio_reference: 0

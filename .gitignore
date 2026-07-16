@@ -4,8 +4,9 @@ fits/**/output_OLD/
 fits/**/output_bkp*/
 fits/**/bkpref/
 
-# PDF-comparison plot outputs
+# PDF-comparison plot and table outputs
 fits/compare/**/plots/
+fits/compare/**/results/
 
 # Condor generated files (created by submit.sh)
 fits/**/condor/run_fit.sh

@@ -3,7 +3,7 @@
 # converge to the all-External 5-source fit? Ratio reference (fit 0) is the
 # all-E target, so the second curve -> 1 as the profiling converges.
 type: pdf-comparison
-Q2: 10.0
+Q2: 4.0
 error_type: symmetric
 observables: [uv, dv, gluon, sea]
 ratio_reference: 0

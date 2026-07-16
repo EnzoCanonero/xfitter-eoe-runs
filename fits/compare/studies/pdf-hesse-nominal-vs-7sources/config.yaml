@@ -1,7 +1,7 @@
 # PDFs: no-EoE nominal vs 7-source all-E EoE, fresh Hesse refits (2026-07-13,
 # quadratic-convention :E errors + P11). Bands include the Bartlett CI factor.
 type: pdf-comparison
-Q2: 10.0
+Q2: 4.0
 error_type: symmetric
 observables: [uv, dv, gluon, sea]
 ratio_reference: 0

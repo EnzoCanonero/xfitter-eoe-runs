@@ -255,54 +255,91 @@ def _evaluate_set(pset, pdfs, obs_func, x_vals, Q, error_type):
 # =========================================================================
 # Plotting
 # =========================================================================
-def _plot_observable(pdf_pages, obs, curves, ref_idx, Q2, ratio_ylim, x_min, x_max):
-    """Render one observable page (central + ratio panels) into the open PdfPages."""
-    fig, (ax_main, ax_ratio) = plt.subplots(1, 2, figsize=(12, 6))
+def _draw_main(ax, obs, curves, Q2, x_min, x_max, legend=True):
+    """Draw the absolute-PDF panel: one curve (+ band) per fit."""
     x_vals = curves[0]["x"]
-    ref = curves[ref_idx]["obs"][obs]
-    ref_central = ref["central"]
+    for c in curves:
+        data = c["obs"][obs]
+        central = data["central"]
+        has_band = np.any(data["err_plus"] != 0) or np.any(data["err_minus"] != 0)
+        ax.semilogx(x_vals, central, label=c["label"],
+                    color=c["color"], linestyle=c["linestyle"])
+        if has_band:
+            ax.fill_between(x_vals,
+                            central - data["err_minus"],
+                            central + data["err_plus"],
+                            color=c["color"], alpha=0.25, linewidth=0)
+
+    ax.set_ylabel(YLABELS[obs], fontsize=14)
+    ax.set_xlabel("x", fontsize=13)
+    ax.set_xlim(x_min, x_max)
+    ax.grid(True, which="both", ls="--", lw=0.5)
+    if legend:
+        # Q^2 rides along as a label-only (invisible) legend entry
+        ax.plot([], [], ' ', label=rf'$Q^2 = {Q2:g}\ \mathrm{{GeV}}^2$')
+        ax.legend(fontsize=11)
+    ax.set_title(f"{TITLES[obs]}", fontsize=14)
+
+
+def _draw_ratio(ax, obs, curves, ref_idx, Q2, ratio_ylim, x_min, x_max, legend=False):
+    """Draw the ratio-to-reference panel: one curve (+ band) per fit."""
+    x_vals = curves[0]["x"]
+    ref_central = curves[ref_idx]["obs"][obs]["central"]
 
     with np.errstate(divide="ignore", invalid="ignore"):
         for c in curves:
             data = c["obs"][obs]
             central = data["central"]
             has_band = np.any(data["err_plus"] != 0) or np.any(data["err_minus"] != 0)
-
-            # --- central panel ---
-            ax_main.semilogx(x_vals, central, label=c["label"],
-                             color=c["color"], linestyle=c["linestyle"])
-            if has_band:
-                ax_main.fill_between(x_vals,
-                                     central - data["err_minus"],
-                                     central + data["err_plus"],
-                                     color=c["color"], alpha=0.25, linewidth=0)
-
-            # --- ratio panel (to reference central) ---
             ratio = np.where(ref_central != 0, central / ref_central, np.nan)
-            ax_ratio.semilogx(x_vals, ratio, color=c["color"], linestyle=c["linestyle"])
+            ax.semilogx(x_vals, ratio, label=c["label"],
+                        color=c["color"], linestyle=c["linestyle"])
             if has_band:
                 lo = np.where(ref_central != 0,
                               (central - data["err_minus"]) / ref_central, np.nan)
                 hi = np.where(ref_central != 0,
                               (central + data["err_plus"]) / ref_central, np.nan)
-                ax_ratio.fill_between(x_vals, lo, hi, color=c["color"],
-                                      alpha=0.25, linewidth=0)
+                ax.fill_between(x_vals, lo, hi, color=c["color"],
+                                alpha=0.25, linewidth=0)
 
-    ax_main.set_ylabel(YLABELS[obs], fontsize=14)
-    ax_main.set_xlabel("x", fontsize=13)
-    ax_main.set_xlim(x_min, x_max)
-    ax_main.grid(True, which="both", ls="--", lw=0.5)
-    ax_main.plot([], [], ' ', label=rf'$Q^2 = {Q2:g}\ \mathrm{{GeV}}^2$')
-    ax_main.legend(fontsize=11)
-    ax_main.set_title(f"{TITLES[obs]}", fontsize=14)
-
-    ax_ratio.axhline(1, color="black", linestyle=":", lw=1)
-    ax_ratio.set_xlabel("x", fontsize=13)
-    ax_ratio.set_ylabel(f"Ratio to {curves[ref_idx]['label']}", fontsize=13)
-    ax_ratio.set_xlim(x_min, x_max)
+    ax.axhline(1, color="black", linestyle=":", lw=1)
+    ax.set_xlabel("x", fontsize=13)
+    ax.set_ylabel(f"Ratio to {curves[ref_idx]['label']}", fontsize=13)
+    ax.set_xlim(x_min, x_max)
     if ratio_ylim is not None:
-        ax_ratio.set_ylim(*ratio_ylim)
-    ax_ratio.grid(True, which="both", ls="--", lw=0.5)
+        ax.set_ylim(*ratio_ylim)
+    ax.grid(True, which="both", ls="--", lw=0.5)
+    if legend:
+        # standalone ratio pages carry the legend + Q^2 themselves, since the
+        # absolute panel that normally hosts them is absent
+        ax.plot([], [], ' ', label=rf'$Q^2 = {Q2:g}\ \mathrm{{GeV}}^2$')
+        ax.legend(fontsize=9)
+        ax.set_title(f"{TITLES[obs]}", fontsize=14)
+
+
+def _plot_observable(pdf_pages, obs, curves, ref_idx, Q2, ratio_ylim, x_min, x_max,
+                     mode="both"):
+    """Render one observable page into the open PdfPages.
+
+    mode: 'both'     -> absolute + ratio side by side (the default layout)
+          'ratio'    -> ratio panel only, single panel
+          'absolute' -> absolute panel only, single panel
+    The single-panel modes are meant to be composed into grids in LaTeX with
+    \\includegraphics[page=N], so they carry their own legend/title.
+    """
+    if mode == "both":
+        fig, (ax_main, ax_ratio) = plt.subplots(1, 2, figsize=(12, 6))
+        _draw_main(ax_main, obs, curves, Q2, x_min, x_max, legend=True)
+        _draw_ratio(ax_ratio, obs, curves, ref_idx, Q2, ratio_ylim, x_min, x_max,
+                    legend=False)
+    elif mode == "ratio":
+        fig, ax = plt.subplots(figsize=(7, 6))
+        _draw_ratio(ax, obs, curves, ref_idx, Q2, ratio_ylim, x_min, x_max, legend=True)
+    elif mode == "absolute":
+        fig, ax = plt.subplots(figsize=(7, 6))
+        _draw_main(ax, obs, curves, Q2, x_min, x_max, legend=True)
+    else:
+        raise ValueError(f"unknown mode '{mode}'")
 
     fig.tight_layout()
     pdf_pages.savefig(fig)
@@ -345,14 +382,28 @@ def compare_pdfs(study_dir: Path):
 
         plots_dir = study_dir / "plots"
         plots_dir.mkdir(exist_ok=True)
-        out_pdf = plots_dir / "pdf_comparison.pdf"
-        with PdfPages(out_pdf) as pdf_pages:
-            for obs in config.observables:
-                _plot_observable(pdf_pages, obs, curves, ref_idx, config.Q2,
-                                 config.ratio_ylim, config.x_min, config.x_max)
 
-        print(f"\nWrote {out_pdf}  ({len(config.observables)} pages, "
-              f"reference = '{labels[ref_idx]}')")
-        return out_pdf
+        # All three variants are emitted from this one call: `curves` is already
+        # fully evaluated, so re-looping is free, and calling compare_pdfs() once
+        # per mode would leave stale lhapdf.pathsPrepend entries pointing at the
+        # staging dirs removed by the finally below.
+        outputs = []
+        for mode, fname in (("both",     "pdf_comparison.pdf"),
+                            ("ratio",    "pdf_comparison_ratio.pdf"),
+                            ("absolute", "pdf_comparison_absolute.pdf")):
+            out_pdf = plots_dir / fname
+            with PdfPages(out_pdf) as pdf_pages:
+                for obs in config.observables:
+                    _plot_observable(pdf_pages, obs, curves, ref_idx, config.Q2,
+                                     config.ratio_ylim, config.x_min, config.x_max,
+                                     mode=mode)
+            outputs.append(out_pdf)
+
+        n = len(config.observables)
+        print(f"\nWrote {n} pages ({', '.join(config.observables)}) at "
+              f"Q^2 = {config.Q2:g} GeV^2, reference = '{labels[ref_idx]}':")
+        for out_pdf in outputs:
+            print(f"  {out_pdf}")
+        return outputs
     finally:
         shutil.rmtree(staging_root, ignore_errors=True)

@@ -1,6 +1,6 @@
 # HERA EoE: all 7 sources as E vs 2 sources E (1053, proc_tb21) + 5 as N
 type: pdf-comparison
-Q2: 10.0
+Q2: 4.0
 error_type: symmetric
 observables: [uv, dv, gluon, sea]
 ratio_reference: 0

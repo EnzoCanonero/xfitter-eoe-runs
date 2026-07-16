@@ -1,5 +1,5 @@
 type: pdf-comparison
-Q2: 10.0
+Q2: 4.0
 error_type: symmetric
 observables: [uv, dv, gluon, sea]
 ratio_reference: 0
