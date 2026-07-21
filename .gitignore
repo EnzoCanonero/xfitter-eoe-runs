@@ -38,6 +38,8 @@ scans/fits/systematic-ranking/*/plots/
 scans/studies/**/runs/
 scans/studies/**/plots/
 scans/studies/**/results/
+scans/studies/**/runs_bkp*/
+scans/studies/**/runs_output_bkp*.tar.gz
 
 # Shared pipeline symlinks in study folders (point to scans/bin/)
 scans/studies/**/plot

@@ -7,10 +7,21 @@ fail_setup() {
     return 1 2>/dev/null || exit 1
 }
 
-# Load .env from repo root if it exists (sets XFITTER_ROOT, etc.)
+# Load .env from repo root if it exists (sets XFITTER_ROOT, etc.).  An explicit
+# caller-provided XFITTER_TREE is authoritative: study-generated job scripts
+# use it to pin a build and must not be silently overridden by a local .env.
+_XFITTER_TREE_WAS_SET=0
+if [ "${XFITTER_TREE+x}" = x ]; then
+    _XFITTER_TREE_WAS_SET=1
+    _XFITTER_TREE_CALLER_VALUE="$XFITTER_TREE"
+fi
 _SETUP_ENV_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [ -f "$_SETUP_ENV_DIR/.env" ] && source "$_SETUP_ENV_DIR/.env"
 unset _SETUP_ENV_DIR
+if [ "$_XFITTER_TREE_WAS_SET" -eq 1 ]; then
+    export XFITTER_TREE="$_XFITTER_TREE_CALLER_VALUE"
+fi
+unset _XFITTER_TREE_WAS_SET _XFITTER_TREE_CALLER_VALUE
 
 # 1) Base LCG environment from CVMFS
 LCG_SETUP="/cvmfs/sft.cern.ch/lcg/views/LCG_105/x86_64-el9-gcc13-opt/setup.sh"

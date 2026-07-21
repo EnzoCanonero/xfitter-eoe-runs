@@ -108,8 +108,13 @@ def plot_scan(study_dir: Path):
 
         if config.scan_type == 'systematic-ranking' and results.get('nominal_chi2'):
             chi2_cols = results['chi2'].columns
-            nominal_row = pd.DataFrame([{c: results['nominal_chi2'].get(c) for c in chi2_cols}])
-            chi2_df = pd.concat([nominal_row, results['chi2']], ignore_index=True)
+            nominal_row = {
+                c: results['nominal_chi2'].get(c) for c in chi2_cols
+            }
+            chi2_df = pd.DataFrame.from_records(
+                [nominal_row] + results['chi2'].to_dict('records'),
+                columns=chi2_cols,
+            )
         else:
             chi2_df = results['chi2']
         chi2_df.to_csv(chi2_file, index=False)
@@ -432,10 +437,19 @@ def _plot_systematic_ranking(results: dict, plots_dir: Path, results_dir: Path,
 
     print("\nGenerating systematic-ranking plots...")
 
-    # Reference point for the corrected dchi2: the nominal (Gaussian) fit, whose
-    # Bartlett factor is absent/1 so its corrected chi2 equals its raw chi2.
+    # Reference point for the corrected dchi2: this round's `nominal` fit, which
+    # is the base of the round -- the Gaussian fit in round 1, the base+EoE fit
+    # from round 2 on. In the latter case it carries its own Bartlett factor, so
+    # its corrected chi2 is NOT its raw chi2; _corrected_chi2 applies the factor
+    # when present, which is what makes dchi2 = chi2_B(base) - chi2_B(base+s).
     nominal_chi2 = results.get('nominal_chi2') or {}
     nom_chi2_corr = nominal_chi2.get('chi2_corrected')
+    nominal_converged = bool(nominal_chi2.get('converged'))
+    if nom_chi2_corr is None:
+        raise RuntimeError("nominal/base fit is missing a corrected chi2")
+    if not nominal_converged:
+        print("  WARNING: nominal/base fit did not reach convergence; "
+              "ranking retained and flagged")
 
     # --- Rankings CSV (ranked by Bartlett-corrected dchi2) ---
     ranked_rows = []
@@ -447,11 +461,11 @@ def _plot_systematic_ranking(results: dict, plots_dir: Path, results_dir: Path,
         ]
         # dchi2 on the Bartlett-corrected scale: the corrected chi2 is the
         # statistic that follows a chi2 distribution, so it is the endpoint the
-        # greedy selection compares. Note this is NOT just a shifted copy of the
-        # raw dchi2: each source's own gof_contrib (3 eps^2 - b_mutheta) enters
-        # its correction, which both offsets and re-orders the candidates.
+        # greedy selection compares.
         dchi2_corr = None
-        if nom_chi2_corr is not None and chi2_row.get('chi2_corrected') is not None:
+        fit_converged = bool(chi2_row.get('converged'))
+        chi2_corr = chi2_row.get('chi2_corrected')
+        if pd.notna(chi2_corr):
             dchi2_corr = nom_chi2_corr - chi2_row['chi2_corrected']
 
         if not fit_shifts.empty:
@@ -463,12 +477,18 @@ def _plot_systematic_ranking(results: dict, plots_dir: Path, results_dir: Path,
                 'dchi2_corrected': dchi2_corr,
                 'ndf': chi2_row['ndf'],
                 'converged': chi2_row['converged'],
+                'non_converged': not fit_converged,
+                'base_converged': nominal_converged,
                 'shift': s['shift'],
                 'error': s['error'],
                 'corr_err': s['corr_err'],
                 'epsilon': s['epsilon'],
                 'b_theta': s['b_theta'],
+                'r': s['r'],
+                'b_tilde': s['b_tilde'],
+                'b_mutheta': s['b_mutheta'],
                 'gof_contrib': s['gof_contrib'],
+                'lr_contrib': s['lr_contrib'],
             })
         else:
             ranked_rows.append({
@@ -478,8 +498,12 @@ def _plot_systematic_ranking(results: dict, plots_dir: Path, results_dir: Path,
                 'dchi2_corrected': dchi2_corr,
                 'ndf': chi2_row['ndf'],
                 'converged': chi2_row['converged'],
+                'non_converged': not fit_converged,
+                'base_converged': nominal_converged,
                 'shift': None, 'error': None, 'corr_err': None,
-                'epsilon': None, 'b_theta': None, 'gof_contrib': None,
+                'epsilon': None, 'b_theta': None, 'r': None,
+                'b_tilde': None, 'b_mutheta': None,
+                'gof_contrib': None, 'lr_contrib': None,
             })
 
     ranked = pd.DataFrame(ranked_rows)
@@ -490,9 +514,15 @@ def _plot_systematic_ranking(results: dict, plots_dir: Path, results_dir: Path,
     ranked.to_csv(rankings_file, index=False)
     print(f"  ✓ Rankings saved to: {rankings_file}")
 
+    n_nonconverged = int(ranked['non_converged'].sum())
+    if n_nonconverged:
+        print(f"  WARNING: {n_nonconverged} fit(s) did not reach convergence; "
+              "they remain ranked with non_converged=True")
+
     print(f"\nTop systematics by Bartlett-corrected dchi2:")
     display_cols = ['rank', 'systematic', 'chi2', 'chi2_corrected', 'dchi2_corrected',
-                    'shift', 'error', 'b_theta', 'gof_contrib', 'converged']
+                    'shift', 'error', 'r', 'b_tilde', 'b_mutheta',
+                    'gof_contrib', 'lr_contrib', 'non_converged']
     display_cols = [c for c in display_cols if c in ranked.columns]
     print(ranked[display_cols].head(10).to_string(index=False))
 
@@ -504,6 +534,7 @@ def _plot_systematic_ranking(results: dict, plots_dir: Path, results_dir: Path,
 
     # Sort systematics by chi2 ascending (most impactful first)
     chi2_map = dict(zip(chi2_df['systematic'], chi2_df['chi2_corrected']))
+    converged_map = dict(zip(chi2_df['systematic'], chi2_df['converged']))
     # Bartlett CI correction per fit (1.0 when Bartlett disabled)
     ci_bart_map = dict(zip(chi2_df['systematic'],
                            chi2_df['ci_bartlett'].fillna(1.0)))
@@ -597,6 +628,8 @@ def _plot_systematic_ranking(results: dict, plots_dir: Path, results_dir: Path,
             chi2_val = chi2_map.get(sys, None)
             subtitle = (f'$\\chi^2_{{\\rm B}} = {chi2_val:.2f}$'
                         if chi2_val is not None else '')
+            if not converged_map.get(sys, False):
+                subtitle += '  [NOT CONVERGED]'
             if error_label:
                 subtitle += f'  [errors: {error_label}]'
             ax.set_title(f'{sys}\n{subtitle}', fontsize=14)
@@ -625,12 +658,16 @@ def _plot_chi2_lollipop(chi2_df, nominal_chi2, plots_dir, config_order):
         return
 
     # Filter out nominal row if present
-    df = chi2_df[chi2_df['systematic'] != 'nominal'].copy()
+    df = chi2_df[
+        (chi2_df['systematic'] != 'nominal') &
+        chi2_df['chi2_corrected'].notna()
+    ].copy()
     if df.empty:
         return
 
     # Use config-file order (reversed so first in config appears at top)
     chi2_map = dict(zip(df['systematic'], df['chi2_corrected']))
+    converged_map = dict(zip(df['systematic'], df['converged']))
     ordered = [s for s in config_order if s in chi2_map and chi2_map[s] is not None]
     labels = list(reversed(ordered))
     chi2_vals = [chi2_map[s] for s in labels]
@@ -642,13 +679,21 @@ def _plot_chi2_lollipop(chi2_df, nominal_chi2, plots_dir, config_order):
 
     # Thin stems from nominal to each chi2
     for i, (y, chi2) in enumerate(zip(y_pos, chi2_vals)):
-        color = '#d62728' if chi2 > nom_chi2 else '#2ca02c'
+        converged = bool(converged_map.get(labels[i], False))
+        color = ('#d62728' if chi2 > nom_chi2 else '#2ca02c') if converged else '#ff7f0e'
+        marker = 'o' if converged else 'x'
         ax.hlines(y, nom_chi2, chi2, color=color, linewidth=1.2)
-        ax.plot(chi2, y, 'o', color=color, markersize=6, zorder=3)
+        ax.plot(chi2, y, marker=marker, color=color, markersize=6, zorder=3)
 
     # Nominal reference line
+    nominal_label = f'nominal $\\chi^2 = {nom_chi2:.1f}$'
+    if not nominal_chi2.get('converged'):
+        nominal_label += ' [NOT CONVERGED]'
     ax.axvline(nom_chi2, color='black', linewidth=0.8, linestyle='--',
-               label=f'nominal $\\chi^2 = {nom_chi2:.1f}$')
+               label=nominal_label)
+    if (~df['converged'].astype(bool)).any():
+        ax.plot([], [], marker='x', linestyle='none', color='#ff7f0e',
+                label='fit not converged')
 
     ax.set_yticks(y_pos)
     ax.set_yticklabels(labels, fontsize=max(7, 11 - n // 10))

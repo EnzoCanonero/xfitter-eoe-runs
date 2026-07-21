@@ -128,6 +128,22 @@ set -e
 export HOME="\${HOME:-/tmp}"
 """ + _xfitter_tree_export(xfitter_tree) + r"""source "$REPO_ROOT/setup_env.sh"
 
+# Record exact executable/library provenance. The selected tree may contain
+# local changes, so its name and Git commit alone are insufficient.
+XFITTER_BIN=\$(command -v xfitter)
+XFITTER_TREE_DIR=\$(cd "\$(dirname "\$XFITTER_BIN")/.." && pwd)
+{
+  echo "binary=\$XFITTER_BIN"
+  echo "git_commit=\$(git -C "\$XFITTER_TREE_DIR" rev-parse HEAD 2>/dev/null || echo unavailable)"
+  if [ -n "\$(git -C "\$XFITTER_TREE_DIR" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+    echo "git_dirty=true"
+  else
+    echo "git_dirty=false"
+  fi
+  find "\$XFITTER_TREE_DIR/bin" "\$XFITTER_TREE_DIR/lib/xfitter" \
+       -maxdepth 1 -type f -print0 2>/dev/null | sort -z | xargs -0 sha256sum
+} > "$FIT_DIR/output/xfitter_provenance.txt"
+
 # flexiblas shim (condor nodes miss libflexiblas, map to openblas)
 SHIM_DIR=\$(mktemp -d)
 trap "rm -rf \$SHIM_DIR" EXIT
@@ -201,6 +217,21 @@ set -e
 FIT_DIR="$1"
 export HOME="${{HOME:-/tmp}}"
 {tree_export}source "{repo_root}/setup_env.sh"
+
+# Record exact executable/library provenance. The selected tree may be dirty.
+XFITTER_BIN=$(command -v xfitter)
+XFITTER_TREE_DIR=$(cd "$(dirname "$XFITTER_BIN")/.." && pwd)
+{{
+  echo "binary=$XFITTER_BIN"
+  echo "git_commit=$(git -C "$XFITTER_TREE_DIR" rev-parse HEAD 2>/dev/null || echo unavailable)"
+  if [ -n "$(git -C "$XFITTER_TREE_DIR" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+    echo "git_dirty=true"
+  else
+    echo "git_dirty=false"
+  fi
+  find "$XFITTER_TREE_DIR/bin" "$XFITTER_TREE_DIR/lib/xfitter" \
+       -maxdepth 1 -type f -print0 2>/dev/null | sort -z | xargs -0 sha256sum
+}} > "$FIT_DIR/output/xfitter_provenance.txt"
 
 SHIM_DIR=$(mktemp -d)
 trap "rm -rf $SHIM_DIR" EXIT

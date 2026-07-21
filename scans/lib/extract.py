@@ -163,25 +163,70 @@ class ResultsParser:
         return pd.DataFrame(rows)
 
     def parse_systematic_shifts(self) -> pd.DataFrame:
+        """Parse the per-source table of Results.txt.
+
+        The two xfitter trees print different tables, so the field count is what
+        identifies the layout:
+
+          xfitter-bartlett-fixes (9 numbers)
+            index name shift error corr_err epsilon r b_tilde b_mutheta
+                  gof_contrib lr_contrib type
+          xfitter-master (6 numbers)
+            index name shift error corr_err epsilon b_theta gof_contrib type
+
+        Both are parseable for diagnostics. Scan extraction nevertheless
+        requires the extended table for every active EoE fit, preventing stale
+        pre-fix outputs from entering a new ranking silently. Columns absent
+        from a legacy layout are left as None rather than aliased.
+        """
         rows = []
         pattern = re.compile(
-            r'^\s*(\d+)\s+(\S+)\s+([-\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+(:[\w:]+)'
+            r'^\s*(\d+)\s+(\S+)\s+((?:[-\d.eE+]+\s+)+)(:[\w:]+)\s*$'
         )
         for line in self.lines:
             m = pattern.match(line)
-            if m:
-                rows.append({
-                    'index': int(m.group(1)),
-                    'name': m.group(2),
-                    'shift': float(m.group(3)),
-                    'error': float(m.group(4)),
-                    'corr_err': float(m.group(5)),
-                    'epsilon': float(m.group(6)),
-                    'b_theta': float(m.group(7)),
-                    'gof_contrib': float(m.group(8)),
-                    'sys_type': m.group(9)
-                })
-        return pd.DataFrame(rows)
+            if not m:
+                continue
+            try:
+                nums = [float(x) for x in m.group(3).split()]
+            except ValueError:
+                continue
+            row = {
+                'index': int(m.group(1)),
+                'name': m.group(2),
+                'shift': nums[0],
+                'error': nums[1],
+                'corr_err': nums[2],
+                'epsilon': nums[3],
+                'sys_type': m.group(4),
+                'b_theta': None, 'r': None, 'b_tilde': None,
+                'b_mutheta': None, 'lr_contrib': None,
+            }
+            if len(nums) == 9:
+                row.update({'r': nums[4], 'b_tilde': nums[5], 'b_mutheta': nums[6],
+                            'gof_contrib': nums[7], 'lr_contrib': nums[8]})
+            elif len(nums) == 6:
+                row.update({'b_theta': nums[4], 'gof_contrib': nums[5]})
+            else:
+                continue
+            rows.append(row)
+        columns = [
+            'index', 'name', 'shift', 'error', 'corr_err', 'epsilon',
+            'b_theta', 'r', 'b_tilde', 'b_mutheta', 'gof_contrib',
+            'lr_contrib', 'sys_type',
+        ]
+        return pd.DataFrame(rows, columns=columns)
+
+    def has_extended_bartlett_table(self) -> bool:
+        """Whether Results.txt contains the corrected-build 12-column table."""
+        return bool(re.search(
+            r'^Index\s+Name\s+Shift\s+Error\s+Corr Err\s+Epsilon\s+r\s+'
+            r'b_tilde\s+b_mutheta\s+GoF Contrib\s+LR Contrib\s+Type\s*$',
+            self.content, re.MULTILINE,
+        ))
+
+    def bartlett_failed(self) -> bool:
+        return 'Bartlett factors UNAVAILABLE' in self.content
 
     def parse_bartlett_factors(self) -> Dict:
         result = {}
@@ -227,20 +272,60 @@ def extract_fit_results(fit_dir: Path, do_errors: Optional[Dict] = None) -> Dict
         'systematic_shifts': results_parser.parse_systematic_shifts(),
         'partial_chi2s': results_parser.parse_partial_chi2s(),
         'bartlett': results_parser.parse_bartlett_factors(),
+        'bartlett_extended': results_parser.has_extended_bartlett_table(),
+        'bartlett_failed': results_parser.bartlett_failed(),
     }
 
     return results
 
 
-def _corrected_chi2(results: Dict):
+def _fit_has_active_eoe(fit_dir: Path) -> bool:
+    """Return true when the generated steering activates a non-zero EoE."""
+    steering = fit_dir / 'config' / 'steering.txt'
+    if not steering.is_file():
+        return False
+    num = r'[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][-+]?\d+)?'
+    return any(
+        float(m.group(1)) != 0.0
+        for m in re.finditer(rf'@eps\s*=\s*({num})', steering.read_text(), re.I)
+    )
+
+
+def _validate_bartlett_output(results: Dict, fit_dir: Path, active_eoe: bool):
+    """Fail closed when an EoE fit lacks corrected-build diagnostics."""
+    if not active_eoe:
+        return
+    if not results.get('bartlett_extended'):
+        raise RuntimeError(
+            f"active EoE fit lacks the 12-column Bartlett table: {fit_dir}"
+        )
+    if results.get('bartlett_failed'):
+        raise RuntimeError(f"Bartlett calculation failed: {fit_dir}")
+    factor = results.get('bartlett', {}).get('chi2_bartlett')
+    if factor is None or not np.isfinite(factor) or factor <= 0.0:
+        raise RuntimeError(
+            f"active EoE fit lacks a valid chi2 Bartlett factor: {fit_dir}"
+        )
+
+
+def _validate_fit_output(results: Dict, fit_dir: Path):
+    """Reject incomplete output while retaining completed non-converged fits."""
+    chi2 = results.get('chi2')
+    if chi2 is None or not np.isfinite(float(chi2)):
+        raise RuntimeError(f"fit lacks a finite minimized chi2: {fit_dir}")
+    if results.get('ndf') is None:
+        raise RuntimeError(f"fit lacks its number of degrees of freedom: {fit_dir}")
+
+
+def _corrected_chi2(results: Dict, active_eoe: bool = False):
     """Bartlett-corrected goodness-of-fit chi2 = chi2 * c_chi2.
 
     This is what xfitter itself prints as 'Corrected Chi2'
     (chi2out_print = chi2out * c_bart_chi2 in fcn.f). We recompute it from the
     raw chi2 and the printed factor rather than parsing that line, because the
-    line is only written when errors-on-errors are active: for a Gaussian fit
-    the factor is absent, and falling back to 1.0 makes the nominal and the EoE
-    fits directly comparable.
+    line is only written when errors-on-errors are active.  A genuinely
+    Gaussian fit therefore uses a unit factor; active EoE fits are validated
+    above and never receive this fallback.
 
     Only meaningful where the chi2 IS a goodness-of-fit, i.e. for the
     systematic-ranking and lambda scans. Likelihood scans report a delta-chi2
@@ -251,7 +336,9 @@ def _corrected_chi2(results: Dict):
     if chi2 is None or (isinstance(chi2, float) and np.isnan(chi2)):
         return chi2
     factor = results.get('bartlett', {}).get('chi2_bartlett')
-    return chi2 * (factor if factor else 1.0)
+    if active_eoe:
+        return chi2 * factor
+    return chi2 * (factor if factor is not None else 1.0)
 
 
 def extract_scan_results(scan_dir: Path, scan_type: str,
@@ -284,7 +371,10 @@ def extract_scan_results(scan_dir: Path, scan_type: str,
         fit_dirs = sorted(fits_dir.glob("lambda_*"))
         key_name = 'lambda'
     elif scan_type == 'systematic-ranking':
-        fit_dirs = sorted([d for d in fits_dir.iterdir() if d.is_dir()])
+        fit_dirs = sorted([
+            d for d in fits_dir.iterdir()
+            if d.is_dir() and d.name != 'batch'
+        ])
         key_name = 'systematic'
     else:
         raise ValueError(f"Unknown scan_type: {scan_type}")
@@ -296,12 +386,19 @@ def extract_scan_results(scan_dir: Path, scan_type: str,
     if scan_type == 'systematic-ranking' and nominal_dir.exists():
         try:
             nominal_results = extract_fit_results(nominal_dir, do_errors=do_errors)
+            _validate_fit_output(nominal_results, nominal_dir)
+            nominal_active_eoe = _fit_has_active_eoe(nominal_dir)
+            _validate_bartlett_output(
+                nominal_results, nominal_dir, nominal_active_eoe
+            )
             for _, row in nominal_results['parameters'].iterrows():
                 nominal_params[row['parameter']] = (row['central_value'], row['error'])
             nominal_chi2 = {
                 'systematic': 'nominal',
                 'chi2': nominal_results['chi2'],
-                'chi2_corrected': _corrected_chi2(nominal_results),
+                'chi2_corrected': _corrected_chi2(
+                    nominal_results, nominal_active_eoe
+                ),
                 'ndf': nominal_results['ndf'],
                 'converged': nominal_results['convergence'] == 'converged',
                 'chi2_bartlett': nominal_results['bartlett'].get('chi2_bartlett'),
@@ -309,14 +406,20 @@ def extract_scan_results(scan_dir: Path, scan_type: str,
             }
             print(f"  Loaded nominal fit: {len(nominal_params)} parameters")
         except Exception as e:
-            print(f"Warning: Failed to extract nominal fit from {nominal_dir}: {e}")
+            raise RuntimeError(
+                f"Failed to extract nominal fit from {nominal_dir}: {e}"
+            ) from e
 
+    failures = []
     for fit_dir in fit_dirs:
         if fit_dir.name == 'nominal':
             continue
 
         try:
             results = extract_fit_results(fit_dir, do_errors=do_errors)
+            _validate_fit_output(results, fit_dir)
+            active_eoe = _fit_has_active_eoe(fit_dir)
+            _validate_bartlett_output(results, fit_dir, active_eoe)
 
             if scan_type == 'lambda-scan':
                 key_value = float(fit_dir.name.replace('lambda_', ''))
@@ -326,7 +429,7 @@ def extract_scan_results(scan_dir: Path, scan_type: str,
             all_chi2.append({
                 key_name: key_value,
                 'chi2': results['chi2'],
-                'chi2_corrected': _corrected_chi2(results),
+                'chi2_corrected': _corrected_chi2(results, active_eoe),
                 'ndf': results['ndf'],
                 'converged': results['convergence'] == 'converged',
                 'chi2_bartlett': results['bartlett'].get('chi2_bartlett'),
@@ -351,13 +454,25 @@ def extract_scan_results(scan_dir: Path, scan_type: str,
                         'corr_err': row['corr_err'],
                         'epsilon': row['epsilon'],
                         'b_theta': row['b_theta'],
+                        'r': row['r'],
+                        'b_tilde': row['b_tilde'],
+                        'b_mutheta': row['b_mutheta'],
                         'gof_contrib': row['gof_contrib'],
+                        'lr_contrib': row['lr_contrib'],
                         'sys_type': row['sys_type'],
                     })
 
         except Exception as e:
-            print(f"Warning: Failed to extract results from {fit_dir}: {e}")
+            failures.append(f"{fit_dir.name}: {e}")
             continue
+
+    if failures:
+        preview = '\n  '.join(failures[:10])
+        more = f"\n  ... and {len(failures) - 10} more" if len(failures) > 10 else ''
+        raise RuntimeError(
+            f"Failed to extract {len(failures)} scan fit(s); refusing a partial "
+            f"ranking:\n  {preview}{more}"
+        )
 
     return {
         'chi2': pd.DataFrame(all_chi2),
