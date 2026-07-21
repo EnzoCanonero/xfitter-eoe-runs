@@ -23,6 +23,11 @@ Config keys (studies/<name>/config.yaml)
 type: xsec-comparison
 dataset: "HERA1+2 NCep 920"        # substring match on the dataset label
 q2bins: [3.5, 4.5, 6.5, 8.5]       # Q2 values to draw; omit/empty = all bins
+# Alternatively, select explicit (dataset, Q2) panels.  This is useful when a
+# single figure should compare representative slices from different samples:
+panels:
+  - {dataset: "HERA1+2 NCep 920", q2: 3.5}
+  - {dataset: "HERA1+2 NCep 575", q2: 8.5}
 fits:                               # 2+ entries; first = reference/data holder
   - {label: "nominal",  path: ../../../hera-baseline/nominal-bartlett2-hesse}
   - {label: "EoE-7src", path: ../../../hera-baseline/baseline-7-sources-bartlett2-hesse}
@@ -47,6 +52,7 @@ xfitter_tree: xfitter-bartlett-fixes   # binary tree under $XFITTER_ROOT
 """
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -160,10 +166,102 @@ def _is_data_row(line: str) -> bool:
         return False
 
 
-def filter_fittedresults(src: Path, dst: Path, dataset: str, q2bins):
+def _normalise_selected_plots(meta, rows):
+    """Give each selected Q2 slice a valid Plot index and matching title.
+
+    In some reduced-energy HERA blocks the plot index in the final data column
+    is offset from the original Plot metadata after the fit's Q2 cut.  The
+    points themselves are correct, but retaining the metadata verbatim then
+    gives the selected panel the neighbouring Q2 title.  At higher Q2, some
+    rows instead carry the sentinel index 999 and have no Plot metadata.  Such
+    slices are assigned temporary indices in the staged file only.
+    """
+    plot_line = re.compile(r"^Plot(\d+)@")
+    title = re.compile(r"(@Title:Q\^\{2\} = )[^@]*(?=\s*@)")
+    plot_meta = {}
+    for i, line in enumerate(meta):
+        match = plot_line.match(line)
+        if match:
+            plot_meta[int(match.group(1))] = i
+    if not plot_meta:
+        return meta, rows
+
+    plots_by_q2 = {}
+    q2_order = []
+    for row in rows:
+        parts = row.split()
+        try:
+            plot = int(parts[-1].split("/", 1)[0])
+            q2 = float(parts[0])
+        except (ValueError, IndexError):
+            continue
+        if q2 not in plots_by_q2:
+            plots_by_q2[q2] = []
+            q2_order.append(q2)
+        if plot not in plots_by_q2[q2]:
+            plots_by_q2[q2].append(plot)
+
+    next_plot = max(plot_meta) + 1
+    assigned, used = {}, set()
+    for q2 in q2_order:
+        valid = next((p for p in plots_by_q2[q2]
+                      if p in plot_meta and p not in used), None)
+        if valid is None:
+            while next_plot in plot_meta or next_plot in used:
+                next_plot += 1
+            valid = next_plot
+            next_plot += 1
+        assigned[q2] = valid
+        used.add(valid)
+
+    rewritten_rows = []
+    for row in rows:
+        parts = row.split()
+        try:
+            q2 = float(parts[0])
+            suffix = parts[-1].split("/", 1)[1]
+        except (ValueError, IndexError):
+            rewritten_rows.append(row)
+            continue
+        prefix = row.rsplit(None, 1)[0]
+        rewritten_rows.append(f"{prefix} {assigned[q2]}/{suffix}")
+
+    out = []
+    for line in meta:
+        match = plot_line.match(line)
+        plot = int(match.group(1)) if match else None
+        q2 = next((q for q, p in assigned.items() if p == plot), None)
+        if q2 is not None:
+            line = title.sub(
+                lambda m: f"{m.group(1)}{q2:g} ",
+                line,
+            )
+        out.append(line)
+
+    template = next(line for line in meta if plot_line.match(line))
+    new_plot_lines = []
+    for q2, plot in assigned.items():
+        if plot in plot_meta:
+            continue
+        line = plot_line.sub(f"Plot{plot}@", template)
+        line = title.sub(lambda m: f"{m.group(1)}{q2:g} ", line)
+        new_plot_lines.append(line)
+    if new_plot_lines:
+        # Plot metadata must precede the column-header line: xfitter-draw stops
+        # parsing plot definitions once the numerical table begins.
+        insert_at = 1 + max(i for i, line in enumerate(out)
+                            if plot_line.match(line))
+        out[insert_at:insert_at] = new_plot_lines
+    return out, rewritten_rows
+
+
+def filter_fittedresults(src: Path, dst: Path, dataset: str, q2bins, panels=None):
     """Copy src -> dst keeping only the matching dataset block(s), and within
     them only data rows whose Q2 (column 1) is in q2bins (all rows if q2bins
-    is empty). Header lines and Plot metadata are kept verbatim."""
+    is empty).  If panels is supplied, it instead selects the explicit
+    (dataset, Q2) pairs listed there.  Header lines are retained and the Plot
+    metadata are normalised to the selected slices."""
+    panels = panels or []
     lines = src.read_text().splitlines()
     blocks, i, npts = [], 1, 0          # line 0 is the original ndatasets count
     while i < len(lines):
@@ -180,17 +278,27 @@ def filter_fittedresults(src: Path, dst: Path, dataset: str, q2bins):
             else:
                 meta.append(lines[i])
             i += 1
-        if dataset and dataset not in label:
-            continue
-        if q2bins:
-            rows = [r for r in rows
-                    if any(abs(float(r.split()[0]) - q) < 1e-6 for q in q2bins)]
+        if panels:
+            selected_q2 = [float(panel["q2"]) for panel in panels
+                           if panel.get("dataset", "") in label]
+            if not selected_q2:
+                continue
+            rows = [r for r in rows if any(
+                abs(float(r.split()[0]) - q) < 1e-6 for q in selected_q2)]
+        else:
+            if dataset and dataset not in label:
+                continue
+            if q2bins:
+                rows = [r for r in rows if any(
+                    abs(float(r.split()[0]) - q) < 1e-6 for q in q2bins)]
         if rows:
+            meta, rows = _normalise_selected_plots(meta, rows)
             blocks.append("\n".join(head + meta + rows))
             npts += len(rows)
     if not blocks:
         raise RuntimeError(
-            f"no data selected from {src} (dataset='{dataset}', q2bins={q2bins})")
+            f"no data selected from {src} (dataset='{dataset}', "
+            f"q2bins={q2bins}, panels={panels})")
     dst.write_text(f"          {len(blocks)}\n" + "\n".join(blocks) + "\n")
     return npts
 
@@ -203,7 +311,7 @@ _AUX_FILES = ["Results.txt", "minuit.out.txt", "parsout_0", "parsout_1"]
 
 
 def _stage_fit(entry: dict, index: int, study_dir: Path, staging: Path,
-               dataset: str, q2bins):
+               dataset: str, q2bins, panels=None):
     label = entry.get("label")
     if "path" not in entry or not label:
         raise ValueError(f"fits[{index}] needs both 'label' and 'path'")
@@ -216,7 +324,8 @@ def _stage_fit(entry: dict, index: int, study_dir: Path, staging: Path,
 
     dst = staging / f"fit{index}"
     dst.mkdir(parents=True)
-    n = filter_fittedresults(fr, dst / "fittedresults.txt", dataset, q2bins)
+    n = filter_fittedresults(fr, dst / "fittedresults.txt", dataset, q2bins,
+                             panels)
     for aux in _AUX_FILES:
         if (out / aux).is_file():
             (dst / aux).symlink_to(out / aux)
@@ -266,6 +375,11 @@ def compare_xsec(study_dir: Path):
 
     dataset = cfg.get("dataset", "")
     q2bins = [float(q) for q in (cfg.get("q2bins") or [])]
+    panels = cfg.get("panels") or []
+    for i, panel in enumerate(panels):
+        if (not isinstance(panel, dict) or not panel.get("dataset")
+                or "q2" not in panel):
+            raise ValueError(f"panels[{i}] needs both 'dataset' and 'q2'")
     fits = cfg.get("fits") or []
     if len(fits) < 1:
         raise ValueError("need at least one entry under 'fits'")
@@ -275,10 +389,15 @@ def compare_xsec(study_dir: Path):
         shutil.rmtree(staging)
     staging.mkdir()
 
-    print(f"dataset: '{dataset or '(all)'}'   Q2 bins: {q2bins or '(all)'}")
+    if panels:
+        print("panels:", ", ".join(
+            f"{p['dataset']} @ Q2={float(p['q2']):g}" for p in panels))
+    else:
+        print(f"dataset: '{dataset or '(all)'}'   Q2 bins: {q2bins or '(all)'}")
     args = []
     for i, entry in enumerate(fits):
-        dst, label = _stage_fit(entry, i, study_dir, staging, dataset, q2bins)
+        dst, label = _stage_fit(entry, i, study_dir, staging, dataset, q2bins,
+                                panels)
         args.append(f"{dst}:{label}")
 
     plots = study_dir / "plots"

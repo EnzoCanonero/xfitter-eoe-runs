@@ -1,7 +1,8 @@
 # Where in the (Q^2, x) plane errors-on-errors change the description of the data:
 # Gaussian baseline vs the greedy-selected EoE fit (both Pumplin, new binary).
-# Cells give the change in the DATA term of the chi2; the nuisance penalty is not
-# per-point and is excluded (see lib/xsec_region.py).
+# Cells give the change in the DATA term of the chi2. The nuisance constraints
+# and prediction-dependent logarithmic term are not per-point and are excluded
+# (see lib/xsec_region.py).
 type: xsec-region-table
 q2bins: [0, 10, 30, 100, 1000, 1.0e9]
 xbins:  [0, 1.0e-3, 1.0e-2, 1.0e-1, 1.0]

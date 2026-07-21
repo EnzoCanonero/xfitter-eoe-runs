@@ -21,6 +21,26 @@ _PUMPLIN_PDF_PARAMS = [
     "CDbar", "CUbar", "Cdv", "Cg", "Cuv", "DUbar", "Euv",
 ]
 
+# Standard HERAPDF parameter order and paper notation.  The order follows the
+# PDF sectors introduced in the fit setup rather than the size of the fitted
+# displacement.
+_HERAPDF_PARAMETER_LABELS = [
+    ("Bg", r"$B_g$"),
+    ("Cg", r"$C_g$"),
+    ("Agp", r"$A'_g$"),
+    ("Bgp", r"$B'_g$"),
+    ("Buv", r"$B_{u_v}$"),
+    ("Cuv", r"$C_{u_v}$"),
+    ("Euv", r"$E_{u_v}$"),
+    ("Bdv", r"$B_{d_v}$"),
+    ("Cdv", r"$C_{d_v}$"),
+    ("CUbar", r"$C_{\bar U}$"),
+    ("DUbar", r"$D_{\bar U}$"),
+    ("ADbar", r"$A_{\bar D}$"),
+    ("BDbar", r"$B_{\bar D}$"),
+    ("CDbar", r"$C_{\bar D}$"),
+]
+
 
 def _pumplin_plot_params(config) -> list:
     params = list(_PUMPLIN_PDF_PARAMS)
@@ -212,6 +232,80 @@ def _save_wide_parameters(results: dict, params_file: Path):
 
     wide_df = pd.DataFrame(rows)
     wide_df.to_csv(params_file, index=False)
+
+
+def _plot_herapdf_parameter_comparison(poi_df: pd.DataFrame,
+                                       chi2_df: pd.DataFrame,
+                                       plots_dir: Path):
+    """Paper-style comparison of the nominal EoE and Gaussian PDF parameters.
+
+    The lambda scan is used only as the source of the Gaussian (lambda=0) and
+    nominal seven-source (lambda=1) fits.  Lambda is deliberately absent from
+    the output notation, which compares the two physical fit configurations.
+    """
+    reference = poi_df[np.isclose(poi_df['lambda'], 0.0)].set_index('parameter')
+    eoe = poi_df[np.isclose(poi_df['lambda'], 1.0)].set_index('parameter')
+    required = [name for name, _ in _HERAPDF_PARAMETER_LABELS]
+
+    missing = [name for name in required
+               if name not in reference.index or name not in eoe.index]
+    if missing:
+        print("  ! Skipping 7_parameter_comparison.pdf: "
+              f"missing standard HERAPDF parameters {missing}")
+        return
+
+    # Pumplin supplies the interval half-widths.  The EoE intervals are then
+    # enlarged by the Bartlett confidence-interval factor of the nominal fit.
+    eoe_chi2 = chi2_df[np.isclose(chi2_df['lambda'], 1.0)]
+    ci_bartlett = 1.0
+    if not eoe_chi2.empty and 'ci_bartlett' in eoe_chi2:
+        value = eoe_chi2['ci_bartlett'].iloc[0]
+        if pd.notna(value):
+            ci_bartlett = float(value)
+
+    pulls = np.array([eoe.loc[name, 'norm_value'] for name in required])
+    intervals = np.array([
+        eoe.loc[name, 'norm_error'] * ci_bartlett for name in required
+    ])
+    labels = [label for _, label in _HERAPDF_PARAMETER_LABELS]
+    y_pos = np.arange(len(required))
+
+    extent = max(1.0, float(np.max(np.abs(pulls) + intervals)))
+    xlim = (-1.12 * extent, 1.12 * extent)
+
+    fig, ax = plt.subplots(figsize=(7.2, 7.2))
+    gaussian_band = ax.axvspan(
+        -1.0, 1.0, color='#d9d9d9', alpha=0.65, zorder=0,
+        label='Gaussian fit',
+    )
+    eoe_intervals = ax.errorbar(
+        pulls, y_pos, xerr=intervals, fmt='o', color='#1f77b4',
+        ecolor='#1f77b4', elinewidth=1.3, capsize=3, markersize=5,
+        zorder=3,
+        label='EoE fit',
+    )
+    ax.axvline(0.0, color='black', linewidth=0.8, zorder=2)
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(labels, fontsize=14)
+    ax.set_ylim(-1.65, len(required) - 0.25)
+    ax.invert_yaxis()
+    ax.set_xlim(xlim)
+    ax.tick_params(axis='x', labelsize=14)
+    ax.set_xlabel(
+        r'$(\widehat a_m^{\mathrm{EoE}}-\widehat a_m^{\mathrm{G}})'
+        r'/\sigma_m^{\mathrm{G}}$',
+        fontsize=14,
+    )
+    ax.grid(axis='x', linestyle='--', linewidth=0.6, alpha=0.3)
+    ax.legend(
+        handles=[gaussian_band, eoe_intervals], loc='upper center',
+        ncol=2, frameon=True, fontsize=12,
+    )
+    fig.tight_layout(pad=0.8)
+    output = plots_dir / "7_parameter_comparison.pdf"
+    fig.savefig(output)
+    plt.close(fig)
+    print(f"  ✓ {output.name}")
 
 
 def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
@@ -424,6 +518,10 @@ def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
             plt.close(fig)
             n_pages += 1
     print(f"  ✓ 6_parameter_pulls.pdf  ({n_pages} pages)")
+
+    # Additional single-page figure for the nominal seven-source comparison.
+    # The existing lambda diagnostics above are retained unchanged.
+    _plot_herapdf_parameter_comparison(poi_df, chi2_df, plots_dir)
 
 
 def _plot_systematic_ranking(results: dict, plots_dir: Path, results_dir: Path,

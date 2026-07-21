@@ -14,11 +14,12 @@ IMPORTANT — what this does and does not account for
 ---------------------------------------------------
 The per-point pulls in fittedresults.txt carry only the DATA term of the chi2:
 each is (data - theory_shifted)/sigma_uncor for one measurement. The correlated
-nuisance-parameter penalty (the quadratic sum_p b_p^2 and the GVM log terms) is
-a property of the fit as a whole, not of any single point, so it cannot be
-binned and is NOT in this table. The two therefore do not add up to the total
-chi2 difference, and the caption must say so: for the HERA 7-source EoE fit the
-split is data -57.7, penalty +7.1, net -50.5.
+nuisance-parameter constraints and the prediction-dependent logarithmic term
+are properties of the fit as a whole, not of any single point, so they cannot
+be binned and are NOT in this table. The entries therefore do not add up to the
+total chi2 difference. For the HERA 7-source EoE fit the split is data -57.7,
+nuisance constraints +10.2 and prediction-dependent logarithmic term -3.1,
+giving a net change of -50.5.
 
 The pull column is theory-with-shifts based (theo_mod), i.e. the description the
 fit actually achieves, which is what the chi2 minimises.
@@ -34,6 +35,7 @@ fits:                                      # exactly 2; first = reference
   - {label: "EoE-7src", path: ../../../hera-baseline/baseline-7-sources-bartlett2-pumplin}
 """
 
+import math
 from pathlib import Path
 
 from lib.xsec_draw import _is_data_row, _load_config
@@ -84,27 +86,34 @@ def _bin_index(value: float, edges):
 def _fmt_edge(v: float) -> str:
     if v == 0:
         return "0"
-    if v >= 1000:
-        return f"10^{{{round(__import__('math').log10(v))}}}"
     if v >= 1:
         return f"{v:g}"
-    return f"10^{{{round(__import__('math').log10(v))}}}"
+    exponent = math.floor(math.log10(v))
+    mantissa = v / 10**exponent
+    if math.isclose(mantissa, 1.0, rel_tol=1e-10, abs_tol=1e-12):
+        return f"10^{{{exponent}}}"
+    return rf"{mantissa:g}\times10^{{{exponent}}}"
 
 
 def _q2_label(lo, hi, last):
     if lo == 0:
         return rf"$Q^2 < {hi:g}$"
     if last:
-        return rf"$Q^2 > {lo:g}$"
-    return rf"${lo:g}-{hi:g}$"
+        return rf"$Q^2 \geq {lo:g}$"
+    return rf"${lo:g}\leq Q^2 < {hi:g}$"
 
 
 def _x_label(lo, hi, last):
     if lo == 0:
         return rf"$x < {_fmt_edge(hi)}$"
     if last:
-        return rf"$x > {_fmt_edge(lo)}$"
-    return rf"${_fmt_edge(lo)}-{_fmt_edge(hi)}$"
+        return rf"$x \geq {_fmt_edge(lo)}$"
+    return rf"${_fmt_edge(lo)}\leq x < {_fmt_edge(hi)}$"
+
+
+def _validate_edges(name: str, edges):
+    if len(edges) < 2 or any(b <= a for a, b in zip(edges, edges[1:])):
+        raise ValueError(f"{name} must contain at least two strictly increasing edges")
 
 
 # ---------------------------------------------------------------------------
@@ -123,6 +132,8 @@ def region_table(study_dir: Path):
 
     q2e = [float(v) for v in (cfg.get("q2bins") or [0, 10, 30, 100, 1000, 1.0e9])]
     xe = [float(v) for v in (cfg.get("xbins") or [0, 1.0e-3, 1.0e-2, 1.0e-1, 1.0])]
+    _validate_edges("q2bins", q2e)
+    _validate_edges("xbins", xe)
     dataset = cfg.get("dataset") or ""
 
     ref_entry, cmp_entry = fits
@@ -189,22 +200,23 @@ def region_table(study_dir: Path):
     (results_dir / "region_table.tex").write_text("\n".join(L) + "\n")
 
     # ---- console ----
-    w = 16
+    w = 24
     print(f"\n  dchi2 = chi2_data({cmp_entry['label']}) - chi2_data({ref_entry['label']}), "
           f"per (Q^2, x) cell, with (npoints)\n")
     corner = "Q2 \\ x"
-    head = f"  {corner:<12}" + "".join(
+    head = f"  {corner:<24}" + "".join(
         f"{_x_label(xe[j], xe[j+1], j == nx-1).replace('$',''):>{w}}" for j in range(nx))
     print(head + f"{'row tot':>12}")
     for i in range(nq):
         lbl = _q2_label(q2e[i], q2e[i + 1], i == nq - 1).replace("$", "")
-        line = f"  {lbl:<12}"
+        line = f"  {lbl:<24}"
         for j in range(nx):
             line += f"{(f'{d[i][j]:+.1f} ({n[i][j]})' if n[i][j] else '-'):>{w}}"
         print(line + f"{row_tot[i]:+12.1f}")
-    line = f"  {'col tot':<12}" + "".join(f"{col_tot[j]:+{w}.1f}" for j in range(nx))
+    line = f"  {'col tot':<24}" + "".join(f"{col_tot[j]:+{w}.1f}" for j in range(nx))
     print(line + f"{total:+12.1f}")
     print(f"\n  total dchi2 (data term) = {total:+.2f} over {npts} points")
-    print("  NB: the nuisance-parameter penalty is not per-point and is excluded.")
+    print("  NB: the nuisance constraints and prediction-dependent logarithmic "
+          "term are not per-point and are excluded.")
     print(f"\nWrote {results_dir/'region_table.tex'}\n      {results_dir/'region_table.csv'}")
     return results_dir / "region_table.tex"
