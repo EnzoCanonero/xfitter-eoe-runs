@@ -88,7 +88,10 @@ class StudyConfig:
     def _expand_systematics(self, entries) -> List[Dict]:
         """Expand ranges and resolve epsilon per-entry (override) or global (fallback).
 
-        Each returned dict has keys: name, type, epsilon, init.
+        Each returned dict has keys: name, type, epsilon, init and
+        scale_with_lambda.  The latter defaults to True and is used only by
+        lambda scans; setting it to False keeps that source's epsilon fixed
+        while the scan parameter is varied.
 
         `init` is an optional MINUIT warm-start value for the source's nuisance
         parameter (emitted as a `set par` command at fit generation). It is valid
@@ -122,15 +125,24 @@ class StudyConfig:
                     )
                 init = float(init)
 
+            scale_with_lambda = entry.get('scale_with_lambda', True)
+            if not isinstance(scale_with_lambda, bool):
+                raise ValueError(
+                    f"Systematic '{entry['name']}': 'scale_with_lambda' must "
+                    f"be true or false"
+                )
+
             if 'range' in entry:
                 prefix, sys_type = entry['name'], entry['type']
                 start, end = entry['range'].split('-')
                 for i in range(int(start), int(end) + 1):
                     result.append({'name': f"{prefix}{i}", 'type': sys_type,
-                                   'epsilon': eps, 'init': None})
+                                   'epsilon': eps, 'init': None,
+                                   'scale_with_lambda': scale_with_lambda})
             else:
                 result.append({'name': entry['name'], 'type': entry['type'],
-                               'epsilon': eps, 'init': init})
+                               'epsilon': eps, 'init': init,
+                               'scale_with_lambda': scale_with_lambda})
         return result
 
     def get(self, key: str, default=None):
@@ -171,7 +183,7 @@ class LambdaScanConfig(StudyConfig):
 
     @property
     def systematics(self) -> List[Dict]:
-        """Get expanded systematics with resolved epsilon."""
+        """Get expanded systematics with resolved epsilon and scaling mode."""
         return self._expand_systematics(self.data['systematics'])
 
 

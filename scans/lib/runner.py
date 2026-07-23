@@ -282,10 +282,19 @@ def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path, dry_run
 
     print(f"\nLambda range: {config.lambda_min} to {config.lambda_max} (step {config.lambda_step})")
     print(f"Number of fits: {len(lambda_vals)}")
-    print(f"Number of systematics: {len(systematics)}")
+    n_scaled = sum(s['scale_with_lambda'] for s in systematics)
+    n_fixed = len(systematics) - n_scaled
+    if n_scaled == 0:
+        raise ValueError(
+            "Lambda scan has no source with scale_with_lambda: true"
+        )
+
+    print(f"Number of systematics: {len(systematics)} "
+          f"({n_scaled} scaled, {n_fixed} fixed)")
     print(f"\nSystematics:")
     for sys in systematics[:10]:
-        print(f"  - {sys['name']} ({sys['type']}, eps={sys['epsilon']})")
+        mode = "scaled" if sys['scale_with_lambda'] else "fixed"
+        print(f"  - {sys['name']} ({sys['type']}, eps={sys['epsilon']}, {mode})")
     if len(systematics) > 10:
         print(f"  ... and {len(systematics) - 10} more")
 
@@ -308,9 +317,12 @@ def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path, dry_run
 
         print(f"Generating {fit_name}...")
 
-        # Scale each systematic's epsilon by lambda
+        # Scale only the requested sources.  Sources marked
+        # scale_with_lambda: false retain their nominal epsilon at every point.
         scaled_sources = [
-            (s['name'], s['type'], s['epsilon'] * lam)
+            (s['name'], s['type'],
+             _fmt_eps(s['epsilon'] * lam
+                      if s['scale_with_lambda'] else s['epsilon']))
             for s in systematics
         ]
 

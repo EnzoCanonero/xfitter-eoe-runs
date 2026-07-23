@@ -82,8 +82,10 @@ Automated framework for running systematic PDF fitting scans on Condor.
 
 ### Scan types
 
-**Lambda-scan** — tests different global epsilon scaling factors (λ):
+**Lambda-scan** — tests different epsilon scaling factors (λ):
 - Config: `lambda: {min, max, step}`, `epsilon` or per-source `epsilon`, `systematics`, `datafiles`
+- By default every source is scaled. Set `scale_with_lambda: false` on a
+  systematic to hold its epsilon fixed while the other sources are scanned.
 - Output: chi2-vs-lambda plots, parameter heatmaps, convergence charts
 
 **Systematic-ranking** — tests each systematic source individually:
