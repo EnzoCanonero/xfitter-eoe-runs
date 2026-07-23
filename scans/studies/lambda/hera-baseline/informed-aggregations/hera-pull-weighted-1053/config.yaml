@@ -1,0 +1,79 @@
+# Scan epsilon_1053 while retaining the other 46 pre-fit EoE assignments.
+# The nominal point is lambda=1, for which epsilon_1053=0.6.
+scan_type: lambda-scan
+xfitter_tree: xfitter-bartlett-fixes
+template: hera-baseline
+
+lambda: {min: 0.0, max: 1.0, step: 0.1}
+n_iterations: 8
+enable_bartlett: true
+
+doErrors:
+  method: Pumplin
+  errdef: 0.5
+  iterate: 10
+
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+
+systematics:
+  # The only scanned source: epsilon_1053 = 0.6 lambda.
+  - {name: sysHZComb1053, type: E, epsilon: 0.6, init: -16.4095,
+     scale_with_lambda: true}
+
+  # Procedural sources: fixed at epsilon = 0.6.
+  - {name: proc_tb21, type: E, epsilon: 0.6, init: -6.3118,
+     scale_with_lambda: false}
+  - {name: proc_nrl, type: N, epsilon: 0.6, scale_with_lambda: false}
+  - {name: proc_tb, range: "22-24", type: N, epsilon: 0.6,
+     scale_with_lambda: false}
+  - {name: proc_gp, type: N, epsilon: 0.6, scale_with_lambda: false}
+  - {name: proc_had, type: N, epsilon: 0.6, scale_with_lambda: false}
+
+  # Sources identified by the HERA combination pull study: epsilon = 0.3.
+  # Source 1053 is already declared above.
+  - {name: sysHZComb1015, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1030, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1048, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1055, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1122, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb, range: "1124-1125", type: N, epsilon: 0.3,
+     scale_with_lambda: false}
+  - {name: sysHZComb1149, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1007, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1008, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1062, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1064, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1067, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1069, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1072, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1074, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1076, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1084, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1090, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1101, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1102, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1105, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1109, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1112, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1114, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1116, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1129, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1136, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1139, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1140, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1144, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1145, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1147, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1151, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1152, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1154, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1156, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1157, type: N, epsilon: 0.3, scale_with_lambda: false}
+  - {name: sysHZComb1160, type: N, epsilon: 0.3, scale_with_lambda: false}

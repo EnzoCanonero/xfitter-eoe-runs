@@ -1,0 +1,99 @@
+Minimizer: MINUIT
+MINUIT:
+  Commands: |
+    set par 24 -15.8343
+    call fcn 1
+    set str 2
+    migrad 100000
+    call fcn 3
+  doErrors: |
+    Pumplin
+    SET ERRDEF 0.5
+    ITERATE 10
+
+# 18-parameter Giuli parametrization (arXiv:1902.11125), initialized AT the
+# converged fixed-order NNLO minimum (chi2=1300.58/1127) of
+# fits/hera-giuli-param/gaussian (MIGRAD CONVERGED).
+# value = best-fit central value, step = MINUIT parameter error.
+Parameters:
+  Ag   :  DEPENDENT
+  Auv  :  DEPENDENT
+  Adv  :  DEPENDENT
+  ZERO : 0
+  fs   : [ 0.4, 0.0 ]
+  Adbar: [ 0.056678,  0.012374  ]
+  Bdbar: [ -0.37149,  0.041961  ]
+  Bdv  : [ 1.0215,    0.093630  ]
+  Bg   : [ -0.48968,  0.045916  ]
+  Buv  : [ 0.76670,   0.13230   ]
+  Cdbar: [ 24.812,    3.9017    ]
+  Cdv  : [ 4.6567,    0.42852   ]
+  Cg   : [ 4.1892,    0.59148   ]
+  Cubar: [ 10.765,    1.4549    ]
+  Cuv  : [ 4.5255,    0.16143   ]
+  Ddbar: [ 55.547,    16.589    ]
+  Dubar: [ 25.819,    7.9801    ]
+  Euv  : [ 2.8045,    1.8021    ]
+  Fdbar: [ 0.074819,  0.0064284 ]
+  Fg   : [ 0.24018,   0.0044290 ]
+  Fuv  : [ 0.35339,   0.056995  ]
+  Gg   : [ 0.014007,  0.00058122 ]
+  Guv  : [ 0.050297,  0.016451  ]
+
+Parameterisations:
+  par_uv:
+    class: Expression
+    expression: "Auv*(x^Buv*(1-x)^Cuv)*(1+Euv*x^2+Fuv*ln(x)+Guv*ln(x)^2)"
+  par_dv:
+    class: Expression
+    expression: "Adv*(x^Bdv*(1-x)^Cdv)"
+  par_ubar:
+    class: Expression
+    expression: "Adbar*(x^Bdbar*(1-x)^Cubar)*(1+Dubar*x+Fdbar*ln(x))"
+  par_dbar:
+    class: Expression
+    expression: "Adbar*(x^Bdbar*(1-x)^Cdbar)*(1+Ddbar*x+Fdbar*ln(x))"
+  par_s:
+    class: Expression
+    expression: "Adbar*fs/(1-fs)*(x^Bdbar*(1-x)^Cdbar)*(1+Ddbar*x+Fdbar*ln(x))"
+  par_g:
+    class: Expression
+    expression: "Ag*(x^Bg*(1-x)^Cg)*(1+Fg*ln(x)+Gg*ln(x)^2)"
+
+DefaultDecomposition: proton
+Decompositions:
+  proton:
+    class: UvDvUbarDbarS
+    xuv: par_uv
+    xdv: par_dv
+    xubar: par_ubar
+    xdbar: par_dbar
+    xs: par_s
+    xg: par_g
+
+DefaultEvolution: proton-QCDNUM
+Evolutions:
+  proton-QCDNUM:
+    ? !include evolutions/QCDNUM.yaml
+    decomposition: proton
+
+Q0 : 1.378404875209  # sqrt(1.9) GeV
+
+? !include constants.yaml
+
+alphas : 0.118
+
+byReaction:
+  RT_DISNC:
+    ? !include reactions/RT_DISNC.yaml
+
+hf_scheme_DISNC:
+  defaultValue: 'RT_DISNC'
+
+hf_scheme_DISCC:
+  defaultValue: 'BaseDISCC'
+
+# Output directory (patched at runtime by run_fit.sh)
+OutputDirectory: "/nfs/scratch2/ecanoner/xfitter-eoe-runs/fits/hera-giuli-param/informed-aggregations/hera-pull-weighted-niter2/output"
+
+MaxErrAllowed: 4

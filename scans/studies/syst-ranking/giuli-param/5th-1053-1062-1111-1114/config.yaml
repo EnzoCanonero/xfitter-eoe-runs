@@ -4,15 +4,15 @@ template: giuli-param
 epsilon: 0.6
 
 # Fifth-order forward-selection scan with the Giuli parametrization (Q2cut = 3.5).
-# The 4th-round next source 1144 cleared the floor (dchi2 = 2.15), so this round is
-# warranted under the dchi2>2 rule. Base held ON in every fit (eps 0.6), warm-started at
-# the JOINT converged values from the 4th-order {1053,1062,1114,1144} fit
-# (giuli-4th-.../runs/sysHZComb1144). Note: Giuli has 23 PDF params, so 1053=#24 ... 1144=#27.
+# The corrected 4th-round scan selects 1114 (dchi2_B = 2.61), so the base
+# {1053,1062,1111,1114} is held ON in every fit (eps 0.6), warm-started at the
+# JOINT converged values from 4th-1053-1062-1111/runs/sysHZComb1114.
+# Giuli has 23 PDF parameters, so the four EoE sources are MINUIT #24--#27.
 base_systematics:
-  - {name: sysHZComb1053, type: E, init: -16.0270}
-  - {name: sysHZComb1062, type: E, init: -5.3746}
-  - {name: sysHZComb1114, type: E, init: 4.5484}
-  - {name: sysHZComb1144, type: E, init: 4.6361}
+  - {name: sysHZComb1053, type: E, init: -16.1891}
+  - {name: sysHZComb1062, type: E, init: -5.8147}
+  - {name: sysHZComb1111, type: E, init: -2.6723}
+  - {name: sysHZComb1114, type: E, init: 3.9881}
 
 datafiles:
   - HERA1+2_NCep_920-thexp.dat
