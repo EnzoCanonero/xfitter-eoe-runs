@@ -1,0 +1,32 @@
+scan_type: systematic-ranking
+xfitter_tree: xfitter-bartlett-fixes
+template: giuli-param
+epsilon: 0.7
+enable_bartlett: true
+q2_cut: 3.5
+n_iterations: 2
+
+# Corrected epsilon=0.7 branch after sysHZComb1144 was selected from the
+# {sysHZComb1053, sysHZComb1062, sysHZComb1114} base.  These warm starts are
+# the fitted shifts at that winning point; all base sources remain free.
+base_systematics:
+  - {name: sysHZComb1053, type: E, init: -16.153126}
+  - {name: sysHZComb1062, type: E, init: -5.676274}
+  - {name: sysHZComb1114, type: E, init: 4.729201}
+  - {name: sysHZComb1144, type: E, init: 4.871537}
+
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+
+systematics:
+  - {name: sysHZComb, range: "1001-1162", type: E}
+  - {name: proc_nrl, type: E}
+  - {name: proc_tb, range: "21-24", type: E}
+  - {name: proc_gp, type: E}
+  - {name: proc_had, type: E}

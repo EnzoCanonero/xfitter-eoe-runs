@@ -1,0 +1,31 @@
+scan_type: systematic-ranking
+xfitter_tree: xfitter-bartlett-fixes
+template: hera-baseline
+epsilon: 0.7
+q2_cut: 3.5
+n_iterations: 2
+enable_bartlett: true
+
+# Conditional fourth round at epsilon=0.7, assuming the epsilon=0.6 prefix
+# {sysHZComb1053, proc_tb21, sysHZComb1064}. Joint epsilon=0.6 minima are used
+# only as warm starts; all parameters are minimised again at epsilon=0.7.
+base_systematics:
+  - {name: sysHZComb1053, type: E, init: -16.6551}
+  - {name: proc_tb21,     type: E, init: -6.1244}
+  - {name: sysHZComb1064, type: E, init: 8.6801}
+
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+
+systematics:
+  - {name: sysHZComb, range: "1001-1162", type: E}
+  - {name: proc_nrl, type: E}
+  - {name: proc_tb, range: "21-24", type: E}
+  - {name: proc_gp, type: E}
+  - {name: proc_had, type: E}

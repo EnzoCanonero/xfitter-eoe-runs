@@ -1,0 +1,29 @@
+scan_type: systematic-ranking
+xfitter_tree: xfitter-bartlett-fixes
+template: giuli-param
+epsilon: 0.7
+enable_bartlett: true
+q2_cut: 3.5
+n_iterations: 2
+
+# Conditional check of the epsilon=0.6 ordering.  sysHZComb1053 is held on in
+# every fit at epsilon=0.7.  Its epsilon=0.6 fitted value is used only as a warm
+# start; the nuisance parameter is free and is refitted in every new fit.
+base_systematics:
+  - {name: sysHZComb1053, type: E, init: -16.2802}
+
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+
+systematics:
+  - {name: sysHZComb, range: "1001-1162", type: E}
+  - {name: proc_nrl, type: E}
+  - {name: proc_tb, range: "21-24", type: E}
+  - {name: proc_gp, type: E}
+  - {name: proc_had, type: E}
