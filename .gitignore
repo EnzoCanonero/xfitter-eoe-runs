@@ -4,9 +4,15 @@ fits/**/output_OLD/
 fits/**/output_bkp*/
 fits/**/bkpref/
 
+# Classified pre-merge fit artifacts
+fits/**/output_legacy_*/
+fits/**/output_retained_*/
+
 # PDF-comparison plot and table outputs
 fits/compare/**/plots/
 fits/compare/**/results/
+fits/compare/**/plots_legacy_*/
+fits/compare/**/results_legacy_*/
 
 # Condor generated files (created by submit.sh)
 fits/**/condor/run_fit.sh
@@ -37,6 +43,15 @@ scans/studies/**/plots/
 scans/studies/**/results/
 scans/studies/**/runs_bkp*/
 scans/studies/**/runs_output_bkp*.tar.gz
+scans/studies/**/runs_legacy_*/
+scans/studies/**/runs_retained_*/
+scans/studies/**/runs_invalid_*/
+scans/studies/**/plots_legacy_*/
+scans/studies/**/plots_retained_*/
+scans/studies/**/plots_invalid_*/
+scans/studies/**/results_legacy_*/
+scans/studies/**/results_retained_*/
+scans/studies/**/results_invalid_*/
 
 # Shared pipeline symlinks in study folders (point to scans/bin/)
 scans/studies/**/plot
