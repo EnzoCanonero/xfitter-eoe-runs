@@ -1,10 +1,11 @@
 """
 PDF comparison for individual fits.
 
-Overlays the parton distributions from an arbitrary number of single fits (each of
-which writes its own LHAPDF set under ``<fit>/output/<set>``) into a single multi-page
-PDF, one page per observable, with a 2-panel layout (central + uncertainty band on the
-left, ratio-to-reference on the right).
+Overlays the parton distributions from an arbitrary number of single fits into a
+single multi-page PDF, one page per observable, with a 2-panel layout (central +
+uncertainty band on the left, ratio-to-reference on the right).  Fits can be read
+either from an LHAPDF set under ``<fit>/output/<set>`` or directly from xFitter's
+``pdfs_q2val`` central and Pumplin error grids.
 
 Driven by a study ``config.yaml`` (see ``compare_pdfs``); mirrors the UX of the scans
 framework but is self-contained.
@@ -56,6 +57,18 @@ TITLES = {
 }
 
 DEFAULT_OBSERVABLES = ["uv", "dv", "gluon", "sea"]
+
+# Column indices in xFitter's ``pdfs_q2val`` tables.  The files already contain
+# x-weighted distributions, in the same convention as LHAPDF's xfxQ.  The
+# table's precomputed ``sea`` column is not used: above the charm threshold it
+# also contains anti-charm, whereas the observable defined here is the light
+# sea 2*(ubar+dbar+sbar).
+XFITTER_GRID_COLUMNS = {
+    "gluon": (1,),
+    "uv": (6,),
+    "dv": (7,),
+    "sea": (9, 10, 15),
+}
 
 # Default colour cycle used when a fit does not specify its own colour.
 _DEFAULT_COLORS = [
@@ -253,6 +266,135 @@ def _evaluate_set(pset, pdfs, obs_func, x_vals, Q, error_type):
 
 
 # =========================================================================
+# Native xFitter grid loading
+# =========================================================================
+def _grid_q2(path: Path) -> float:
+    """Read Q2 from the first line of an xFitter ``pdfs_q2val`` file."""
+    with open(path) as handle:
+        fields = handle.readline().split()
+    if not fields:
+        raise ValueError(f"empty xFitter PDF grid: {path}")
+    return float(fields[0])
+
+
+def _find_central_grid(output_dir: Path, Q2: float):
+    """Return the central grid matching Q2 and its two-digit file suffix."""
+    candidates = []
+    pattern = re.compile(r"pdfs_q2val_(\d{2})\.txt$")
+    for path in sorted(output_dir.glob("pdfs_q2val_??.txt")):
+        match = pattern.fullmatch(path.name)
+        if match and math.isclose(_grid_q2(path), Q2, rel_tol=1.0e-8,
+                                  abs_tol=1.0e-10):
+            candidates.append((path, match.group(1)))
+    if not candidates:
+        raise FileNotFoundError(
+            f"no central pdfs_q2val grid at Q^2={Q2:g} GeV^2 in {output_dir}"
+        )
+    if len(candidates) > 1:
+        raise ValueError(
+            f"multiple central pdfs_q2val grids at Q^2={Q2:g} GeV^2 in {output_dir}"
+        )
+    return candidates[0]
+
+
+def _read_xfitter_grid(path: Path) -> np.ndarray:
+    """Read the numeric table below the two-line xFitter grid header."""
+    table = np.loadtxt(path, skiprows=2)
+    if table.ndim != 2 or table.shape[1] < 2:
+        raise ValueError(f"unexpected xFitter PDF-grid layout in {path}")
+    return table
+
+
+def _xfitter_grid_observable(table: np.ndarray, observable: str) -> np.ndarray:
+    """Build an observable from the columns of a native xFitter grid."""
+    columns = XFITTER_GRID_COLUMNS[observable]
+    if table.shape[1] <= max(columns):
+        raise ValueError(
+            f"xFitter PDF grid has no columns required for '{observable}'"
+        )
+    if observable == "sea":
+        return 2.0 * np.sum(table[:, columns], axis=1)
+    return table[:, columns[0]]
+
+
+def _interpolate_grid(x_source, values, x_target):
+    """Interpolate a native xFitter grid on the comparison's logarithmic x grid."""
+    if np.any(x_target < x_source[0]) or np.any(x_target > x_source[-1]):
+        raise ValueError(
+            f"requested x range [{x_target[0]:g}, {x_target[-1]:g}] lies outside "
+            f"xFitter grid [{x_source[0]:g}, {x_source[-1]:g}]"
+        )
+    return np.interp(np.log(x_target), np.log(x_source), values)
+
+
+def _evaluate_xfitter_grids(fit_dir: Path, observables, x_vals, Q2, error_type):
+    """Evaluate central values and Pumplin bands from ``pdfs_q2val`` files."""
+    output_dir = fit_dir / "output"
+    if not output_dir.is_dir():
+        raise FileNotFoundError(f"fit output directory not found: {output_dir}")
+
+    central_path, suffix = _find_central_grid(output_dir, Q2)
+    central_table = _read_xfitter_grid(central_path)
+    x_source = central_table[:, 0]
+
+    pair_pattern = re.compile(
+        rf"pdfs_q2val_s(\d+)([pm])_{re.escape(suffix)}\.txt$"
+    )
+    pair_paths = {}
+    for path in sorted(output_dir.glob(f"pdfs_q2val_s*?_{suffix}.txt")):
+        match = pair_pattern.fullmatch(path.name)
+        if match:
+            pair_paths.setdefault(int(match.group(1)), {})[match.group(2)] = path
+
+    incomplete = [index for index, pair in pair_paths.items()
+                  if set(pair) != {"p", "m"}]
+    if incomplete:
+        raise ValueError(
+            f"incomplete Pumplin +/- grid pairs {incomplete} in {output_dir}"
+        )
+
+    member_tables = []
+    for index in sorted(pair_paths):
+        # Keep each +/- pair adjacent for the Hessian-band prescription.
+        for sign in ("p", "m"):
+            table = _read_xfitter_grid(pair_paths[index][sign])
+            if table.shape != central_table.shape or not np.allclose(
+                    table[:, 0], x_source, rtol=0.0, atol=1.0e-12):
+                raise ValueError(
+                    f"grid mismatch between {central_path} and "
+                    f"{pair_paths[index][sign]}"
+                )
+            member_tables.append(table)
+
+    symmetric = (error_type == "symmetric")
+    obs_data = {}
+    for obs in observables:
+        central = _interpolate_grid(
+            x_source, _xfitter_grid_observable(central_table, obs), x_vals
+        )
+        members = [
+            _interpolate_grid(
+                x_source, _xfitter_grid_observable(table, obs), x_vals
+            )
+            for table in member_tables
+        ]
+
+        err_plus = np.zeros_like(central)
+        err_minus = np.zeros_like(central)
+        for i in range(len(x_vals)):
+            values = [member[i] for member in members]
+            err_plus[i], err_minus[i] = _hessian_band(
+                central[i], values, False, symmetric
+            )
+        obs_data[obs] = {
+            "central": central,
+            "err_plus": err_plus,
+            "err_minus": err_minus,
+        }
+    return obs_data, len(pair_paths)
+
+
+# =========================================================================
 # Plotting
 # =========================================================================
 def _draw_main(ax, obs, curves, Q2, x_min, x_max, legend=True):
@@ -365,15 +507,49 @@ def compare_pdfs(study_dir: Path):
         # Resolve + load every fit up front.
         curves = []
         for i, entry in enumerate(config.fits):
-            label, name, color, linestyle = _resolve_fit(entry, i, study_dir, staging_root)
-            print(f"  [{i}] {label}  <-  {name}")
-            pset = lhapdf.getPDFSet(name)      # load members once, reuse across observables
-            pdfs = pset.mkPDFs()
-            obs_data = {}
-            for obs in config.observables:
-                central, ep, em = _evaluate_set(pset, pdfs, OBSERVABLE_FUNCS[obs],
-                                                x_vals, Q, error_type)
-                obs_data[obs] = {"central": central, "err_plus": ep, "err_minus": em}
+            source = entry.get("source", "lhapdf")
+            if source == "xfitter-grid":
+                if "path" not in entry:
+                    raise ValueError(
+                        f"fit entry #{i} with source 'xfitter-grid' must have 'path'"
+                    )
+                fit_dir = (study_dir / entry["path"]).resolve()
+                label = entry.get("label", fit_dir.name)
+                color = entry.get(
+                    "color", _DEFAULT_COLORS[i % len(_DEFAULT_COLORS)]
+                )
+                linestyle = entry.get("linestyle", "-")
+                obs_data, n_directions = _evaluate_xfitter_grids(
+                    fit_dir, config.observables, x_vals, config.Q2, error_type
+                )
+                print(
+                    f"  [{i}] {label}  <-  {fit_dir}/output "
+                    f"({n_directions} Pumplin directions)"
+                )
+            elif source == "lhapdf":
+                label, name, color, linestyle = _resolve_fit(
+                    entry, i, study_dir, staging_root
+                )
+                print(f"  [{i}] {label}  <-  {name}")
+                # Load members once and reuse them across observables.
+                pset = lhapdf.getPDFSet(name)
+                pdfs = pset.mkPDFs()
+                obs_data = {}
+                for obs in config.observables:
+                    central, ep, em = _evaluate_set(
+                        pset, pdfs, OBSERVABLE_FUNCS[obs],
+                        x_vals, Q, error_type
+                    )
+                    obs_data[obs] = {
+                        "central": central,
+                        "err_plus": ep,
+                        "err_minus": em,
+                    }
+            else:
+                raise ValueError(
+                    f"unknown source '{source}' in fit entry #{i}; "
+                    "choose 'lhapdf' or 'xfitter-grid'"
+                )
             curves.append({"label": label, "color": color, "linestyle": linestyle,
                            "x": x_vals, "obs": obs_data})
 

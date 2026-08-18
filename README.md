@@ -174,6 +174,8 @@ ratio_reference: 0            # ratio-panel denominator: fit index or label
 fits:
   - {label: "Q2 > 2.0", path: ../../../Q2cut/q2cut-2.0}
   - {label: "Q2 > 5.0", path: ../../../Q2cut/q2cut-5.0}
+  # Read xFitter's native central and Pumplin grids when no LHAPDF set was written:
+  # - {label: "4 iterations", path: ../../../my-fit-niter4, source: xfitter-grid}
   # An installed LHAPDF set can be overlaid instead of a fit dir:
   # - {label: "HERAPDF2.0 NNLO", lhapdf_set: HERAPDF20_NNLO_EIG}
 EOF
@@ -184,9 +186,12 @@ ln -s ../../bin/plot .
 
 Each fit entry uses either `path` (a local fit dir, relative to the study) or
 `lhapdf_set` (an installed set); optional `set`, `color`, `linestyle`, `label`.
+For a local fit, `source: xfitter-grid` reads the `pdfs_q2val` central grid and
+Pumplin `sNNp`/`sNNm` pairs at the requested `Q2` directly from `output/`;
+otherwise the local `proton` LHAPDF set is used.
 Uncertainty bands are **auto-detected**: a set with `1+2N` members gets a Hessian band
-(via `PDFSet.uncertainty`, honouring its `ErrorType`); a single-member set is drawn as a
-central line only. Comparisons may freely mix the two.
+computed from its error members, honouring its `ErrorType`; a single-member set is
+drawn as a central line only. Comparisons may freely mix the two.
 
 ## Git workflow
 
