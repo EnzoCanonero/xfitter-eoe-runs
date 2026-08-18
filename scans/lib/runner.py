@@ -261,7 +261,10 @@ def _generate_pumplin_stability_fits(config: PumplinStabilityConfig, fits_dir: P
                 all_fit_dirs.append(fit_dir.resolve())
 
     print(f"\nCreated {len(all_fit_dirs)} fits in {fits_dir}")
-    return generate_batch_submit(fits_dir, all_fit_dirs, config.xfitter_tree)
+    return generate_batch_submit(
+        fits_dir, all_fit_dirs, config.xfitter_tree,
+        request_memory=str(config.get('request_memory', '2GB')),
+    )
 
 
 def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path, dry_run: bool):
@@ -342,7 +345,10 @@ def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path, dry_run
         all_fit_dirs.append(fit_dir.resolve())
 
     print(f"\nCreated {len(lambda_vals)} fits in {fits_dir}")
-    return generate_batch_submit(fits_dir, all_fit_dirs, config.xfitter_tree)
+    return generate_batch_submit(
+        fits_dir, all_fit_dirs, config.xfitter_tree,
+        request_memory=str(config.get('request_memory', '2GB')),
+    )
 
 
 def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir: Path, dry_run: bool):
@@ -412,7 +418,10 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir:
         all_fit_dirs.append(fit_dir.resolve())
 
     print(f"\nCreated {len(systematics) + 1} fits in {fits_dir} (including nominal)")
-    return generate_batch_submit(fits_dir, all_fit_dirs, config.xfitter_tree)
+    return generate_batch_submit(
+        fits_dir, all_fit_dirs, config.xfitter_tree,
+        request_memory=str(config.get('request_memory', '2GB')),
+    )
 
 
 def _build_reference_params(ref_fit_dir: Path,
@@ -788,7 +797,10 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
         json.dump(manifest, f, indent=2)
 
     # Generate single-cluster batch submission
-    submit_script = generate_batch_submit(fits_dir, all_fit_dirs, config.xfitter_tree)
+    submit_script = generate_batch_submit(
+        fits_dir, all_fit_dirs, config.xfitter_tree,
+        request_memory=str(config.get('request_memory', '2GB')),
+    )
 
     print(f"\nCreated {total_fits} fits in {fits_dir}")
     print(f"Scan manifest: {manifest_file}")

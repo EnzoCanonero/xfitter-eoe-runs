@@ -189,7 +189,8 @@ def _find_repo_root(start: Path) -> Path:
 
 
 def generate_batch_submit(fits_dir: Path, fit_dirs: List[Path],
-                          xfitter_tree: Optional[str] = None) -> Path:
+                          xfitter_tree: Optional[str] = None,
+                          request_memory: str = "2GB") -> Path:
     """
     Generate a single-cluster Condor batch submission for a scan.
 
@@ -204,6 +205,35 @@ def generate_batch_submit(fits_dir: Path, fit_dirs: List[Path],
     """
     repo_root = _find_repo_root(fits_dir)
     tree_export = _xfitter_tree_export(xfitter_tree)
+    smallx_guard = ""
+    smallx_provenance = ""
+    if xfitter_tree == "xfitter-bartlett-apfel306-hell3":
+        expected_tree = repo_root.parent / "PDF" / xfitter_tree
+        apfel_prefix = repo_root.parent / "PDF" / "deps" / "apfel"
+        smallx_guard = f'''\
+EXPECTED_TREE="{expected_tree}"
+if [ "$XFITTER_TREE_DIR" != "$EXPECTED_TREE" ]; then
+    echo "Unexpected xFitter tree: $XFITTER_TREE_DIR" >&2
+    exit 2
+fi
+
+APFEL_MODULE="$XFITTER_TREE_DIR/lib/xfitter/libevolutionAPFEL.so"
+APFEL_LIB=$(ldd "$APFEL_MODULE" | awk '$1 ~ /^libAPFEL/ {{print $3; exit}}')
+case "$APFEL_LIB" in
+    {apfel_prefix}/lib/*) ;;
+    *)
+        echo "Unexpected APFEL library: ${{APFEL_LIB:-not resolved}}" >&2
+        exit 3
+        ;;
+esac
+'''
+        smallx_provenance = f'''\
+  echo "apfel_library=$APFEL_LIB"
+  echo "apfel_version=$({apfel_prefix}/bin/apfel-config --version)"
+  sha256sum "$APFEL_LIB"
+  echo "[APFEL module linkage]"
+  ldd "$APFEL_MODULE"
+'''
     batch_dir = fits_dir / "batch"
     batch_dir.mkdir(parents=True, exist_ok=True)
 
@@ -213,7 +243,7 @@ def generate_batch_submit(fits_dir: Path, fit_dirs: List[Path],
     run_fit = batch_dir / "run_fit.sh"
     run_fit.write_text(f"""\
 #!/bin/bash
-set -e
+set -eo pipefail
 FIT_DIR="$1"
 export HOME="${{HOME:-/tmp}}"
 {tree_export}source "{repo_root}/setup_env.sh"
@@ -221,6 +251,7 @@ export HOME="${{HOME:-/tmp}}"
 # Record exact executable/library provenance. The selected tree may be dirty.
 XFITTER_BIN=$(command -v xfitter)
 XFITTER_TREE_DIR=$(cd "$(dirname "$XFITTER_BIN")/.." && pwd)
+{smallx_guard}
 {{
   echo "binary=$XFITTER_BIN"
   echo "git_commit=$(git -C "$XFITTER_TREE_DIR" rev-parse HEAD 2>/dev/null || echo unavailable)"
@@ -231,6 +262,10 @@ XFITTER_TREE_DIR=$(cd "$(dirname "$XFITTER_BIN")/.." && pwd)
   fi
   find "$XFITTER_TREE_DIR/bin" "$XFITTER_TREE_DIR/lib/xfitter" \
        -maxdepth 1 -type f -print0 2>/dev/null | sort -z | xargs -0 sha256sum
+  if [ -f "$XFITTER_TREE_DIR/lib/libxfitter.so" ]; then
+    sha256sum "$XFITTER_TREE_DIR/lib/libxfitter.so"
+  fi
+{smallx_provenance}\
 }} > "$FIT_DIR/output/xfitter_provenance.txt"
 
 SHIM_DIR=$(mktemp -d)
@@ -240,7 +275,24 @@ ln -s /cvmfs/sft.cern.ch/lcg/views/LCG_105/x86_64-el9-gcc13-opt/lib/libopenblas.
 export LD_LIBRARY_PATH="$SHIM_DIR:$LD_LIBRARY_PATH"
 
 cd "$FIT_DIR/config"
-xfitter
+RUN_LOG="$FIT_DIR/output/xfitter_run.log"
+xfitter 2>&1 | tee "$RUN_LOG"
+
+# HELL and loader failures do not always propagate a non-zero process status.
+if grep -Eqi 'HELLx: Error|Fortran runtime error|symbol lookup error|error while loading shared libraries' "$RUN_LOG"; then
+    echo "Fatal runtime signature found in $RUN_LOG" >&2
+    exit 4
+fi
+
+if [ ! -s "$FIT_DIR/output/Results.txt" ]; then
+    echo "Missing or empty Results.txt for $FIT_DIR" >&2
+    exit 5
+fi
+
+if [ ! -s "$FIT_DIR/output/minuit.out.txt" ]; then
+    echo "Missing or empty minuit.out.txt for $FIT_DIR" >&2
+    exit 6
+fi
 """)
     run_fit.chmod(0o755)
 
@@ -255,7 +307,7 @@ log                 = {batch_dir}/batch.log
 should_transfer_files = NO
 initialdir          = $(fitdir)/config
 request_cpus        = 1
-request_memory      = 2GB
+request_memory      = {request_memory}
 queue fitdir from {fit_dirs_file}
 """)
 
