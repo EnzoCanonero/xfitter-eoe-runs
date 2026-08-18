@@ -1,0 +1,11 @@
+# Convergence of the informed Giuli fit between two and four
+# nuisance-profiling iterations.  The later result is the ratio reference.
+type: pdf-comparison
+Q2: 4.0
+error_type: symmetric
+observables: [uv, dv, gluon, sea]
+ratio_reference: 1
+ratio_ylim: [0.98, 1.02]
+fits:
+  - {label: "2 iterations", path: ../../../hera-giuli-param/informed-aggregations/hera-pull-weighted-niter2, source: xfitter-grid}
+  - {label: "4 iterations", path: ../../../hera-giuli-param/informed-aggregations/hera-pull-weighted-niter4, source: xfitter-grid}
