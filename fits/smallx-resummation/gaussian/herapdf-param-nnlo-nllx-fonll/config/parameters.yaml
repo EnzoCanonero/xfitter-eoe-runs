@@ -1,0 +1,121 @@
+Minimizer: MINUIT
+MINUIT:
+  Commands: |
+    call fcn 1
+    set str 2
+    migrad 100000
+    call fcn 3
+  doErrors: |
+    Pumplin
+    SET ERRDEF 0.5
+    ITERATE 10
+
+# HERAPDF2.0 input parametrisation. Precise starting values are mapped from
+# xFitter's SmallxResummation example into the equivalent Ubar/Dbar basis.
+# They are shared by the fixed-order and resummed fits.
+Parameters:
+  Ag   : DEPENDENT
+  Bg   : [  0.0580, 0.0170 ]
+  Cg   : [  5.8390, 0.2039 ]
+  Agp  : [ -0.5721, 0.0322 ]
+  Bgp  : [ -0.2012, 0.0072 ]
+  Cgp  : [ 25.0,    0.     ]
+  Auv  : DEPENDENT
+  Buv  : [  0.7897, 0.0038 ]
+  Cuv  : [  4.8997, 0.0231 ]
+  Euv  : [  9.7890, 0.2234 ]
+  Adv  : DEPENDENT
+  Bdv  : [  1.0236, 0.0178 ]
+  Cdv  : [  4.9197, 0.1140 ]
+  CUbar: [  3.7690, 0.3359 ]
+  DUbar: [ -2.4329, 0.1384 ]
+  ADbar: [  0.3085, 0.0033333333 ]
+  BDbar: [ -0.1324, 0.0011 ]
+  CDbar:
+    value: 12.1991
+    step: 4.5059
+  ZERO : 0
+  fs   : [ 0.4, 0.0 ]
+  fd   : "=1-fs"
+  AUbar: "=(1-fs)*ADbar"
+
+Parameterisations:
+  par_uv:
+    class: HERAPDF
+    parameters: [Auv,Buv,Cuv,ZERO,Euv]
+  par_dv:
+    class: HERAPDF
+    parameters: [Adv,Bdv,Cdv]
+  par_Ubar:
+    class: HERAPDF
+    parameters: [AUbar,BDbar,CUbar,DUbar]
+  par_Dbar:
+    class: HERAPDF
+    parameters: [ADbar,BDbar,CDbar]
+  par_dbar:
+    class: Factor
+    input: par_Dbar
+    factor: fd
+  par_s:
+    class: Factor
+    input: par_Dbar
+    factor: fs
+  par_g:
+    class: NegativeGluon
+    parameters: [Ag,Bg,Cg,ZERO,ZERO,Agp,Bgp,Cgp]
+
+DefaultDecomposition: proton
+Decompositions:
+  proton:
+    class: UvDvUbarDbarS
+    xuv: par_uv
+    xdv: par_dv
+    xubar: par_Ubar
+    xdbar: par_dbar
+    xs: par_s
+    xg: par_g
+
+DefaultEvolution: proton-APFELff
+Evolutions:
+  proton-APFELff:
+    ? !include evolutions/APFEL.yaml
+    decomposition: proton
+    kmc: 1.12
+    nllxResummation: "On"
+    qLimits: [1.6, 4550.0]
+
+Order: NNLO
+NFlavour: 5
+isFFNS: 0
+Q0: 1.6
+alphas: 0.118
+
+? !include constants.yaml
+
+# Override the value in constants.yaml, following the Bonvini--Giuli setup.
+mch: 1.46
+
+byReaction:
+  FONLL_DISNC:
+    ? !include reactions/FONLL_DISNC.yaml
+  FONLL_DISCC:
+    ? !include reactions/FONLL_DISCC.yaml
+
+hf_scheme_DISNC:
+  defaultValue: 'FONLL_DISNC'
+
+hf_scheme_DISCC:
+  defaultValue: 'FONLL_DISCC'
+
+WriteLHAPDF6:
+  name: "proton"
+  evolution: proton-APFELff
+  Xrange: [1e-4, 1]
+  Qrange: [1.6, 1000]
+  Xnpoints: 200
+  Qnpoints: 120
+  description: "HERAPDF parametrisation, NNLO+NLLx APFEL/FONLL-C"
+  authors: ""
+  reference: ""
+
+OutputDirectory: "/nfs/scratch2/ecanoner/xfitter-eoe-runs/fits/smallx-resummation/gaussian/herapdf-param-nnlo-nllx-fonll/output"

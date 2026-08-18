@@ -1,0 +1,122 @@
+Minimizer: MINUIT
+MINUIT:
+  Commands: |
+    set par 24 -13.929429
+    set par 25 -7.128870
+    set par 26 -2.470411
+    set par 27 4.176216
+    set par 28 4.461378
+    call fcn 1
+    set str 2
+    migrad 100000
+    call fcn 3
+
+  doErrors: |
+    Pumplin
+    SET ERRDEF 0.5
+    ITERATE 10
+
+# Bonvini--Giuli input parametrisation, warm-started at the final five-source
+# NNLO+NLLx APFEL/FONLL-C greedy-selection minimum.
+Parameters:
+  Ag   : DEPENDENT
+  Auv  : DEPENDENT
+  Adv  : DEPENDENT
+  ZERO : 0
+  fs   : [ 0.4, 0.0 ]
+  Bg   : [ -0.475840, 0.055178 ]
+  Cg   : [  4.638345, 0.633073 ]
+  Fg   : [  0.211986, 0.008429 ]
+  Gg   : [  0.011566, 0.000871 ]
+  Buv  : [  0.740034, 0.116260 ]
+  Cuv  : [  4.586574, 0.162697 ]
+  Euv  : [  2.593050, 1.608534 ]
+  Fuv  : [  0.358613, 0.050406 ]
+  Guv  : [  0.050330, 0.014413 ]
+  Bdv  : [  0.976419, 0.089667 ]
+  Cdv  : [  4.632323, 0.425937 ]
+  Cubar: [ 10.854736, 1.427819 ]
+  Dubar: [ 19.663558, 5.885614 ]
+  Adbar: [  0.075127, 0.012284 ]
+  Bdbar: [ -0.356421, 0.031652 ]
+  Cdbar: [ 23.817128, 3.891163 ]
+  Ddbar: [ 38.040669, 12.338671 ]
+  Fdbar: [  0.076732, 0.004687 ]
+
+Parameterisations:
+  par_uv:
+    class: Expression
+    expression: "Auv*(x^Buv*(1-x)^Cuv)*(1+Euv*x^2+Fuv*ln(x)+Guv*ln(x)^2)"
+  par_dv:
+    class: Expression
+    expression: "Adv*(x^Bdv*(1-x)^Cdv)"
+  par_ubar:
+    class: Expression
+    expression: "Adbar*(x^Bdbar*(1-x)^Cubar)*(1+Dubar*x+Fdbar*ln(x))"
+  par_dbar:
+    class: Expression
+    expression: "Adbar*(x^Bdbar*(1-x)^Cdbar)*(1+Ddbar*x+Fdbar*ln(x))"
+  par_s:
+    class: Expression
+    expression: "Adbar*fs/(1-fs)*(x^Bdbar*(1-x)^Cdbar)*(1+Ddbar*x+Fdbar*ln(x))"
+  par_g:
+    class: Expression
+    expression: "Ag*(x^Bg*(1-x)^Cg)*(1+Fg*ln(x)+Gg*ln(x)^2)"
+
+DefaultDecomposition: proton
+Decompositions:
+  proton:
+    class: UvDvUbarDbarS
+    xuv: par_uv
+    xdv: par_dv
+    xubar: par_ubar
+    xdbar: par_dbar
+    xs: par_s
+    xg: par_g
+
+DefaultEvolution: proton-APFELff
+Evolutions:
+  proton-APFELff:
+    ? !include evolutions/APFEL.yaml
+    decomposition: proton
+    kmc: 1.12
+    nllxResummation: "On"
+    qLimits: [1.6, 4550.0]
+
+Order: NNLO
+NFlavour: 5
+isFFNS: 0
+Q0: 1.6
+alphas: 0.118
+
+? !include constants.yaml
+
+# Override the value in constants.yaml, following the Bonvini--Giuli setup.
+mch: 1.46
+
+byReaction:
+  FONLL_DISNC:
+    ? !include reactions/FONLL_DISNC.yaml
+  FONLL_DISCC:
+    ? !include reactions/FONLL_DISCC.yaml
+
+hf_scheme_DISNC:
+  defaultValue: 'FONLL_DISNC'
+
+hf_scheme_DISCC:
+  defaultValue: 'FONLL_DISCC'
+
+WriteLHAPDF6:
+  name: "proton"
+  evolution: proton-APFELff
+  Xrange: [1e-4, 1]
+  Qrange: [1.6, 1000]
+  Xnpoints: 200
+  Qnpoints: 120
+  description: "Bonvini--Giuli parametrisation, NNLO+NLLx APFEL/FONLL-C, five-source errors-on-errors greedy endpoint"
+  authors: ""
+  reference: ""
+
+OutputDirectory: "/nfs/scratch2/ecanoner/xfitter-eoe-runs/fits/smallx-resummation/eoe/bg-param-nnlo-nllx-fonll-greedy-top5/output"
+
+MaxErrAllowed: 4

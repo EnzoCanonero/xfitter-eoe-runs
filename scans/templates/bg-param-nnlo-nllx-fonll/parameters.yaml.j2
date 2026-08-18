@@ -1,0 +1,110 @@
+Minimizer: MINUIT
+MINUIT:
+  Commands: |
+    call fcn 1
+    set str 2
+    migrad 100000
+    call fcn 3
+{% if do_errors %}
+  doErrors: |
+    {{ do_errors | indent(4) }}
+{% else %}
+  # Ranking fits perform only the central minimisation; uncertainty-band
+  # calculations are deliberately omitted.
+{% endif %}
+
+# Bonvini--Giuli input parametrisation, warm-started at the converged Gaussian
+# NNLO+NLLx APFEL/FONLL-C minimum in
+# fits/smallx-resummation/gaussian/bg-param-nnlo-nllx-fonll.
+Parameters:
+  Ag   : DEPENDENT
+  Auv  : DEPENDENT
+  Adv  : DEPENDENT
+  ZERO : 0
+  fs   : [ 0.4, 0.0 ]
+  Bg   : [ -0.500359, 0.049549 ]
+  Cg   : [  4.506618, 0.610345 ]
+  Fg   : [  0.215582, 0.006657 ]
+  Gg   : [  0.011881, 0.000701 ]
+  Buv  : [  0.734404, 0.128758 ]
+  Cuv  : [  4.579018, 0.160105 ]
+  Euv  : [  2.797840, 1.729045 ]
+  Fuv  : [  0.340340, 0.053460 ]
+  Guv  : [  0.046376, 0.015045 ]
+  Bdv  : [  0.991186, 0.089558 ]
+  Cdv  : [  4.715986, 0.422393 ]
+  Cubar: [ 10.850988, 1.519403 ]
+  Dubar: [ 17.348110, 5.658251 ]
+  Adbar: [  0.083185, 0.013932 ]
+  Bdbar: [ -0.340285, 0.033658 ]
+  Cdbar: [ 24.253808, 3.611306 ]
+  Ddbar: [ 37.698654, 11.333578 ]
+  Fdbar: [  0.075041, 0.005369 ]
+
+Parameterisations:
+  par_uv:
+    class: Expression
+    expression: "Auv*(x^Buv*(1-x)^Cuv)*(1+Euv*x^2+Fuv*ln(x)+Guv*ln(x)^2)"
+  par_dv:
+    class: Expression
+    expression: "Adv*(x^Bdv*(1-x)^Cdv)"
+  par_ubar:
+    class: Expression
+    expression: "Adbar*(x^Bdbar*(1-x)^Cubar)*(1+Dubar*x+Fdbar*ln(x))"
+  par_dbar:
+    class: Expression
+    expression: "Adbar*(x^Bdbar*(1-x)^Cdbar)*(1+Ddbar*x+Fdbar*ln(x))"
+  par_s:
+    class: Expression
+    expression: "Adbar*fs/(1-fs)*(x^Bdbar*(1-x)^Cdbar)*(1+Ddbar*x+Fdbar*ln(x))"
+  par_g:
+    class: Expression
+    expression: "Ag*(x^Bg*(1-x)^Cg)*(1+Fg*ln(x)+Gg*ln(x)^2)"
+
+DefaultDecomposition: proton
+Decompositions:
+  proton:
+    class: UvDvUbarDbarS
+    xuv: par_uv
+    xdv: par_dv
+    xubar: par_ubar
+    xdbar: par_dbar
+    xs: par_s
+    xg: par_g
+
+DefaultEvolution: proton-APFELff
+Evolutions:
+  proton-APFELff:
+    ? !include evolutions/APFEL.yaml
+    decomposition: proton
+    kmc: 1.12
+    nllxResummation: "On"
+    qLimits: [1.6, 4550.0]
+
+Order: NNLO
+NFlavour: 5
+isFFNS: 0
+Q0: 1.6
+alphas: 0.118
+
+? !include constants.yaml
+
+# Override the value in constants.yaml, following the Bonvini--Giuli setup.
+mch: 1.46
+
+byReaction:
+  FONLL_DISNC:
+    ? !include reactions/FONLL_DISNC.yaml
+  FONLL_DISCC:
+    ? !include reactions/FONLL_DISCC.yaml
+
+hf_scheme_DISNC:
+  defaultValue: 'FONLL_DISNC'
+
+hf_scheme_DISCC:
+  defaultValue: 'FONLL_DISCC'
+
+# Patched to the absolute fit directory by the generated submit wrapper.
+OutputDirectory: "__SET_AT_RUNTIME__"
+
+MaxErrAllowed: 4

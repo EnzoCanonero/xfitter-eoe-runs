@@ -1,0 +1,68 @@
+*  Namelist to control input data
+*
+
+&InFiles
+  NInputFiles = {{ datafiles|length }}
+
+  InputFileNames =
+{%- for datafile in datafiles %}
+     '{{ datafile }}'{{ "," if not loop.last else "" }}
+{%- endfor %}
+
+&End
+
+*
+* Main steering cards
+*
+&xFitter
+   CHI2SettingsName = 'StatScale', 'UncorSysScale', 'CorSysScale', 'UncorChi2Type', 'CorChi2Type'
+   Chi2Settings     = 'Poisson'  , 'Linear',        'Linear'     , 'Diagonal'     , 'Hessian'
+   Chi2ExtraParam = 'PoissonCorr'
+   LDEBUG = False
+&End
+
+{% if sources %}&Systematics
+  ! Errors-on-errors sources used in this fit.
+  ListOfSources =
+{%- for name, type, eps in sources %}
+    '{{ name }}:{{ type }}@eps={{ eps }}'{{ "," if not loop.last else "" }}
+{%- endfor %}
+
+  n_iterations = {{ n_iterations }}
+  Enable_Bartlett = {{ '.true.' if enable_bartlett else '.false.' }}
+&End
+{% endif %}
+
+*
+* Output steering cards
+*
+&Output
+  Q2VAL = 2.56, 2.8, 3.0, 4.0, 5., 10., 100., 6464, 8317
+  OUTNX = 101
+  OUTXRANGE = 1E-4, 0.9999
+&End
+
+*
+* Process dependent cuts
+*
+&Cuts
+   ProcessName(1) = 'NC e+-p'
+   Variable(1) = 'Q2'
+   CutValueMin(1) = {{ q2_cut }}
+   CutValueMax(1) = 1000000.0
+
+   ProcessName(2) = 'NC e+-p'
+   Variable(2) = 'x'
+   CutValueMin(2) = 0.000001
+   CutValueMax(2) = 1.0
+
+   ProcessName(3) = 'CC e+-p'
+   Variable(3) = 'Q2'
+   CutValueMin(3) = {{ q2_cut }}
+   CutValueMax(3) = 1000000.0
+
+   ProcessName(4) = 'CC e+-p'
+   Variable(4) = 'x'
+   CutValueMin(4) = 0.000001
+   CutValueMax(4) = 1.0
+&End
