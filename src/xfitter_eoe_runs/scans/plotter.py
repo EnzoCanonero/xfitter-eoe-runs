@@ -51,20 +51,19 @@ def _pumplin_plot_params(config) -> list:
     return params
 
 
-def plot_scan(study_dir: Path, run_dir: Path, template_root: Path):
+def plot_scan(run_dir: Path, template_root: Path):
     """
-    Extract results and generate plots for a scan study
+    Extract results and generate plots for a scan workspace
 
     Args:
-        study_dir: Path to study directory containing config.yaml
-        run_dir: Path to the matching runtime workspace
-        template_root: Path containing the named study templates
+        run_dir: Path to the workspace containing config.yaml and runtime output
+        template_root: Path containing the named scan templates
     """
     # Load configuration
-    config = load_study_config(study_dir, template_root)
+    run_dir = Path(run_dir)
+    config = load_study_config(run_dir, template_root)
 
-    print(f"Extracting results from: {study_dir}")
-    print(f"Runtime workspace: {run_dir}")
+    print(f"Extracting results from workspace: {run_dir}")
     print(f"Scan type: {config.scan_type}")
 
     # Pumplin-stability has its own data model (Pumplin interval widths, not
@@ -812,7 +811,7 @@ def _plot_chi2_lollipop(chi2_df, nominal_chi2, plots_dir, config_order):
 
 def _plot_likelihood_scan(results: dict, plots_dir: Path, results_dir: Path):
     """
-    Generate profile likelihood plots for a likelihood-scan study.
+    Generate profile likelihood plots for a likelihood-scan workspace.
 
     Produces one file:
       profiles_1d.pdf  — one page per parameter: Δχ² profile + Gaussian reference

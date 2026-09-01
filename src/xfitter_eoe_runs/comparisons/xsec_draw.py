@@ -2,7 +2,7 @@
 """
 xsec-comparison pipeline: Fig.2-style reduced-cross-section overlays of N fits,
 rendered by the REAL xfitter-draw (logo, hatched therr bands, delta-total band,
-Theory+shifts, ratio panel), driven by a study config.yaml.
+Theory+shifts, ratio panel), driven by a workspace config.yaml.
 
 How it works
 ------------
@@ -18,7 +18,7 @@ Theory error bands (--therr) come from the therr+/- columns, which are filled
 (and Bartlett-scaled) by fits run with the bartlett-fixes binary from
 2026-07-13 onwards; older outputs have zeros there and simply show no band.
 
-Config keys (comparison-study-dir/config.yaml)
+Config keys (runs/comparisons/<workspace>/config.yaml)
 ------------------------------------------------
 type: xsec-comparison
 dataset: "HERA1+2 NCep 920"        # substring match on the dataset label
@@ -29,8 +29,8 @@ panels:
   - {dataset: "HERA1+2 NCep 920", q2: 3.5}
   - {dataset: "HERA1+2 NCep 575", q2: 8.5}
 fits:                               # 2+ entries; first = reference/data holder
-  - {label: "nominal",  path: ../../../runs/fits/hera-baseline/nominal-bartlett2-hesse}
-  - {label: "EoE-7src", path: ../../../runs/fits/hera-baseline/baseline-7-sources-bartlett2-hesse}
+  - {label: "nominal",  path: ../../fits/hera-baseline/nominal-bartlett2-hesse}
+  - {label: "EoE-7src", path: ../../fits/hera-baseline/baseline-7-sources-bartlett2-hesse}
 
 # element toggles (defaults reproduce the Fig.2 / xfitter-draw look)
 therr: true                # theory uncertainty bands        (--therr)
@@ -310,12 +310,12 @@ def filter_fittedresults(src: Path, dst: Path, dataset: str, q2bins, panels=None
 _AUX_FILES = ["Results.txt", "minuit.out.txt", "parsout_0", "parsout_1"]
 
 
-def _stage_fit(entry: dict, index: int, study_dir: Path, staging: Path,
+def _stage_fit(entry: dict, index: int, workspace_dir: Path, staging: Path,
                dataset: str, q2bins, panels=None):
     label = entry.get("label")
     if "path" not in entry or not label:
         raise ValueError(f"fits[{index}] needs both 'label' and 'path'")
-    out = (study_dir / entry["path"]).resolve()
+    out = (workspace_dir / entry["path"]).resolve()
     if (out / "output").is_dir():
         out = out / "output"
     fr = out / "fittedresults.txt"
@@ -368,10 +368,9 @@ def _find_xfitter_draw(cfg: dict):
     raise FileNotFoundError(f"xfitter-draw not found (looked in {exe} and PATH)")
 
 
-def compare_xsec(study_dir: Path, run_dir: Path):
-    study_dir = Path(study_dir)
+def compare_xsec(run_dir: Path):
     run_dir = Path(run_dir)
-    cfg = _load_config(study_dir / "config.yaml")
+    cfg = _load_config(run_dir / "config.yaml")
     if cfg.get("type") != "xsec-comparison":
         raise ValueError(f"config type is '{cfg.get('type')}', expected 'xsec-comparison'")
 
@@ -399,7 +398,7 @@ def compare_xsec(study_dir: Path, run_dir: Path):
         print(f"dataset: '{dataset or '(all)'}'   Q2 bins: {q2bins or '(all)'}")
     args = []
     for i, entry in enumerate(fits):
-        dst, label = _stage_fit(entry, i, study_dir, staging, dataset, q2bins,
+        dst, label = _stage_fit(entry, i, run_dir, staging, dataset, q2bins,
                                 panels)
         args.append(f"{dst}:{label}")
 
@@ -426,7 +425,7 @@ def compare_xsec(study_dir: Path, run_dir: Path):
     # therr sanity note: warn when bands were requested but a fit has none
     if cfg.get("therr", True):
         for i, entry in enumerate(fits):
-            out = (study_dir / entry["path"]).resolve()
+            out = (run_dir / entry["path"]).resolve()
             fr = (out / "output" / "fittedresults.txt")
             if not fr.is_file():
                 fr = out / "fittedresults.txt"

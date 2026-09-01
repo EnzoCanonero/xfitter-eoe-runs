@@ -6,7 +6,7 @@ panels:
   - {dataset: "HERA1+2 NCep 920", q2: 3.5}
   - {dataset: "HERA1+2 NCep 920", q2: 4.5}
 fits:
-  - {label: "HERAPDF2.0", path: ../../../runs/fits/hera-baseline/nominal-bartlett2-pumplin}
-  - {label: "seven-source EoE", path: ../../../runs/fits/hera-baseline/baseline-7-sources-bartlett2-pumplin}
+  - {label: "HERAPDF2.0", path: ../../fits/hera-baseline/nominal-bartlett2-pumplin}
+  - {label: "seven-source EoE", path: ../../fits/hera-baseline/baseline-7-sources-bartlett2-pumplin}
 therr: true
 plots_per_page: 1

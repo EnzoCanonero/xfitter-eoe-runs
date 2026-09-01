@@ -1,5 +1,5 @@
 # EoE convergence (baseline, bartlett2 + Pumplin bands):
-# does 2E5N with the 5 nuisance sources profiled over 2 Newton iteration(s)
+# does 2E5N with the 5 nuisance sources profiled over 4 Newton iteration(s)
 # converge to the all-External 7-source fit? Ratio reference (fit 0) is the
 # all-E target, so the second curve -> 1 as the profiling converges.
 type: pdf-comparison
@@ -8,5 +8,5 @@ error_type: symmetric
 observables: [uv, dv, gluon, sea]
 ratio_reference: 0
 fits:
-  - {label: "Numerical", path: ../../../runs/fits/hera-baseline/baseline-7-sources-bartlett2-pumplin}
-  - {label: "Iterative", path: ../../../runs/fits/hera-baseline/baseline-2E5N-bartlett2-pumplin}
+  - {label: "Numerical", path: ../../fits/hera-baseline/baseline-7-sources-bartlett2-pumplin}
+  - {label: "Iterative", path: ../../fits/hera-baseline/baseline-2E5N-niter4-bartlett2-pumplin}

@@ -7,7 +7,7 @@ uncertainty band on the left, ratio-to-reference on the right).  Fits can be rea
 either from an LHAPDF set under ``<fit>/output/<set>`` or directly from xFitter's
 ``pdfs_q2val`` central and Pumplin error grids.
 
-Driven by a study ``config.yaml`` (see ``compare_pdfs``).
+Driven by a workspace ``config.yaml`` (see ``compare_pdfs``).
 """
 
 from pathlib import Path
@@ -86,7 +86,7 @@ LEGEND_SIZE = 13
 # Configuration
 # =========================================================================
 class CompareConfig:
-    """Parsed config.yaml for a PDF-comparison study.
+    """Parsed config.yaml for a PDF-comparison workspace.
 
     Follows the scan package's StudyConfig loader style: yaml.safe_load
     with property accessors and clear errors on missing required fields.
@@ -94,7 +94,7 @@ class CompareConfig:
 
     def __init__(self, config_file: Path):
         self.config_file = Path(config_file)
-        self.study_dir = self.config_file.parent
+        self.workspace_dir = self.config_file.parent
         with open(self.config_file) as f:
             self.data = yaml.safe_load(f) or {}
 
@@ -195,7 +195,8 @@ def _stage_local_set(set_dir: Path, set_name: str, uniq: str, staging_root: Path
     return uniq
 
 
-def _resolve_fit(entry: dict, index: int, study_dir: Path, staging_root: Path):
+def _resolve_fit(entry: dict, index: int, workspace_dir: Path,
+                 staging_root: Path):
     """Turn a config 'fits' entry into (label, lhapdf_name, color, linestyle)."""
     color = entry.get("color", _DEFAULT_COLORS[index % len(_DEFAULT_COLORS)])
     linestyle = entry.get("linestyle", "-")
@@ -208,7 +209,7 @@ def _resolve_fit(entry: dict, index: int, study_dir: Path, staging_root: Path):
     if "path" not in entry:
         raise ValueError(f"fit entry #{index} must have 'path' or 'lhapdf_set'")
 
-    fit_dir = (study_dir / entry["path"]).resolve()
+    fit_dir = (workspace_dir / entry["path"]).resolve()
     set_name = entry.get("set", "proton")
     set_dir = fit_dir / "output" / set_name
     if not set_dir.is_dir():
@@ -510,11 +511,10 @@ def _plot_observable(pdf_pages, obs, curves, ref_idx, Q2, ratio_ylim, x_min, x_m
 # =========================================================================
 # Entry point
 # =========================================================================
-def compare_pdfs(study_dir: Path, run_dir: Path):
-    """Load a study config and write its plots beneath the runtime workspace."""
-    study_dir = Path(study_dir)
+def compare_pdfs(run_dir: Path):
+    """Load a workspace config and write its plots beneath that workspace."""
     run_dir = Path(run_dir)
-    config = CompareConfig(study_dir / "config.yaml")
+    config = CompareConfig(run_dir / "config.yaml")
 
     x_vals = config.x_grid()
     Q = config.Q
@@ -533,7 +533,7 @@ def compare_pdfs(study_dir: Path, run_dir: Path):
                     raise ValueError(
                         f"fit entry #{i} with source 'xfitter-grid' must have 'path'"
                     )
-                fit_dir = (study_dir / entry["path"]).resolve()
+                fit_dir = (run_dir / entry["path"]).resolve()
                 label = entry.get("label", fit_dir.name)
                 color = entry.get(
                     "color", _DEFAULT_COLORS[i % len(_DEFAULT_COLORS)]
@@ -548,7 +548,7 @@ def compare_pdfs(study_dir: Path, run_dir: Path):
                 )
             elif source == "lhapdf":
                 label, name, color, linestyle = _resolve_fit(
-                    entry, i, study_dir, staging_root
+                    entry, i, run_dir, staging_root
                 )
                 print(f"  [{i}] {label}  <-  {name}")
                 # Load members once and reuse them across observables.

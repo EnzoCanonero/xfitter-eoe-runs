@@ -11,7 +11,7 @@ notes:
   - "On 2026-09-01 inactive study trees were moved, without deletion, under the ignored root legacy/<original-path>."
   - "On 2026-09-01 the ignored extra plots/ bundle was moved, without deletion, to legacy/extra-plots."
   - "The legacy payload is workspace-local and is not distributed by Git; its original tracked state remains recoverable from source commit 53522078349ad29f586ee6ff56ecf5e958f4fe81."
-  - "The historical artifact classifications below describe the 2026-08-18 snapshot; layout_reorganization_20260901 is authoritative for current active paths."
+  - "The historical artifact classifications below describe the 2026-08-18 snapshot; workspace_collapse_20260901 is authoritative for current active paths."
 
 layout_cleanup_20260901:
   source_repository_commit: "53522078349ad29f586ee6ff56ecf5e958f4fe81"
@@ -130,6 +130,26 @@ layout_reorganization_20260901:
     file_bytes: 8283605
     inventory_sha256: "85582165cbdadd805f74ff762f0d0a72b011ea4ffc4c92e7e6fdf03906226879"
     inventory_sha256_method: "SHA-256 of sorted sha256sum lines for ./-prefixed relative regular-file paths"
+
+workspace_collapse_20260901:
+  source_repository_commit: "fcbf59882a13a276975633c42c6165cb9d51c987"
+  jobs_submitted: false
+  scientific_content_modified: false
+  runtime_payloads_preserved: true
+  mappings:
+    scan_templates: "studies/templates/<template>/<file> -> templates/<template>/<file>"
+    scan_definitions: "studies/scans/<study>/config.yaml -> runs/scans/<study>/config.yaml"
+    comparison_definitions: "studies/comparisons/<study>/config.yaml -> runs/comparisons/<study>/config.yaml"
+  moved_inventory:
+    scan_configurations: 29
+    comparison_configurations: 9
+    template_files: 12
+  resulting_layout:
+    scan_workspace: "runs/scans/<study>"
+    comparison_workspace: "runs/comparisons/<study>"
+    scan_templates: "templates/<template>"
+  removed_directory: "studies"
+
 current_targets:
   standard:
     tree: "xfitter-master"

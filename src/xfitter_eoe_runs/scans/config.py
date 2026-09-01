@@ -1,6 +1,6 @@
 """
 Configuration management for scan framework
-Reads study config.yaml and provides structured access
+Reads a workspace config.yaml and provides structured access
 """
 
 from pathlib import Path
@@ -10,11 +10,11 @@ import yaml
 
 
 class StudyConfig:
-    """Configuration for a scan study"""
+    """Configuration for a scan workspace."""
 
     def __init__(self, config_file: Path, template_root: Path):
         self.config_file = config_file
-        self.study_dir = config_file.parent
+        self.workspace_dir = config_file.parent
         self.template_root = template_root
 
         with open(config_file, 'r') as f:
@@ -35,10 +35,10 @@ class StudyConfig:
 
     @property
     def template_dir(self) -> Path:
-        """Template folder for this study, selected by name under template_root.
+        """Template folder for this scan, selected by name under template_root.
 
-        Resolved against the explicit template root (not the study dir) so studies can be
-        moved/reorganized without breaking. Each folder is a self-contained setup:
+        Resolved against the explicit template root rather than the workspace.
+        Each folder is a self-contained setup:
         steering.txt.j2, parameters.yaml.j2, constants.yaml, unpolarised.wgt.
         """
         root = self.template_root
@@ -59,11 +59,11 @@ class StudyConfig:
 
     @property
     def xfitter_tree(self) -> Optional[str]:
-        """Build tree under $XFITTER_ROOT to run this study against (optional).
+        """Build tree under $XFITTER_ROOT for this scan (optional).
 
         Written into the generated run scripts as `export XFITTER_TREE=...`.
         Condor jobs do not inherit the submitting shell's environment, so
-        without this a study silently runs against whatever .env defaults to.
+        without this a scan silently runs against whatever .env defaults to.
         """
         return self.data.get('xfitter_tree')
 
@@ -152,7 +152,7 @@ class StudyConfig:
 
 
 class LambdaScanConfig(StudyConfig):
-    """Configuration for lambda-scan studies"""
+    """Configuration for lambda-scan workspaces."""
 
     def __init__(self, config_file: Path, template_root: Path):
         super().__init__(config_file, template_root)
@@ -190,7 +190,7 @@ class LambdaScanConfig(StudyConfig):
 
 
 class SystematicRankingConfig(StudyConfig):
-    """Configuration for systematic-ranking studies"""
+    """Configuration for systematic-ranking workspaces."""
 
     def __init__(self, config_file: Path, template_root: Path):
         super().__init__(config_file, template_root)
@@ -234,7 +234,7 @@ class SystematicRankingConfig(StudyConfig):
 
 
 class PumplinStabilityConfig(StudyConfig):
-    """Configuration for pumplin-stability studies.
+    """Configuration for pumplin-stability workspaces.
 
     Scans a 3-axis grid: lambda (EoE strength) x errdef x iterate. A Gaussian
     fit (no &Systematics source) is always added as the lambda=0.0 group.
@@ -287,7 +287,7 @@ class PumplinStabilityConfig(StudyConfig):
 
 
 class LikelihoodScanConfig(StudyConfig):
-    """Configuration for likelihood-scan studies (1D; 2D support to be added).
+    """Configuration for likelihood-scan workspaces.
 
     The scan_type field in config.yaml must be 'likelihood-scan'.
     Use scan_params_1d to list parameters to scan one at a time.
@@ -311,8 +311,8 @@ class LikelihoodScanConfig(StudyConfig):
 
     @property
     def reference_fit(self) -> Path:
-        """Absolute path to reference fit directory (resolved relative to study_dir)."""
-        return (self.study_dir / self.data['reference_fit']).resolve()
+        """Absolute reference fit path, resolved relative to the workspace."""
+        return (self.workspace_dir / self.data['reference_fit']).resolve()
 
     @property
     def scan_defaults(self) -> dict:
@@ -361,21 +361,22 @@ class LikelihoodScanConfig(StudyConfig):
         return self.data.get('parameter_overrides', {})
 
 
-def load_study_config(study_dir: Path, template_root: Path) -> StudyConfig:
+def load_study_config(run_dir: Path, template_root: Path) -> StudyConfig:
     """
-    Load study configuration and return appropriate config object
+    Load a scan workspace configuration and return the appropriate config object
 
     Args:
-        study_dir: Path to study directory containing config.yaml
-        template_root: Path containing the named study templates
+        run_dir: Path to the workspace containing config.yaml
+        template_root: Path containing the named scan templates
 
     Returns:
         StudyConfig subclass instance based on scan_type
     """
-    config_file = study_dir / "config.yaml"
+    run_dir = Path(run_dir)
+    config_file = run_dir / "config.yaml"
 
     if not config_file.exists():
-        raise FileNotFoundError(f"No config.yaml found in {study_dir}")
+        raise FileNotFoundError(f"No config.yaml found in {run_dir}")
 
     with open(config_file, 'r') as f:
         data = yaml.safe_load(f)

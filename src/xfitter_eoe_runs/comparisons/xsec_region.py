@@ -24,15 +24,15 @@ giving a net change of -50.5.
 The pull column is theory-with-shifts based (theo_mod), i.e. the description the
 fit actually achieves, which is what the chi2 minimises.
 
-Config keys (comparison-study-dir/config.yaml)
+Config keys (runs/comparisons/<workspace>/config.yaml)
 ------------------------------------------------
 type: xsec-region-table
 q2bins: [0, 10, 30, 100, 1000, 1.0e9]     # bin EDGES, ascending
 xbins:  [0, 1.0e-3, 1.0e-2, 1.0e-1, 1.0]  # bin EDGES, ascending
 dataset: ""                                # optional substring filter; "" = all
 fits:                                      # exactly 2; first = reference
-  - {label: "nominal",  path: ../../../runs/fits/hera-baseline/nominal-bartlett2-pumplin}
-  - {label: "EoE-7src", path: ../../../runs/fits/hera-baseline/baseline-7-sources-bartlett2-pumplin}
+  - {label: "nominal",  path: ../../fits/hera-baseline/nominal-bartlett2-pumplin}
+  - {label: "EoE-7src", path: ../../fits/hera-baseline/baseline-7-sources-bartlett2-pumplin}
 """
 
 import math
@@ -120,10 +120,9 @@ def _validate_edges(name: str, edges):
 # entry point
 # ---------------------------------------------------------------------------
 
-def region_table(study_dir: Path, run_dir: Path):
-    study_dir = Path(study_dir)
+def region_table(run_dir: Path):
     run_dir = Path(run_dir)
-    cfg = _load_config(study_dir / "config.yaml")
+    cfg = _load_config(run_dir / "config.yaml")
     if cfg.get("type") != "xsec-region-table":
         raise ValueError(f"config type is '{cfg.get('type')}', expected 'xsec-region-table'")
 
@@ -138,8 +137,8 @@ def region_table(study_dir: Path, run_dir: Path):
     dataset = cfg.get("dataset") or ""
 
     ref_entry, cmp_entry = fits
-    ref_pts = _read_points((study_dir / ref_entry["path"]).resolve(), dataset)
-    cmp_pts = _read_points((study_dir / cmp_entry["path"]).resolve(), dataset)
+    ref_pts = _read_points((run_dir / ref_entry["path"]).resolve(), dataset)
+    cmp_pts = _read_points((run_dir / cmp_entry["path"]).resolve(), dataset)
 
     if len(ref_pts) != len(cmp_pts):
         raise RuntimeError(f"grid mismatch: {len(ref_pts)} vs {len(cmp_pts)} points")

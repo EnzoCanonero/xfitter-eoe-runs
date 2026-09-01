@@ -1,6 +1,6 @@
 """
 Scan runner implementation
-Generates fits and submits to Condor based on study config
+Generates fits and submits to Condor based on a workspace config
 """
 
 import json
@@ -225,27 +225,25 @@ def _order_systematics_by_e_reference(systematics: Sequence[Dict],
     return [next(ordered_iter) if s.get('type') == 'E' else s for s in systematics]
 
 
-def run_scan(study_dir: Path, run_dir: Path, template_root: Path,
-             dataset_root: Path, setup_env: Path, dry_run: bool = False,
-             submit: bool = True):
+def run_scan(run_dir: Path, template_root: Path, dataset_root: Path,
+             setup_env: Path, dry_run: bool = False, submit: bool = True):
     """
-    Generate fits for a scan study and optionally submit to Condor
+    Generate fits for a scan workspace and optionally submit to Condor
 
     Args:
-        study_dir: Path to study directory containing config.yaml
-        run_dir: Path to the matching runtime workspace
-        template_root: Path containing the named study templates
+        run_dir: Path to the workspace containing config.yaml and runtime output
+        template_root: Path containing the named scan templates
         dataset_root: Path containing the configured dataset files
         setup_env: Environment setup script to source in generated jobs
         dry_run: If True, only print what would be done without creating files
         submit: If True, automatically submit jobs to Condor after generating fits
     """
     # Load configuration
-    config = load_study_config(study_dir, template_root)
+    run_dir = Path(run_dir)
+    config = load_study_config(run_dir, template_root)
 
     print(f"Scan type: {config.scan_type}")
-    print(f"Study directory: {study_dir}")
-    print(f"Run directory: {run_dir}")
+    print(f"Run workspace: {run_dir}")
 
     if config.do_errors:
         print(f"doErrors: {config.do_errors['method']}")
@@ -388,7 +386,7 @@ def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path,
                                setup_env: Path):
     """Generate fits for lambda-scan"""
 
-    # Template folder selected by the study config's `template:` field
+    # Template folder selected by the scan config's `template:` field
     template_dir = config.template_dir
     templates = TemplateManager(template_dir)
 
@@ -477,7 +475,7 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig,
                                       dataset_root: Path, setup_env: Path):
     """Generate fits for systematic-ranking"""
 
-    # Template folder selected by the study config's `template:` field
+    # Template folder selected by the scan config's `template:` field
     template_dir = config.template_dir
     templates = TemplateManager(template_dir)
 
@@ -565,7 +563,7 @@ def _build_reference_params(ref_fit_dir: Path,
 
     Args:
         ref_fit_dir: Path to the reference fit directory (contains output/)
-        e_type_systematics: Full names of all E-type systematics in the study config.
+        e_type_systematics: Full names of all E-type systematics in the scan config.
         e_source_order: Already-validated reference declaration order. When
             omitted, it is read and validated from ``config/steering.txt``.
 
@@ -660,7 +658,7 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
     Returns:
         Path to runs/submit.sh (None in dry-run mode).
     """
-    # Template folder selected by the study config's `template:` field
+    # Template folder selected by the scan config's `template:` field
     template_dir = config.template_dir
     templates = TemplateManager(template_dir)
 

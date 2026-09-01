@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Plot a cross-section study from an explicitly named directory.
+"""Plot a cross-section comparison from an explicitly named run workspace.
 
-Dispatches on the study config's ``type``:
+Dispatches on the workspace config's ``type``:
   xsec-comparison   -> plots/xsec_comparison.pdf
   xsec-region-table -> results/region_table.{tex,csv}
 """
@@ -15,7 +15,6 @@ src_dir = Path(__file__).resolve().parent.parent / "src"
 sys.path.insert(0, str(src_dir))
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-STUDY_ROOT = REPO_ROOT / "studies" / "comparisons"
 RUN_ROOT = REPO_ROOT / "runs" / "comparisons"
 
 from xfitter_eoe_runs.comparisons.xsec_draw import compare_xsec, _load_config
@@ -29,31 +28,30 @@ HANDLERS = {
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Write cross-section plots or tables for a configured study."
+        description="Write cross-section plots or tables for a configured run workspace."
     )
     parser.add_argument(
-        "study_dir",
+        "run_dir",
         type=Path,
-        help="comparison study directory containing config.yaml",
+        help="comparison workspace under runs/comparisons containing config.yaml",
     )
     args = parser.parse_args()
 
-    study_dir = args.study_dir.expanduser().resolve()
-    if not (study_dir / "config.yaml").is_file():
-        parser.error(f"no config.yaml found in study directory: {study_dir}")
+    run_dir = args.run_dir.expanduser().resolve()
+    if not (run_dir / "config.yaml").is_file():
+        parser.error(f"no config.yaml found in comparison workspace: {run_dir}")
     try:
-        relative_study = study_dir.relative_to(STUDY_ROOT)
+        run_dir.relative_to(RUN_ROOT)
     except ValueError:
-        parser.error(f"study directory must be under {STUDY_ROOT}: {study_dir}")
-    run_dir = RUN_ROOT / relative_study
+        parser.error(f"comparison workspace must be under {RUN_ROOT}: {run_dir}")
     try:
-        stype = _load_config(study_dir / "config.yaml").get("type")
+        stype = _load_config(run_dir / "config.yaml").get("type")
         handler = HANDLERS.get(stype)
         if handler is None:
             print(f"Error: config type '{stype}' is not handled by plot-xsec "
                   f"(expected one of: {', '.join(HANDLERS)})")
             sys.exit(1)
-        handler(study_dir, run_dir)
+        handler(run_dir)
     except Exception as e:
         print(f"Error: {e}")
         import traceback

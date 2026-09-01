@@ -2,7 +2,7 @@
 scan_type: likelihood-scan
 xfitter_tree: xfitter-master
 template: hera-baseline
-reference_fit: ../../../../../runs/fits/hera-baseline/nominal-bartlett2-pumplin
+reference_fit: ../../../../fits/hera-baseline/nominal-bartlett2-pumplin
 n_iterations: 2
 enable_bartlett: true
 q2_cut: 3.5

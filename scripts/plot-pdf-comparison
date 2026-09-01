@@ -1,6 +1,6 @@
 #!/bin/bash
 # PDF-comparison command.
-# Overlays PDFs from several fits into the matching runs/comparisons workspace.
+# Overlays PDFs from several fits in a runs/comparisons workspace.
 # Sources an LCG view from CVMFS for matplotlib/numpy/yaml/lhapdf only if needed.
 
 LCG_SETUP=${LCG_SETUP:-/cvmfs/sft.cern.ch/lcg/views/LCG_106/x86_64-el9-gcc13-opt/setup.sh}

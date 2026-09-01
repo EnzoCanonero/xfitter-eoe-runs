@@ -73,7 +73,7 @@ def create_fit_structure(fit_dir: Path,
                          xfitter_tree: Optional[str] = None):
     """Create a fit directory from a template folder.
 
-    template_dir is selected by the study config and contains parameters.yaml.j2,
+    template_dir is selected by the scan config and contains parameters.yaml.j2,
     constants.yaml and unpolarised.wgt. dataset_root and setup_env are supplied
     by the command layer so this module has no repository-layout dependency.
     """

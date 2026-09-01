@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """
 run-scan command
-Generates fits and submits to Condor for a scan study
+Generates fits and submits to Condor for a scan workspace
 """
 
 import argparse
@@ -14,9 +14,8 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 from xfitter_eoe_runs.scans.runner import run_scan
 
 
-STUDY_ROOT = REPO_ROOT / "studies" / "scans"
 RUN_ROOT = REPO_ROOT / "runs" / "scans"
-TEMPLATE_ROOT = REPO_ROOT / "studies" / "templates"
+TEMPLATE_ROOT = REPO_ROOT / "templates"
 DATASET_ROOT = (REPO_ROOT / "datasets" / "hera" / "h1zeusCombined" /
                 "inclusiveDis" / "1506.06042")
 SETUP_ENV = REPO_ROOT / "scripts" / "setup-env.sh"
@@ -27,9 +26,9 @@ def main():
         description="Generate fits and submit scan to Condor"
     )
     parser.add_argument(
-        'study_dir',
+        'run_dir',
         type=Path,
-        help="Study directory containing config.yaml"
+        help="scan workspace under runs/scans containing config.yaml"
     )
     parser.add_argument(
         '--dry-run',
@@ -43,23 +42,21 @@ def main():
     )
     args = parser.parse_args()
 
-    study_dir = args.study_dir.expanduser().resolve()
-    config_file = study_dir / "config.yaml"
+    run_dir = args.run_dir.expanduser().resolve()
+    config_file = run_dir / "config.yaml"
 
     if not config_file.exists():
-        print(f"Error: No config.yaml found in study directory: {study_dir}")
+        print(f"Error: No config.yaml found in scan workspace: {run_dir}")
         sys.exit(1)
 
     try:
-        relative_study = study_dir.relative_to(STUDY_ROOT)
+        run_dir.relative_to(RUN_ROOT)
     except ValueError:
-        parser.error(f"study directory must be under {STUDY_ROOT}: {study_dir}")
-    run_dir = RUN_ROOT / relative_study
+        parser.error(f"scan workspace must be under {RUN_ROOT}: {run_dir}")
 
     try:
         run_scan(
-            study_dir,
-            run_dir=run_dir,
+            run_dir,
             template_root=TEMPLATE_ROOT,
             dataset_root=DATASET_ROOT,
             setup_env=SETUP_ENV,

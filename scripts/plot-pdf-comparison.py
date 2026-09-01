@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot a PDF-comparison study from an explicitly named directory."""
+"""Plot a PDF comparison from an explicitly named run workspace."""
 
 import argparse
 import sys
@@ -10,7 +10,6 @@ src_dir = Path(__file__).resolve().parent.parent / "src"
 sys.path.insert(0, str(src_dir))
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-STUDY_ROOT = REPO_ROOT / "studies" / "comparisons"
 RUN_ROOT = REPO_ROOT / "runs" / "comparisons"
 
 from xfitter_eoe_runs.comparisons.pdf_compare import compare_pdfs
@@ -18,29 +17,28 @@ from xfitter_eoe_runs.comparisons.pdf_compare import compare_pdfs
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Write PDF-comparison plots for a configured study."
+        description="Write PDF-comparison plots for a configured run workspace."
     )
     parser.add_argument(
-        "study_dir",
+        "run_dir",
         type=Path,
-        help="comparison study directory containing config.yaml",
+        help="comparison workspace under runs/comparisons containing config.yaml",
     )
     args = parser.parse_args()
 
-    study_dir = args.study_dir.expanduser().resolve()
-    config_file = study_dir / "config.yaml"
+    run_dir = args.run_dir.expanduser().resolve()
+    config_file = run_dir / "config.yaml"
 
     if not config_file.is_file():
-        parser.error(f"no config.yaml found in study directory: {study_dir}")
+        parser.error(f"no config.yaml found in comparison workspace: {run_dir}")
 
     try:
-        relative_study = study_dir.relative_to(STUDY_ROOT)
+        run_dir.relative_to(RUN_ROOT)
     except ValueError:
-        parser.error(f"study directory must be under {STUDY_ROOT}: {study_dir}")
-    run_dir = RUN_ROOT / relative_study
+        parser.error(f"comparison workspace must be under {RUN_ROOT}: {run_dir}")
 
     try:
-        compare_pdfs(study_dir, run_dir)
+        compare_pdfs(run_dir)
     except Exception as e:
         print(f"Error: {e}")
         import traceback

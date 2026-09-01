@@ -1,9 +1,10 @@
 # xFitter EoE Runs
 
-Workspace for the xFitter errors-on-errors studies. The repository keeps study
-definitions, reusable code, commands, datasets, and execution workspaces in
-separate top-level directories. Generated results and local historical
-artifacts are not tracked by Git.
+Workspace for the xFitter errors-on-errors studies. The repository keeps
+reusable code, commands, templates, datasets, and execution workspaces in
+separate top-level directories. Each scan or comparison configuration lives
+with its generated products under `runs/`; generated results and local
+historical artifacts are not tracked by Git.
 
 ## Layout
 
@@ -14,40 +15,40 @@ xfitter-eoe-runs/
 │       ├── scans/
 │       └── comparisons/
 ├── scripts/                     # user-facing commands and environment setup
-├── studies/                     # declarative study inputs
-│   ├── scans/                   # scan config.yaml files
-│   ├── comparisons/             # comparison config.yaml files
-│   └── templates/               # named xFitter scan templates
-├── runs/                        # execution workspaces and generated artifacts
+├── templates/                   # named xFitter scan templates
+├── runs/                        # tracked configurations and local artifacts
 │   ├── fits/                    # manual fit configs, launchers, and outputs
-│   ├── scans/                   # generated scan fits, results, and plots
-│   └── comparisons/             # generated comparison results and plots
+│   ├── scans/<study>/           # config.yaml, generated fits, results, plots
+│   └── comparisons/<study>/     # config.yaml, generated results and plots
 ├── datasets/                    # canonical input data
 ├── tests/
 ├── legacy-artifacts.yaml        # provenance for local historical material
 └── legacy/                      # ignored local archive; absent in fresh clones
 ```
 
-Empty or generated directories under `runs/` may be absent in a fresh clone;
-the commands create them when needed.
+Generated directories under `runs/` may be absent in a fresh clone; commands
+create them when needed. The enclosing workspaces and their `config.yaml` files
+are tracked.
 
 ## Boundaries
 
 - `src/` contains path-agnostic implementation code. It does not import from or
-  discover `scripts/`, `studies/`, `runs/`, or `datasets/`.
-- `scripts/` contains the entry points. Commands import `src/`, read definitions
-  from `studies/` and inputs from `datasets/`, and write runtime data to `runs/`.
-- `studies/` contains configuration and templates only. Generated fits, plots,
-  tables, logs, and results do not belong there.
+  discover `scripts/`, `templates/`, `runs/`, or `datasets/`.
+- `scripts/` contains the entry points. Commands import `src/`, read the selected
+  workspace configuration, templates, and datasets, then write generated data
+  back into that workspace.
+- `templates/` contains reusable scan inputs only. Generated fits, plots, tables,
+  logs, and results do not belong there.
 - `datasets/` is input-only. Commands may copy data into a run workspace but do
   not write results back into the dataset tree.
-- `runs/` contains execution workspaces. Comparison definitions may reference
-  fit workspaces under `runs/fits/`, as may likelihood reference definitions.
-  Definitions do not consume generated `runs/scans/` or `runs/comparisons/`
-  products, and reusable code never lives under `runs/`.
+- `runs/` owns execution workspaces. Each scan and comparison workspace keeps
+  its tracked `config.yaml` beside its ignored runtime products. Comparison
+  configurations and likelihood references may consume fit workspaces under
+  `runs/fits/`; reusable code never lives under `runs/`.
 
-The resulting flow is one way: commands call reusable code, definitions and
-datasets feed executions, and executions write to `runs/`.
+The flow remains one way: commands call reusable code; workspace configurations,
+templates, and datasets feed executions; executions write only to their
+workspace under `runs/`.
 
 ## Setup
 
@@ -61,14 +62,14 @@ source scripts/setup-env.sh
 ```
 
 Commands resolve the repository root from their own location, so run them from
-the repository root without creating per-study symlinks.
+the repository root without creating per-workspace symlinks.
 
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
 | `scripts/new-fit` | Create a manual workspace under `runs/fits/` |
-| `scripts/run-scan` | Preview, generate, or submit a scan study |
+| `scripts/run-scan` | Preview, generate, or submit a scan workspace |
 | `scripts/plot-scan` | Extract completed scan results and create plots |
 | `scripts/plot-pdf-comparison` | Plot a configured PDF comparison |
 | `scripts/plot-xsec` | Plot a cross-section comparison or create a region table |
@@ -111,34 +112,33 @@ runs/fits/hera-baseline/my-study/variant-a/condor/submit.sh
 The retained small-x studies keep their existing grouped batch launchers under
 `runs/fits/smallx-resummation/`.
 
-## Scan studies
+## Scan workspaces
 
-Scan definitions live under `studies/scans/`. Each `config.yaml` selects a
-named template from `studies/templates/`. The same relative path is used for
-the runtime workspace:
+Each scan workspace contains its tracked definition and local generated
+products:
 
 ```text
-studies/scans/<study>/config.yaml
-                         │
-                         └──> runs/scans/<study>/
-                              ├── runs/
-                              ├── results/
-                              └── plots/
+runs/scans/<study>/
+├── config.yaml                  # tracked definition
+├── runs/                        # generated xFitter jobs
+├── results/                     # generated extracted results
+└── plots/                       # generated figures
 ```
 
-Use an existing definition as the starting point for a new study, then pass its
-directory explicitly to the commands:
+Each `config.yaml` selects a named template from root `templates/`. Pass the
+workspace directory directly to the commands:
 
 ```bash
-study=studies/scans/lambda/hera-baseline/greedy-selection
+workspace=runs/scans/lambda/hera-baseline/greedy-selection
 
-scripts/run-scan --dry-run "$study"   # preview only
-scripts/run-scan "$study"             # generate and submit
-scripts/plot-scan "$study"            # extract results and plot
+scripts/run-scan --dry-run "$workspace"   # preview only
+scripts/run-scan "$workspace"             # generate and submit
+scripts/plot-scan "$workspace"            # extract results and plot
 ```
 
-Use `scripts/run-scan --no-submit "$study"` instead of the submission command
-when the run directories should be generated without submitting Condor jobs.
+Use `scripts/run-scan --no-submit "$workspace"` instead of the submission
+command when the run directories should be generated without submitting Condor
+jobs.
 
 The existing scan types are:
 
@@ -150,42 +150,42 @@ The existing scan types are:
 
 Likelihood generation requires the configured reference fit's
 `config/steering.txt` and `output/minuit.out.txt`. Outputs are ignored, so the
-reference output must exist locally before running the study.
+reference output must exist locally before running the workspace.
 
-## Comparison studies
+## Comparison workspaces
 
-Comparison definitions live under `studies/comparisons/`; their generated
-plots and tables use the matching path under `runs/comparisons/`.
+Each comparison workspace keeps its tracked `config.yaml` beside its ignored
+plots or tables under `runs/comparisons/<study>/`.
 
 The supported definition types and commands are:
 
-- `pdf-comparison` — `scripts/plot-pdf-comparison <study-dir>`
-- `xsec-comparison` — `scripts/plot-xsec <study-dir>`
-- `xsec-region-table` — `scripts/plot-xsec <study-dir>`
+- `pdf-comparison` — `scripts/plot-pdf-comparison <workspace-dir>`
+- `xsec-comparison` — `scripts/plot-xsec <workspace-dir>`
+- `xsec-region-table` — `scripts/plot-xsec <workspace-dir>`
 
 For example:
 
 ```bash
 scripts/plot-pdf-comparison \
-  studies/comparisons/baseline-nominal-vs-7sources
+  runs/comparisons/baseline-nominal-vs-7sources
 
 scripts/plot-xsec \
-  studies/comparisons/xsec-nc-cc-nominal-vs-7sources-pumplin
+  runs/comparisons/xsec-nc-cc-nominal-vs-7sources-pumplin
 ```
 
-Local fit paths in a comparison config are resolved relative to its study
-directory. A typical entry therefore looks like:
+Local fit paths in a comparison config are resolved relative to its workspace.
+A typical entry therefore looks like:
 
 ```yaml
 fits:
   - label: HERA baseline
-    path: ../../../runs/fits/hera-baseline/nominal-bartlett2-pumplin
+    path: ../../fits/hera-baseline/nominal-bartlett2-pumplin
 ```
 
 Local comparisons require a populated `<fit>/output/`. Historical directories
 such as `output_legacy_*` or `output_retained_*` are not promoted automatically.
 PDF comparisons write combined, ratio-only, and absolute-only PDFs beneath the
-matching `runs/comparisons/<study>/plots/` directory.
+workspace's `plots/` directory.
 
 ## Datasets and historical material
 
@@ -208,6 +208,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 ## Git workflow
 
 - Use a branch per change or study.
-- Keep study rationale in its `config.yaml` comments or a local `README.md`.
-- Commit definitions, source, commands, tests, and documentation.
+- Keep study rationale in its workspace `config.yaml` comments or a local
+  `README.md`.
+- Commit configurations, templates, source, commands, tests, and documentation.
 - Do not commit outputs, Condor logs, copied data tables, or `legacy/` payloads.

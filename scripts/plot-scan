@@ -1,6 +1,6 @@
 #!/bin/bash
 # plot-scan command
-# Extracts results and generates plots for a scan study
+# Extracts results and generates plots for a scan workspace
 # Sources LCG_106 from CVMFS for matplotlib/pandas/numpy only if needed
 
 LCG_SETUP=${LCG_SETUP:-/cvmfs/sft.cern.ch/lcg/views/LCG_106/x86_64-el9-gcc13-opt/setup.sh}

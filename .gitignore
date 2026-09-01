@@ -1,5 +1,5 @@
-# Consolidated runtime layout
-# Manual fit workspaces retain tracked config/launchers but not runtime payloads.
+# Run workspaces retain tracked configurations and launchers, not runtime payloads.
+# Manual fit products are generated beneath their workspace.
 runs/fits/**/output/
 runs/fits/**/output_OLD/
 runs/fits/**/output_bkp*/
@@ -14,7 +14,8 @@ runs/fits/**/*.dat
 runs/fits/sandbox/*
 !runs/fits/sandbox/.gitkeep
 
-# Scan workspaces and comparison products are generated under runs/.
+# Scan and comparison config.yaml files are tracked in their run workspaces;
+# their generated products are ignored below.
 runs/scans/**/fits/
 runs/scans/**/fits_*/
 runs/scans/**/runs/

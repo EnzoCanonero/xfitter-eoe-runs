@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 plot-scan command
-Extracts results and generates plots for a scan study
+Extracts results and generates plots for a scan workspace
 """
 
 import argparse
@@ -14,34 +14,32 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 from xfitter_eoe_runs.scans.plotter import plot_scan
 
 
-STUDY_ROOT = REPO_ROOT / "studies" / "scans"
 RUN_ROOT = REPO_ROOT / "runs" / "scans"
-TEMPLATE_ROOT = REPO_ROOT / "studies" / "templates"
+TEMPLATE_ROOT = REPO_ROOT / "templates"
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Extract results and generate plots for a scan study"
+        description="Extract results and generate plots for a scan workspace"
     )
     parser.add_argument(
-        'study_dir',
+        'run_dir',
         type=Path,
-        help="Study directory containing config.yaml",
+        help="scan workspace under runs/scans containing config.yaml",
     )
     args = parser.parse_args()
 
-    study_dir = args.study_dir.expanduser().resolve()
-    config_file = study_dir / "config.yaml"
+    run_dir = args.run_dir.expanduser().resolve()
+    config_file = run_dir / "config.yaml"
 
     if not config_file.exists():
-        print(f"Error: No config.yaml found in study directory: {study_dir}")
+        print(f"Error: No config.yaml found in scan workspace: {run_dir}")
         sys.exit(1)
 
     try:
-        relative_study = study_dir.relative_to(STUDY_ROOT)
+        run_dir.relative_to(RUN_ROOT)
     except ValueError:
-        parser.error(f"study directory must be under {STUDY_ROOT}: {study_dir}")
-    run_dir = RUN_ROOT / relative_study
+        parser.error(f"scan workspace must be under {RUN_ROOT}: {run_dir}")
 
     # Check that the runtime fit directory exists
     fits_dir = run_dir / "runs"
@@ -51,7 +49,7 @@ def main():
         sys.exit(1)
 
     try:
-        plot_scan(study_dir, run_dir=run_dir, template_root=TEMPLATE_ROOT)
+        plot_scan(run_dir, template_root=TEMPLATE_ROOT)
     except Exception as e:
         print(f"Error: {e}")
         import traceback
