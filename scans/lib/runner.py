@@ -5,8 +5,10 @@ Generates fits and submits to Condor based on study config
 
 import json
 import re
+import warnings
+from collections import Counter
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 from .config import (load_study_config, LambdaScanConfig, LikelihoodScanConfig,
                      SystematicRankingConfig, PumplinStabilityConfig)
@@ -128,6 +130,99 @@ def _apply_source_inits(fit_dir: Path, sources: List[Dict]) -> None:
     # depend on the full set), then we set par only for the init-bearing ones.
     idx = _eoe_param_indices(params_file.read_text(), e_sources)
     _inject_init_commands(params_file, {idx[n]: e_init[n] for n in e_init})
+
+
+def _parse_e_source_order(steering_text: str) -> List[str]:
+    """Return E-type source names in ``ListOfSources`` declaration order.
+
+    Only the ``&Systematics`` namelist is inspected. Quoted source strings use
+    xFitter's ``name:type@...`` format; non-E sources are intentionally omitted
+    because they do not become MINUIT nuisance parameters.
+    """
+    block_match = re.search(
+        r'&Systematics\b(.*?)(?=^\s*(?:&End|/)\s*$)',
+        steering_text,
+        re.IGNORECASE | re.MULTILINE | re.DOTALL,
+    )
+    if block_match is None:
+        return []
+
+    list_match = re.search(
+        r'\bListOfSources\s*=\s*(.*?)(?=^\s*[A-Za-z_]\w*\s*=|\Z)',
+        block_match.group(1),
+        re.IGNORECASE | re.MULTILINE | re.DOTALL,
+    )
+    if list_match is None:
+        return []
+
+    order = []
+    for quoted in re.finditer(r"'([^']*)'|\"([^\"]*)\"", list_match.group(1)):
+        source_spec = quoted.group(1) if quoted.group(1) is not None else quoted.group(2)
+        parsed = re.match(r'^\s*([^:\s,]+)\s*:\s*([^@\s,]+)', source_spec)
+        if parsed is not None and parsed.group(2).upper() == 'E':
+            order.append(parsed.group(1))
+    return order
+
+
+def _reference_e_source_order(ref_fit_dir: Path,
+                              configured_order: Sequence[str]) -> List[str]:
+    """Get and validate the reference fit's ordered E-source declaration.
+
+    A reference steering file is the authoritative source for MINUIT parameter
+    ordering. Falling back to the configured order is safe only when that file
+    is unavailable; an available steering file whose E-source multiset differs
+    from the likelihood configuration is an error rather than a guess.
+    """
+    configured = list(configured_order)
+    steering_file = ref_fit_dir / 'config' / 'steering.txt'
+    if not steering_file.is_file():
+        if configured:
+            warnings.warn(
+                f"reference steering unavailable at {steering_file}; "
+                "falling back to likelihood configuration E-source order",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+        return configured
+
+    reference = _parse_e_source_order(steering_file.read_text())
+    configured_counts = Counter(configured)
+    reference_counts = Counter(reference)
+    if reference_counts != configured_counts:
+        missing = list((configured_counts - reference_counts).elements())
+        unexpected = list((reference_counts - configured_counts).elements())
+        raise ValueError(
+            "likelihood/reference E-source mismatch: "
+            f"missing from reference={missing}, unexpected in reference={unexpected}; "
+            f"configured={configured}, reference={reference}"
+        )
+    return reference
+
+
+def _order_systematics_by_e_reference(systematics: Sequence[Dict],
+                                      e_source_order: Sequence[str]) -> List[Dict]:
+    """Reorder E entries to match the reference while retaining non-E slots."""
+    configured_e = [s['name'] for s in systematics if s.get('type') == 'E']
+    if Counter(configured_e) != Counter(e_source_order):
+        raise ValueError(
+            "cannot apply reference E-source order to configured systematics: "
+            f"configured={configured_e}, reference={list(e_source_order)}"
+        )
+
+    by_name: Dict[str, List[Dict]] = {}
+    for systematic in systematics:
+        if systematic.get('type') == 'E':
+            by_name.setdefault(systematic['name'], []).append(systematic)
+
+    ordered_e = []
+    for name in e_source_order:
+        entries = by_name.get(name, [])
+        if not entries:
+            raise ValueError(f"E-source '{name}' has no matching systematic entry")
+        ordered_e.append(entries.pop(0))
+
+    ordered_iter = iter(ordered_e)
+    return [next(ordered_iter) if s.get('type') == 'E' else s for s in systematics]
 
 
 def run_scan(study_dir: Path, dry_run: bool = False, submit: bool = True):
@@ -425,22 +520,37 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir:
 
 
 def _build_reference_params(ref_fit_dir: Path,
-                             e_type_systematics: List[str]) -> Dict[str, Dict]:
+                             e_type_systematics: Sequence[str],
+                             e_source_order: Optional[Sequence[str]] = None
+                             ) -> Dict[str, Dict]:
     """
     Read fitted parameter values and errors from a reference fit's MINUIT output.
 
-    MINUIT truncates parameter names to 10 characters.  E-type systematics with
-    longer names (e.g. sysHZComb1053) collide when truncated.  They are resolved
-    back to full names by matching against the alphabetically-sorted list of
-    E-type systematics (MINUIT assigns parameter numbers in alphabetical order).
+    MINUIT truncates parameter names to 10 characters. E-type systematics with
+    longer names (e.g. sysHZComb1053) collide when truncated. Repeated prefixes
+    are resolved by parameter-definition index and the reference fit's
+    ``ListOfSources`` declaration order.
 
     Args:
         ref_fit_dir: Path to the reference fit directory (contains output/)
-        e_type_systematics: Full names of all E-type systematics in the study config
+        e_type_systematics: Full names of all E-type systematics in the study config.
+        e_source_order: Already-validated reference declaration order. When
+            omitted, it is read and validated from ``config/steering.txt``.
 
     Returns:
         dict {full_name: {'value': float, 'error': float}}
     """
+    configured_order = list(e_type_systematics)
+    if e_source_order is None:
+        resolved_e_order = _reference_e_source_order(ref_fit_dir, configured_order)
+    else:
+        resolved_e_order = list(e_source_order)
+        if Counter(resolved_e_order) != Counter(configured_order):
+            raise ValueError(
+                "provided reference E-source order does not match configured sources: "
+                f"configured={configured_order}, reference={resolved_e_order}"
+            )
+
     minuit_file = ref_fit_dir / "output" / "minuit.out.txt"
     with open(minuit_file, 'r') as f:
         content = f.read()
@@ -450,9 +560,9 @@ def _build_reference_params(ref_fit_dir: Path,
     for m in re.finditer(r"^\s*(\d+)\s+'([^']*?)\s*'", content, re.MULTILINE):
         defs[int(m.group(1))] = m.group(2).strip()
 
-    # Build truncated_prefix → [sorted full names] from E-type systematics
+    # Build truncated_prefix → [full names in ListOfSources order].
     trunc_groups: Dict[str, List[str]] = {}
-    for full in sorted(e_type_systematics):
+    for full in resolved_e_order:
         trunc = full[:10]
         trunc_groups.setdefault(trunc, []).append(full)
 
@@ -521,13 +631,22 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
     templates = TemplateManager(template_dir)
 
     systematics = config.systematics
-    e_type_names = [s['name'] for s in systematics if s['type'] == 'E']
+    configured_e_type_names = [s['name'] for s in systematics if s['type'] == 'E']
+    e_type_names = _reference_e_source_order(
+        config.reference_fit, configured_e_type_names,
+    )
+    # Generated likelihood fits must register their E nuisances in the same
+    # order as the reference whose MINUIT indices are reused below.
+    systematics = _order_systematics_by_e_reference(systematics, e_type_names)
 
     print(f"\nReference fit: {config.reference_fit}")
     print(f"E-type systematics (free in MINUIT): {e_type_names}")
 
     # Read fitted values and errors from reference fit
-    ref_params = _build_reference_params(config.reference_fit, e_type_names)
+    ref_params = _build_reference_params(
+        config.reference_fit, configured_e_type_names,
+        e_source_order=e_type_names,
+    )
 
     # Build initial MINUIT starting values from reference fit (override with config).
     # PDF params are every fitted (variable) parameter in the reference fit that is

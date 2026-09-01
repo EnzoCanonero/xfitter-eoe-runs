@@ -13,7 +13,8 @@ matplotlib.use('Agg')  # Non-interactive backend
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from .config import load_study_config
-from .extract import extract_scan_results, extract_pumplin_widths
+from .extract import (extract_scan_results, extract_pumplin_widths,
+                      _resolve_ordered_minuit_definitions)
 
 # PDF parameters shown in pumplin-stability plots (free HERAPDF params, sorted).
 _PUMPLIN_PDF_PARAMS = [
@@ -1217,20 +1218,15 @@ def _parse_pumplin_run_key(minuit_file: Path):
     return lam, errdef, iterate
 
 
-def _resolve_minuit_name(name: str, target_names) -> str:
-    """Map MINUIT-truncated names to configured full names when unambiguous."""
-    if name in target_names:
-        return name
-    matches = [target for target in target_names if target[:10] == name]
-    return matches[0] if len(matches) == 1 else name
-
-
 def _parse_active_minuit_names(text: str, target_names):
     """Parse active MINUIT parameter names in covariance-matrix order."""
-    definitions = {
-        int(m.group(1)): _resolve_minuit_name(m.group(2).strip(), target_names)
+    raw_definitions = {
+        int(m.group(1)): m.group(2).strip()
         for m in re.finditer(r"^\s*(\d+)\s+'([^']*?)\s*'", text, re.MULTILINE)
     }
+    definitions = _resolve_ordered_minuit_definitions(
+        raw_definitions, target_names,
+    )
     lines = text.splitlines()
     start = None
     for i, line in enumerate(lines):
@@ -1403,7 +1399,7 @@ def _plot_pumplin_eigenmode_diagnostics(
         study_dir: Path, params, widths, lambdas, errdefs, iterates,
         errdef_ref, max_iter, plots_dir: Path, results_dir: Path):
     """Aligned eigenmode-contribution diagnostics from Pumplin MINUIT outputs."""
-    records, skipped = _collect_pumplin_eigen_records(study_dir / "runs", set(params))
+    records, skipped = _collect_pumplin_eigen_records(study_dir / "runs", params)
     if not records:
         print("  ! No Pumplin covariance eigenmode records found")
         return
@@ -1651,7 +1647,7 @@ def _plot_pumplin_stability(study_dir, config, plots_dir: Path, results_dir: Pat
         one line per ITERATE.
     """
     params = _pumplin_plot_params(config)
-    widths, incomplete = extract_pumplin_widths(study_dir / "runs", set(params))
+    widths, incomplete = extract_pumplin_widths(study_dir / "runs", params)
     if not widths:
         raise SystemExit("No completed Pumplin interval blocks found under runs/")
 

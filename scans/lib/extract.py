@@ -4,7 +4,7 @@ Extracts chi2, parameters, convergence status from fit results
 """
 
 from pathlib import Path
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Sequence
 import json
 import re
 import numpy as np
@@ -661,15 +661,41 @@ _PUMPLIN_XRANGE_PARAM = re.compile(
 )
 
 
-def _resolve_pumplin_name(name: str, params: set) -> str:
-    """Map MINUIT-truncated names back to configured full names when unambiguous."""
-    if name in params:
-        return name
-    matches = [p for p in params if p[:10] == name]
-    return matches[0] if len(matches) == 1 else name
+def _resolve_ordered_minuit_definitions(definitions: Dict[int, str],
+                                        target_names: Sequence[str]) -> Dict[int, str]:
+    """Resolve truncated MINUIT names by definition-index occurrence.
+
+    ``target_names`` must be an ordered sequence (for Pumplin, the configured
+    parameter order). Multiple long names can share the same ten-character
+    MINUIT spelling; their occurrences in the parameter-definition table are
+    paired with the corresponding targets in sequence order.
+    """
+    if isinstance(target_names, (set, frozenset)):
+        raise TypeError("target_names must be an ordered sequence, not a set")
+
+    trunc_groups: Dict[str, List[str]] = {}
+    for target in target_names:
+        trunc_groups.setdefault(target[:10], []).append(target)
+
+    counters = {prefix: 0 for prefix in trunc_groups}
+    resolved: Dict[int, str] = {}
+    for index in sorted(definitions):
+        truncated = definitions[index].strip()
+        candidates = trunc_groups.get(truncated)
+        if candidates is None:
+            resolved[index] = truncated
+            continue
+        occurrence = counters[truncated]
+        resolved[index] = (
+            candidates[occurrence]
+            if occurrence < len(candidates)
+            else truncated
+        )
+        counters[truncated] += 1
+    return resolved
 
 
-def extract_pumplin_widths(runs_dir: Path, params: set):
+def extract_pumplin_widths(runs_dir: Path, params: Sequence[str]):
     """Parse completed Pumplin interval widths from a pumplin-stability runs/ tree.
 
     Expects runs laid out as runs/lambda_<v>/errdef<X>p<Y>_iter<NN>/output/minuit.out.txt.
@@ -679,6 +705,10 @@ def extract_pumplin_widths(runs_dir: Path, params: set):
       incomplete: [str] run dirs (relative to runs_dir) missing a complete Pumplin block.
     """
     import math
+
+    if isinstance(params, (set, frozenset)):
+        raise TypeError("params must be an ordered sequence, not a set")
+    params = tuple(params)
 
     widths: Dict = {}
     incomplete: List[str] = []
@@ -703,7 +733,7 @@ def extract_pumplin_widths(runs_dir: Path, params: set):
             incomplete.append(str(run_dir.relative_to(runs_dir)))
             continue
 
-        names: Dict[int, str] = {}
+        raw_names: Dict[int, str] = {}
         in_definitions = False
         for line in text.splitlines():
             if "PARAMETER DEFINITIONS" in line:
@@ -714,7 +744,9 @@ def extract_pumplin_widths(runs_dir: Path, params: set):
             if in_definitions:
                 m = _PUMPLIN_PARAM_DEF.match(line)
                 if m:
-                    names[int(m.group(1))] = _resolve_pumplin_name(m.group(2), params)
+                    raw_names[int(m.group(1))] = m.group(2)
+
+        names = _resolve_ordered_minuit_definitions(raw_names, params)
 
         errdef = float(run_match.group("err").replace("p", "."))
         iterate = int(run_match.group("it"))
