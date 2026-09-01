@@ -1,3 +1,35 @@
+# Consolidated runtime layout (added before the tracked layout migration)
+# Manual fit workspaces retain tracked config/launchers but not runtime payloads.
+runs/fits/**/output/
+runs/fits/**/output_OLD/
+runs/fits/**/output_bkp*/
+runs/fits/**/bkpref/
+runs/fits/**/output_legacy_*/
+runs/fits/**/output_retained_*/
+runs/fits/**/condor/run_fit.sh
+runs/fits/**/condor/job.sub
+runs/fits/**/condor/logs/
+runs/fits/**/batch/*.log
+runs/fits/**/*.dat
+runs/fits/sandbox/*
+!runs/fits/sandbox/.gitkeep
+
+# Scan workspaces and comparison products are generated under runs/.
+runs/scans/**/fits/
+runs/scans/**/fits_*/
+runs/scans/**/runs/
+runs/scans/**/runs_*/
+runs/scans/**/runs_output_bkp*.tar.gz
+runs/scans/**/plots/
+runs/scans/**/plots_*/
+runs/scans/**/results/
+runs/scans/**/results_*/
+runs/comparisons/**/plots/
+runs/comparisons/**/plots_*/
+runs/comparisons/**/results/
+runs/comparisons/**/results_*/
+runs/comparisons/**/.xfdraw-staging/
+
 # xfitter output (created at runtime), including backups
 fits/**/output/
 fits/**/output_OLD/
