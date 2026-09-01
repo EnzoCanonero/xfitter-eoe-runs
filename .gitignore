@@ -1,4 +1,4 @@
-# Consolidated runtime layout (added before the tracked layout migration)
+# Consolidated runtime layout
 # Manual fit workspaces retain tracked config/launchers but not runtime payloads.
 runs/fits/**/output/
 runs/fits/**/output_OLD/
@@ -30,60 +30,8 @@ runs/comparisons/**/results/
 runs/comparisons/**/results_*/
 runs/comparisons/**/.xfdraw-staging/
 
-# xfitter output (created at runtime), including backups
-fits/**/output/
-fits/**/output_OLD/
-fits/**/output_bkp*/
-fits/**/bkpref/
-
-# Classified pre-merge fit artifacts
-fits/**/output_legacy_*/
-fits/**/output_retained_*/
-
-# PDF-comparison plot and table outputs
-fits/compare/**/plots/
-fits/compare/**/results/
-fits/compare/**/plots_legacy_*/
-fits/compare/**/results_legacy_*/
-
-# Condor generated files (created by submit.sh)
-fits/**/condor/run_fit.sh
-fits/**/condor/job.sub
-fits/**/condor/logs/
-fits/**/batch/*.log
-
-# Data files in config/ (copied by scripts/new-fit)
-fits/**/*.dat
-
-# Local one-off study grids
-fits/hera/hera-pumplin-stability-sysHZComb1053/
-
-# Sandbox (personal throwaway fits), keep folder tracked
-fits/sandbox/*
-!fits/sandbox/.gitkeep
-
-# Scan framework generated files
+# Historical plot bundle retained locally pending separate archival.
 extra plots/
-scans/fits/lambda-scans/*/fits/
-scans/fits/lambda-scans/*/results/
-scans/fits/lambda-scans/*/plots/
-scans/fits/systematic-ranking/*/fits/
-scans/fits/systematic-ranking/*/results/
-scans/fits/systematic-ranking/*/plots/
-scans/studies/**/runs/
-scans/studies/**/plots/
-scans/studies/**/results/
-scans/studies/**/runs_bkp*/
-scans/studies/**/runs_output_bkp*.tar.gz
-scans/studies/**/runs_legacy_*/
-scans/studies/**/runs_retained_*/
-scans/studies/**/runs_invalid_*/
-scans/studies/**/plots_legacy_*/
-scans/studies/**/plots_retained_*/
-scans/studies/**/plots_invalid_*/
-scans/studies/**/results_legacy_*/
-scans/studies/**/results_retained_*/
-scans/studies/**/results_invalid_*/
 
 # Python cache
 __pycache__/

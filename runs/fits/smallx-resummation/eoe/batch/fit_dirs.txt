@@ -1,0 +1,1 @@
+/nfs/scratch2/ecanoner/xfitter-eoe-runs/runs/fits/smallx-resummation/eoe/bg-param-nnlo-nllx-fonll-greedy-top5

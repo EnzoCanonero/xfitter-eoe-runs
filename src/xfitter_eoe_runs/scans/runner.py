@@ -225,13 +225,15 @@ def _order_systematics_by_e_reference(systematics: Sequence[Dict],
     return [next(ordered_iter) if s.get('type') == 'E' else s for s in systematics]
 
 
-def run_scan(study_dir: Path, template_root: Path, dataset_root: Path,
-             setup_env: Path, dry_run: bool = False, submit: bool = True):
+def run_scan(study_dir: Path, run_dir: Path, template_root: Path,
+             dataset_root: Path, setup_env: Path, dry_run: bool = False,
+             submit: bool = True):
     """
     Generate fits for a scan study and optionally submit to Condor
 
     Args:
         study_dir: Path to study directory containing config.yaml
+        run_dir: Path to the matching runtime workspace
         template_root: Path containing the named study templates
         dataset_root: Path containing the configured dataset files
         setup_env: Environment setup script to source in generated jobs
@@ -243,12 +245,13 @@ def run_scan(study_dir: Path, template_root: Path, dataset_root: Path,
 
     print(f"Scan type: {config.scan_type}")
     print(f"Study directory: {study_dir}")
+    print(f"Run directory: {run_dir}")
 
     if config.do_errors:
         print(f"doErrors: {config.do_errors['method']}")
 
     # Create runs directory
-    fits_dir = study_dir / "runs"
+    fits_dir = run_dir / "runs"
 
     if config.scan_type == 'lambda-scan':
         submit_script = _generate_lambda_scan_fits(

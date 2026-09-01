@@ -10,7 +10,7 @@ notes:
   - "Residual empty or stale output_OLD directories were left for a separate cleanup pass."
   - "On 2026-09-01 inactive study trees were moved, without deletion, under the ignored root legacy/<original-path>."
   - "The legacy payload is workspace-local and is not distributed by Git; its original tracked state remains recoverable from source commit 53522078349ad29f586ee6ff56ecf5e958f4fe81."
-  - "The historical artifact classifications below describe the 2026-08-18 snapshot; layout_cleanup_20260901 is authoritative for the current active layout."
+  - "The historical artifact classifications below describe the 2026-08-18 snapshot; layout_reorganization_20260901 is authoritative for current active paths."
 
 layout_cleanup_20260901:
   source_repository_commit: "53522078349ad29f586ee6ff56ecf5e958f4fe81"
@@ -99,6 +99,27 @@ layout_cleanup_20260901:
       - "scans/studies/likelihood/hera-baseline/greedy-selection"
     pumplin_stability:
       - "scans/studies/pumplin-stability/hera-baseline/greedy-selection"
+layout_reorganization_20260901:
+  source_repository_commit: "20bba404519572536f3552e4837c14bbe178812a"
+  jobs_submitted: false
+  scientific_content_modified: false
+  runtime_payloads_preserved: true
+  mappings:
+    datasets: "datafiles -> datasets"
+    manual_fit_workspaces: "fits/<fit> -> runs/fits/<fit>"
+    scan_templates: "scans/templates -> studies/templates"
+    scan_definitions: "scans/studies/<study>/config.yaml -> studies/scans/<study>/config.yaml"
+    scan_runtime: "scans/studies/<study>/<artifact> -> runs/scans/<study>/<artifact>"
+    comparison_definitions: "fits/compare/studies/<study>/config.yaml -> studies/comparisons/<study>/config.yaml"
+    comparison_runtime: "fits/compare/studies/<study>/<artifact> -> runs/comparisons/<study>/<artifact>"
+  active_inventory:
+    manual_fit_workspaces: 10
+    scan_studies: 29
+    comparison_studies: 9
+    scan_templates: 3
+    dataset_files: 16
+  deferred:
+    - "The ignored extra plots/ bundle remains in place pending separate historical archival."
 current_targets:
   standard:
     tree: "xfitter-master"

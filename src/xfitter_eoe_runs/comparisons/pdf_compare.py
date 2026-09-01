@@ -510,9 +510,10 @@ def _plot_observable(pdf_pages, obs, curves, ref_idx, Q2, ratio_ylim, x_min, x_m
 # =========================================================================
 # Entry point
 # =========================================================================
-def compare_pdfs(study_dir: Path):
-    """Load every fit in the study's config.yaml and write plots/pdf_comparison.pdf."""
+def compare_pdfs(study_dir: Path, run_dir: Path):
+    """Load a study config and write its plots beneath the runtime workspace."""
     study_dir = Path(study_dir)
+    run_dir = Path(run_dir)
     config = CompareConfig(study_dir / "config.yaml")
 
     x_vals = config.x_grid()
@@ -575,8 +576,8 @@ def compare_pdfs(study_dir: Path):
         labels = [c["label"] for c in curves]
         ref_idx = config.reference_index(labels)
 
-        plots_dir = study_dir / "plots"
-        plots_dir.mkdir(exist_ok=True)
+        plots_dir = run_dir / "plots"
+        plots_dir.mkdir(parents=True, exist_ok=True)
 
         # All three variants are emitted from this one call: `curves` is already
         # fully evaluated, so re-looping is free, and calling compare_pdfs() once

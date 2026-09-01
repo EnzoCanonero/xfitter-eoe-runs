@@ -51,38 +51,40 @@ def _pumplin_plot_params(config) -> list:
     return params
 
 
-def plot_scan(study_dir: Path, template_root: Path):
+def plot_scan(study_dir: Path, run_dir: Path, template_root: Path):
     """
     Extract results and generate plots for a scan study
 
     Args:
-        study_dir: Path to study directory containing config.yaml and runs/
+        study_dir: Path to study directory containing config.yaml
+        run_dir: Path to the matching runtime workspace
         template_root: Path containing the named study templates
     """
     # Load configuration
     config = load_study_config(study_dir, template_root)
 
     print(f"Extracting results from: {study_dir}")
+    print(f"Runtime workspace: {run_dir}")
     print(f"Scan type: {config.scan_type}")
 
     # Pumplin-stability has its own data model (Pumplin interval widths, not
     # central/error per fit), so it bypasses the generic extractor entirely.
     if config.scan_type == 'pumplin-stability':
-        results_dir = study_dir / "results"
-        results_dir.mkdir(exist_ok=True)
-        plots_dir = study_dir / "plots"
-        plots_dir.mkdir(exist_ok=True)
-        _plot_pumplin_stability(study_dir, config, plots_dir, results_dir)
+        results_dir = run_dir / "results"
+        results_dir.mkdir(parents=True, exist_ok=True)
+        plots_dir = run_dir / "plots"
+        plots_dir.mkdir(parents=True, exist_ok=True)
+        _plot_pumplin_stability(run_dir, config, plots_dir, results_dir)
         print(f"\nPlots saved in: {plots_dir}")
         return
 
     # Extract results
-    results = extract_scan_results(study_dir, config.scan_type,
+    results = extract_scan_results(run_dir, config.scan_type,
                                    do_errors=config.do_errors)
 
     # Save results
-    results_dir = study_dir / "results"
-    results_dir.mkdir(exist_ok=True)
+    results_dir = run_dir / "results"
+    results_dir.mkdir(parents=True, exist_ok=True)
 
     if config.scan_type == 'likelihood-scan':
         print(f"\nResults saved:")
@@ -151,8 +153,8 @@ def plot_scan(study_dir: Path, template_root: Path):
         print(f"  - {params_file}")
 
     # Generate plots
-    plots_dir = study_dir / "plots"
-    plots_dir.mkdir(exist_ok=True)
+    plots_dir = run_dir / "plots"
+    plots_dir.mkdir(parents=True, exist_ok=True)
 
     # Error method label for plot annotations
     error_label = None
@@ -1397,10 +1399,10 @@ def _aligned_variance_contributions(record, reference):
 
 
 def _plot_pumplin_eigenmode_diagnostics(
-        study_dir: Path, params, widths, lambdas, errdefs, iterates,
+        run_dir: Path, params, widths, lambdas, errdefs, iterates,
         errdef_ref, max_iter, plots_dir: Path, results_dir: Path):
     """Aligned eigenmode-contribution diagnostics from Pumplin MINUIT outputs."""
-    records, skipped = _collect_pumplin_eigen_records(study_dir / "runs", params)
+    records, skipped = _collect_pumplin_eigen_records(run_dir / "runs", params)
     if not records:
         print("  ! No Pumplin covariance eigenmode records found")
         return
@@ -1638,7 +1640,7 @@ def _plot_pumplin_eigenmode_diagnostics(
         print(f"  ({len(skipped)} covariance record(s) skipped)")
 
 
-def _plot_pumplin_stability(study_dir, config, plots_dir: Path, results_dir: Path):
+def _plot_pumplin_stability(run_dir, config, plots_dir: Path, results_dir: Path):
     """Pumplin-stability plots: one panel per lambda value, <=4 panels/page.
 
     Produces two PDFs (per-parameter pages):
@@ -1648,7 +1650,7 @@ def _plot_pumplin_stability(study_dir, config, plots_dir: Path, results_dir: Pat
         one line per ITERATE.
     """
     params = _pumplin_plot_params(config)
-    widths, incomplete = extract_pumplin_widths(study_dir / "runs", params)
+    widths, incomplete = extract_pumplin_widths(run_dir / "runs", params)
     if not widths:
         raise SystemExit("No completed Pumplin interval blocks found under runs/")
 
@@ -1755,7 +1757,7 @@ def _plot_pumplin_stability(study_dir, config, plots_dir: Path, results_dir: Pat
     print(f"  ✓ {conv_pdf.name}")
     print(f"  ✓ {errdef_pdf.name}")
     _plot_pumplin_eigenmode_diagnostics(
-        study_dir, params, widths, lambdas, errdefs, iterates,
+        run_dir, params, widths, lambdas, errdefs, iterates,
         errdef_ref, max_iter, plots_dir, results_dir,
     )
     if incomplete:

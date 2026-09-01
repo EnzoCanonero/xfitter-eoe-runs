@@ -14,8 +14,10 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 from xfitter_eoe_runs.scans.runner import run_scan
 
 
-TEMPLATE_ROOT = REPO_ROOT / "scans" / "templates"
-DATASET_ROOT = (REPO_ROOT / "datafiles" / "hera" / "h1zeusCombined" /
+STUDY_ROOT = REPO_ROOT / "studies" / "scans"
+RUN_ROOT = REPO_ROOT / "runs" / "scans"
+TEMPLATE_ROOT = REPO_ROOT / "studies" / "templates"
+DATASET_ROOT = (REPO_ROOT / "datasets" / "hera" / "h1zeusCombined" /
                 "inclusiveDis" / "1506.06042")
 SETUP_ENV = REPO_ROOT / "scripts" / "setup-env.sh"
 
@@ -49,8 +51,15 @@ def main():
         sys.exit(1)
 
     try:
+        relative_study = study_dir.relative_to(STUDY_ROOT)
+    except ValueError:
+        parser.error(f"study directory must be under {STUDY_ROOT}: {study_dir}")
+    run_dir = RUN_ROOT / relative_study
+
+    try:
         run_scan(
             study_dir,
+            run_dir=run_dir,
             template_root=TEMPLATE_ROOT,
             dataset_root=DATASET_ROOT,
             setup_env=SETUP_ENV,

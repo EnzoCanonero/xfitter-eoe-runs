@@ -2,7 +2,7 @@
 # Create a new xfitter fit directory.
 # Usage: scripts/new-fit <path> [template_dir]
 #
-# path:         Nested path under fits/ (e.g. hera-baseline/my-study/variant-a)
+# path:         Nested path under runs/fits/ (e.g. hera-baseline/my-study/variant-a)
 # template_dir: Directory containing steering.txt and parameters.yaml.
 #               Can be an existing fit's config/ dir or an xfitter example dir.
 #               Defaults to the retained HERA nominal Pumplin configuration.
@@ -11,7 +11,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-FITSDIR="$REPO_ROOT/fits"
+FITSDIR="$REPO_ROOT/runs/fits"
 NAME="$1"
 TEMPLATE="${2:-$FITSDIR/hera-baseline/nominal-bartlett2-pumplin/config}"
 
@@ -23,7 +23,7 @@ fi
 if [ -z "$NAME" ]; then
     echo "Usage: $0 <path> [template_dir]"
     echo ""
-    echo "  path:         Nested path under fits/ (e.g. hera-baseline/my-study/variant-a)"
+    echo "  path:         Nested path under runs/fits/ (e.g. hera-baseline/my-study/variant-a)"
     echo "  template_dir: Directory with steering.txt + parameters.yaml"
     echo "                (default: hera-baseline/nominal-bartlett2-pumplin/config)"
     echo ""
@@ -73,19 +73,19 @@ done
 
 # ── 4. Copy data files into config/ ─────────────────────────
 # Parse steering.txt for InputFileNames and copy the .dat files
-DATAROOT="$REPO_ROOT/datafiles"
+DATAROOT="$REPO_ROOT/datasets"
 if [ -f "$CONFIGDIR/steering.txt" ]; then
     while IFS= read -r line; do
         # Extract each filename between single quotes ending in .dat.
         while IFS= read -r fname; do
             [ -n "$fname" ] || continue
             base=$(basename "$fname")
-            # Find the file in datafiles/
+            # Find the file in datasets/
             src=$(find -L "$DATAROOT" -name "$base" -type f 2>/dev/null | head -1)
             if [ -n "$src" ]; then
                 cp "$src" "$CONFIGDIR/$base"
             else
-                echo "Warning: data file not found in datafiles/: $base"
+                echo "Warning: data file not found in datasets/: $base"
             fi
         done < <(echo "$line" | grep -oP "'\K[^']*\.dat" || true)
     done < "$CONFIGDIR/steering.txt"

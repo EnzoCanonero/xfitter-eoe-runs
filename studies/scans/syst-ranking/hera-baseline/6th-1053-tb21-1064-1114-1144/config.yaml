@@ -1,0 +1,31 @@
+scan_type: systematic-ranking
+xfitter_tree: xfitter-bartlett-fixes
+template: hera-baseline
+epsilon: 0.6
+
+# Sixth-order forward-selection scan (Q2cut = 3.5, baseline parametrization).
+# Run by explicit request, beyond the dchi2>2 stop rule (next source 1144 had dchi2 = 1.63).
+# Base held ON in every fit (eps 0.6), warm-started at the JOINT converged values from the
+# 5th-order {1053,proc_tb21,1064,1114,1144} fit (runs/scans/syst-ranking/hera-baseline/5th-1053-tb21-1064-1114/runs/sysHZComb1144).
+base_systematics:
+  - {name: sysHZComb1053, type: E, init: -16.3636}
+  - {name: proc_tb21,     type: E, init: -6.1758}
+  - {name: sysHZComb1064, type: E, init: 9.1569}
+  - {name: sysHZComb1114, type: E, init: 4.4113}
+  - {name: sysHZComb1144, type: E, init: 4.2686}
+
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+
+systematics:
+  - {name: sysHZComb, range: "1001-1162", type: E}
+  - {name: proc_nrl, type: E}
+  - {name: proc_tb, range: "21-24", type: E}
+  - {name: proc_gp, type: E}
+  - {name: proc_had, type: E}

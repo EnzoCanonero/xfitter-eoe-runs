@@ -29,8 +29,8 @@ panels:
   - {dataset: "HERA1+2 NCep 920", q2: 3.5}
   - {dataset: "HERA1+2 NCep 575", q2: 8.5}
 fits:                               # 2+ entries; first = reference/data holder
-  - {label: "nominal",  path: ../../../hera-baseline/nominal-bartlett2-hesse}
-  - {label: "EoE-7src", path: ../../../hera-baseline/baseline-7-sources-bartlett2-hesse}
+  - {label: "nominal",  path: ../../../runs/fits/hera-baseline/nominal-bartlett2-hesse}
+  - {label: "EoE-7src", path: ../../../runs/fits/hera-baseline/baseline-7-sources-bartlett2-hesse}
 
 # element toggles (defaults reproduce the Fig.2 / xfitter-draw look)
 therr: true                # theory uncertainty bands        (--therr)
@@ -368,7 +368,9 @@ def _find_xfitter_draw(cfg: dict):
     raise FileNotFoundError(f"xfitter-draw not found (looked in {exe} and PATH)")
 
 
-def compare_xsec(study_dir: Path):
+def compare_xsec(study_dir: Path, run_dir: Path):
+    study_dir = Path(study_dir)
+    run_dir = Path(run_dir)
     cfg = _load_config(study_dir / "config.yaml")
     if cfg.get("type") != "xsec-comparison":
         raise ValueError(f"config type is '{cfg.get('type')}', expected 'xsec-comparison'")
@@ -384,7 +386,8 @@ def compare_xsec(study_dir: Path):
     if len(fits) < 1:
         raise ValueError("need at least one entry under 'fits'")
 
-    staging = study_dir / ".xfdraw-staging"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    staging = run_dir / ".xfdraw-staging"
     if staging.exists():
         shutil.rmtree(staging)
     staging.mkdir()
@@ -400,8 +403,8 @@ def compare_xsec(study_dir: Path):
                                 panels)
         args.append(f"{dst}:{label}")
 
-    plots = study_dir / "plots"
-    plots.mkdir(exist_ok=True)
+    plots = run_dir / "plots"
+    plots.mkdir(parents=True, exist_ok=True)
     outdir = staging / "out"
     outdir.mkdir()
 

@@ -14,7 +14,9 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 from xfitter_eoe_runs.scans.plotter import plot_scan
 
 
-TEMPLATE_ROOT = REPO_ROOT / "scans" / "templates"
+STUDY_ROOT = REPO_ROOT / "studies" / "scans"
+RUN_ROOT = REPO_ROOT / "runs" / "scans"
+TEMPLATE_ROOT = REPO_ROOT / "studies" / "templates"
 
 
 def main():
@@ -35,15 +37,21 @@ def main():
         print(f"Error: No config.yaml found in study directory: {study_dir}")
         sys.exit(1)
 
-    # Check that runs directory exists
-    fits_dir = study_dir / "runs"
+    try:
+        relative_study = study_dir.relative_to(STUDY_ROOT)
+    except ValueError:
+        parser.error(f"study directory must be under {STUDY_ROOT}: {study_dir}")
+    run_dir = RUN_ROOT / relative_study
+
+    # Check that the runtime fit directory exists
+    fits_dir = run_dir / "runs"
     if not fits_dir.exists():
-        print(f"Error: No runs/ directory found in {study_dir}")
+        print(f"Error: No runs/ directory found in {run_dir}")
         print("\nRun 'run-scan' first to generate runs.")
         sys.exit(1)
 
     try:
-        plot_scan(study_dir, template_root=TEMPLATE_ROOT)
+        plot_scan(study_dir, run_dir=run_dir, template_root=TEMPLATE_ROOT)
     except Exception as e:
         print(f"Error: {e}")
         import traceback

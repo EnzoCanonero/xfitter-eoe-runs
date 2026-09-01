@@ -341,23 +341,23 @@ def _corrected_chi2(results: Dict, active_eoe: bool = False):
     return chi2 * (factor if factor is not None else 1.0)
 
 
-def extract_scan_results(scan_dir: Path, scan_type: str,
+def extract_scan_results(run_dir: Path, scan_type: str,
                          do_errors: Optional[Dict] = None) -> Dict[str, pd.DataFrame]:
     """
     Extract and consolidate results from all fits in a scan
 
     Args:
-        scan_dir: Path to study directory containing fits/
+        run_dir: Path to the runtime workspace containing runs/
         scan_type: 'lambda-scan' or 'systematic-ranking'
         do_errors: Optional doErrors config dict (with 'method' key)
 
     Returns:
         Dictionary with 'chi2' and 'parameters' DataFrames
     """
-    fits_dir = scan_dir / "runs"
+    fits_dir = run_dir / "runs"
 
     if not fits_dir.exists():
-        raise FileNotFoundError(f"No runs directory found in {scan_dir}")
+        raise FileNotFoundError(f"No runs directory found in {run_dir}")
 
     all_chi2 = []
     all_parameters = []

@@ -31,8 +31,8 @@ q2bins: [0, 10, 30, 100, 1000, 1.0e9]     # bin EDGES, ascending
 xbins:  [0, 1.0e-3, 1.0e-2, 1.0e-1, 1.0]  # bin EDGES, ascending
 dataset: ""                                # optional substring filter; "" = all
 fits:                                      # exactly 2; first = reference
-  - {label: "nominal",  path: ../../../hera-baseline/nominal-bartlett2-pumplin}
-  - {label: "EoE-7src", path: ../../../hera-baseline/baseline-7-sources-bartlett2-pumplin}
+  - {label: "nominal",  path: ../../../runs/fits/hera-baseline/nominal-bartlett2-pumplin}
+  - {label: "EoE-7src", path: ../../../runs/fits/hera-baseline/baseline-7-sources-bartlett2-pumplin}
 """
 
 import math
@@ -120,8 +120,9 @@ def _validate_edges(name: str, edges):
 # entry point
 # ---------------------------------------------------------------------------
 
-def region_table(study_dir: Path):
+def region_table(study_dir: Path, run_dir: Path):
     study_dir = Path(study_dir)
+    run_dir = Path(run_dir)
     cfg = _load_config(study_dir / "config.yaml")
     if cfg.get("type") != "xsec-region-table":
         raise ValueError(f"config type is '{cfg.get('type')}', expected 'xsec-region-table'")
@@ -170,8 +171,8 @@ def region_table(study_dir: Path):
     col_tot = [sum(d[i][j] for i in range(nq)) for j in range(nx)]
     row_tot = [sum(d[i]) for i in range(nq)]
 
-    results_dir = study_dir / "results"
-    results_dir.mkdir(exist_ok=True)
+    results_dir = run_dir / "results"
+    results_dir.mkdir(parents=True, exist_ok=True)
 
     # ---- csv ----
     csv = ["q2_lo,q2_hi,x_lo,x_hi,npoints,dchi2"]
