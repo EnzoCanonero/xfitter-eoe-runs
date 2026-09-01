@@ -9,6 +9,7 @@ notes:
   - "Pre-existing output_bkp archives and runs_output_bkp tarballs were left untouched."
   - "Residual empty or stale output_OLD directories were left for a separate cleanup pass."
   - "On 2026-09-01 inactive study trees were moved, without deletion, under the ignored root legacy/<original-path>."
+  - "On 2026-09-01 the ignored extra plots/ bundle was moved, without deletion, to legacy/extra-plots."
   - "The legacy payload is workspace-local and is not distributed by Git; its original tracked state remains recoverable from source commit 53522078349ad29f586ee6ff56ecf5e958f4fe81."
   - "The historical artifact classifications below describe the 2026-08-18 snapshot; layout_reorganization_20260901 is authoritative for current active paths."
 
@@ -118,8 +119,17 @@ layout_reorganization_20260901:
     comparison_studies: 9
     scan_templates: 3
     dataset_files: 16
-  deferred:
-    - "The ignored extra plots/ bundle remains in place pending separate historical archival."
+  historical_plot_archive:
+    original_path: "extra plots"
+    archived_path: "legacy/extra-plots"
+    archived_at: "2026-09-01"
+    workspace_repository_commit: "c722658514157d4421adc84be704643b4191bc61"
+    payload_tracked: false
+    regular_files: 16
+    directories_including_root: 4
+    file_bytes: 8283605
+    inventory_sha256: "85582165cbdadd805f74ff762f0d0a72b011ea4ffc4c92e7e6fdf03906226879"
+    inventory_sha256_method: "SHA-256 of sorted sha256sum lines for ./-prefixed relative regular-file paths"
 current_targets:
   standard:
     tree: "xfitter-master"

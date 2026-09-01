@@ -30,9 +30,6 @@ runs/comparisons/**/results/
 runs/comparisons/**/results_*/
 runs/comparisons/**/.xfdraw-staging/
 
-# Historical plot bundle retained locally pending separate archival.
-extra plots/
-
 # Python cache
 __pycache__/
 *.pyc

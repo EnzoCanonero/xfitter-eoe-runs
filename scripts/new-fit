@@ -105,7 +105,7 @@ if [ -f "$CONFIGDIR/parameters.yaml" ]; then
     sed -i '/^# Output directory.*xfitter/d' "$CONFIGDIR/parameters.yaml"
     cat >> "$CONFIGDIR/parameters.yaml" << 'EOF'
 
-# Output directory (patched at runtime by run_fit.sh)
+# Output directory (patched by condor/submit.sh before submission)
 OutputDirectory: "__SET_AT_RUNTIME__"
 EOF
 fi
@@ -173,7 +173,7 @@ chmod +x "$FITDIR/condor/submit.sh"
 echo ""
 echo "Done. Structure:"
 echo "  $FITDIR/"
-echo "    config/    -- steering.txt, parameters.yaml, data symlinks"
+echo "    config/    -- steering.txt, parameters.yaml, copied data files"
 echo "    condor/    -- submit.sh (generates run_fit.sh + job.sub)"
 echo "    output/    -- (xfitter writes here)"
 echo ""
