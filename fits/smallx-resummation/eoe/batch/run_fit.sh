@@ -2,8 +2,15 @@
 set -eo pipefail
 
 FIT_DIR="${1:?fit directory is required}"
-REPO_ROOT=/nfs/scratch2/ecanoner/xfitter-eoe-runs
-LHAPDF_INFO_FIXER="$REPO_ROOT/fits/fix_lhapdf_info.sh"
+REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
+while [ ! -f "$REPO_ROOT/scripts/setup-env.sh" ] && [ "$REPO_ROOT" != "/" ]; do
+    REPO_ROOT="$(dirname "$REPO_ROOT")"
+done
+[ -f "$REPO_ROOT/scripts/setup-env.sh" ] || {
+    echo "Cannot find scripts/setup-env.sh" >&2
+    exit 2
+}
+LHAPDF_INFO_FIXER="$REPO_ROOT/scripts/fix-lhapdf-info"
 EXPECTED_MEMBERS=47
 EXPECTED_PAIRS=23
 
@@ -13,7 +20,7 @@ if [ ! -x "$LHAPDF_INFO_FIXER" ]; then
 fi
 
 export XFITTER_TREE=xfitter-bartlett-apfel306-hell3
-source "$REPO_ROOT/setup_env.sh"
+source "$REPO_ROOT/scripts/setup-env.sh"
 
 XFITTER_BIN=$(command -v xfitter)
 XFITTER_TREE_DIR=$(cd "$(dirname "$XFITTER_BIN")/.." && pwd)

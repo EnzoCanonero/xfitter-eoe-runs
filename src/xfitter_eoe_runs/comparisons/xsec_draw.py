@@ -18,8 +18,8 @@ Theory error bands (--therr) come from the therr+/- columns, which are filled
 (and Bartlett-scaled) by fits run with the bartlett-fixes binary from
 2026-07-13 onwards; older outputs have zeros there and simply show no band.
 
-Config keys (studies/<name>/config.yaml)
-----------------------------------------
+Config keys (comparison-study-dir/config.yaml)
+------------------------------------------------
 type: xsec-comparison
 dataset: "HERA1+2 NCep 920"        # substring match on the dataset label
 q2bins: [3.5, 4.5, 6.5, 8.5]       # Q2 values to draw; omit/empty = all bins

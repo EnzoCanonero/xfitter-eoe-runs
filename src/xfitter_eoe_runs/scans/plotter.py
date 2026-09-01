@@ -51,15 +51,16 @@ def _pumplin_plot_params(config) -> list:
     return params
 
 
-def plot_scan(study_dir: Path):
+def plot_scan(study_dir: Path, template_root: Path):
     """
     Extract results and generate plots for a scan study
 
     Args:
-        study_dir: Path to study directory containing config.yaml and fits/
+        study_dir: Path to study directory containing config.yaml and runs/
+        template_root: Path containing the named study templates
     """
     # Load configuration
-    config = load_study_config(study_dir)
+    config = load_study_config(study_dir, template_root)
 
     print(f"Extracting results from: {study_dir}")
     print(f"Scan type: {config.scan_type}")

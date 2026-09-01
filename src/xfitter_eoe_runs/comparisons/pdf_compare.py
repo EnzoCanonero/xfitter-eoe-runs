@@ -7,8 +7,7 @@ uncertainty band on the left, ratio-to-reference on the right).  Fits can be rea
 either from an LHAPDF set under ``<fit>/output/<set>`` or directly from xFitter's
 ``pdfs_q2val`` central and Pumplin error grids.
 
-Driven by a study ``config.yaml`` (see ``compare_pdfs``); mirrors the UX of the scans
-framework but is self-contained.
+Driven by a study ``config.yaml`` (see ``compare_pdfs``).
 """
 
 from pathlib import Path
@@ -89,7 +88,7 @@ LEGEND_SIZE = 13
 class CompareConfig:
     """Parsed config.yaml for a PDF-comparison study.
 
-    Follows the StudyConfig loader style used in scans/lib/config.py: yaml.safe_load
+    Follows the scan package's StudyConfig loader style: yaml.safe_load
     with property accessors and clear errors on missing required fields.
     """
 

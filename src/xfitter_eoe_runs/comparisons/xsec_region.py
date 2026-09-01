@@ -24,8 +24,8 @@ giving a net change of -50.5.
 The pull column is theory-with-shifts based (theo_mod), i.e. the description the
 fit actually achieves, which is what the chi2 minimises.
 
-Config keys (studies/<name>/config.yaml)
-----------------------------------------
+Config keys (comparison-study-dir/config.yaml)
+------------------------------------------------
 type: xsec-region-table
 q2bins: [0, 10, 30, 100, 1000, 1.0e9]     # bin EDGES, ascending
 xbins:  [0, 1.0e-3, 1.0e-2, 1.0e-1, 1.0]  # bin EDGES, ascending
@@ -38,7 +38,7 @@ fits:                                      # exactly 2; first = reference
 import math
 from pathlib import Path
 
-from lib.xsec_draw import _is_data_row, _load_config
+from .xsec_draw import _is_data_row, _load_config
 
 
 # ---------------------------------------------------------------------------

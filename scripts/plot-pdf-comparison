@@ -1,6 +1,6 @@
 #!/bin/bash
-# plot command (PDF comparison)
-# Overlays PDFs from several fits into plots/pdf_comparison.pdf.
+# PDF-comparison command.
+# Overlays PDFs from several fits into <study-dir>/plots/pdf_comparison.pdf.
 # Sources an LCG view from CVMFS for matplotlib/numpy/yaml/lhapdf only if needed.
 
 LCG_SETUP=${LCG_SETUP:-/cvmfs/sft.cern.ch/lcg/views/LCG_106/x86_64-el9-gcc13-opt/setup.sh}
@@ -13,4 +13,4 @@ fi
 # Resolve the directory containing this script (handles symlinks).
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 
-exec python3 "$SCRIPT_DIR/plot.py" "$@"
+exec python3 "$SCRIPT_DIR/plot-pdf-comparison.py" "$@"

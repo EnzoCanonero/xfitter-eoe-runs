@@ -5,12 +5,12 @@ set -e
 DIR="$(cd "$(dirname "$0")" && pwd)"
 FIT_DIR="$(cd "$DIR/.." && pwd)"
 
-# Find setup_env.sh at the repo root
+# Find scripts/setup-env.sh at the repo root
 REPO_ROOT="$DIR"
-while [ ! -f "$REPO_ROOT/setup_env.sh" ] && [ "$REPO_ROOT" != "/" ]; do
+while [ ! -f "$REPO_ROOT/scripts/setup-env.sh" ] && [ "$REPO_ROOT" != "/" ]; do
     REPO_ROOT="$(dirname "$REPO_ROOT")"
 done
-[ -f "$REPO_ROOT/setup_env.sh" ] || { echo "Cannot find setup_env.sh" >&2; exit 1; }
+[ -f "$REPO_ROOT/scripts/setup-env.sh" ] || { echo "Cannot find scripts/setup-env.sh" >&2; exit 1; }
 
 mkdir -p "$DIR/logs" "$FIT_DIR/output"
 
@@ -20,7 +20,7 @@ cat > "$DIR/run_fit.sh" << EOF
 set -e
 export HOME="\${HOME:-/tmp}"
 export XFITTER_TREE=xfitter-bartlett-fixes
-source "$REPO_ROOT/setup_env.sh"
+source "$REPO_ROOT/scripts/setup-env.sh"
 
 # flexiblas shim (condor nodes miss libflexiblas, map to openblas)
 SHIM_DIR=\$(mktemp -d)

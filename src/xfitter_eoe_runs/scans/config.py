@@ -12,9 +12,10 @@ import yaml
 class StudyConfig:
     """Configuration for a scan study"""
 
-    def __init__(self, config_file: Path):
+    def __init__(self, config_file: Path, template_root: Path):
         self.config_file = config_file
         self.study_dir = config_file.parent
+        self.template_root = template_root
 
         with open(config_file, 'r') as f:
             self.data = yaml.safe_load(f)
@@ -23,7 +24,8 @@ class StudyConfig:
             raise ValueError("config.yaml must specify 'scan_type'")
         if 'template' not in self.data:
             raise ValueError("config.yaml must specify 'template' (a folder name "
-                             "under scans/templates/, e.g. 'hera-baseline' or 'giuli')")
+                             "under the configured template root, e.g. "
+                             "'hera-baseline' or 'giuli')")
 
         self.scan_type = self.data['scan_type']
 
@@ -33,13 +35,13 @@ class StudyConfig:
 
     @property
     def template_dir(self) -> Path:
-        """Template folder for this study, selected by name under scans/templates/.
+        """Template folder for this study, selected by name under template_root.
 
-        Resolved against scans/templates/ (not the study dir) so studies can be
+        Resolved against the explicit template root (not the study dir) so studies can be
         moved/reorganized without breaking. Each folder is a self-contained setup:
         steering.txt.j2, parameters.yaml.j2, constants.yaml, unpolarised.wgt.
         """
-        root = Path(__file__).resolve().parent.parent / "templates"
+        root = self.template_root
         d = root / self.data['template']
         if not d.is_dir():
             raise FileNotFoundError(
@@ -152,8 +154,8 @@ class StudyConfig:
 class LambdaScanConfig(StudyConfig):
     """Configuration for lambda-scan studies"""
 
-    def __init__(self, config_file: Path):
-        super().__init__(config_file)
+    def __init__(self, config_file: Path, template_root: Path):
+        super().__init__(config_file, template_root)
 
         if self.scan_type != 'lambda-scan':
             raise ValueError(f"Expected scan_type='lambda-scan', got '{self.scan_type}'")
@@ -190,8 +192,8 @@ class LambdaScanConfig(StudyConfig):
 class SystematicRankingConfig(StudyConfig):
     """Configuration for systematic-ranking studies"""
 
-    def __init__(self, config_file: Path):
-        super().__init__(config_file)
+    def __init__(self, config_file: Path, template_root: Path):
+        super().__init__(config_file, template_root)
 
         if self.scan_type != 'systematic-ranking':
             raise ValueError(f"Expected scan_type='systematic-ranking', got '{self.scan_type}'")
@@ -242,8 +244,8 @@ class PumplinStabilityConfig(StudyConfig):
     SET ERRDEF / ITERATE grids set per fit via doErrors.
     """
 
-    def __init__(self, config_file: Path):
-        super().__init__(config_file)
+    def __init__(self, config_file: Path, template_root: Path):
+        super().__init__(config_file, template_root)
 
         if self.scan_type != 'pumplin-stability':
             raise ValueError(f"Expected scan_type='pumplin-stability', got '{self.scan_type}'")
@@ -292,8 +294,8 @@ class LikelihoodScanConfig(StudyConfig):
     A future scan_params_2d key will enable 2D contour scans.
     """
 
-    def __init__(self, config_file: Path):
-        super().__init__(config_file)
+    def __init__(self, config_file: Path, template_root: Path):
+        super().__init__(config_file, template_root)
 
         if self.scan_type != 'likelihood-scan':
             raise ValueError(f"Expected scan_type='likelihood-scan', got '{self.scan_type}'")
@@ -359,12 +361,13 @@ class LikelihoodScanConfig(StudyConfig):
         return self.data.get('parameter_overrides', {})
 
 
-def load_study_config(study_dir: Path) -> StudyConfig:
+def load_study_config(study_dir: Path, template_root: Path) -> StudyConfig:
     """
     Load study configuration and return appropriate config object
 
     Args:
         study_dir: Path to study directory containing config.yaml
+        template_root: Path containing the named study templates
 
     Returns:
         StudyConfig subclass instance based on scan_type
@@ -380,12 +383,12 @@ def load_study_config(study_dir: Path) -> StudyConfig:
     scan_type = data.get('scan_type')
 
     if scan_type == 'lambda-scan':
-        return LambdaScanConfig(config_file)
+        return LambdaScanConfig(config_file, template_root)
     elif scan_type == 'systematic-ranking':
-        return SystematicRankingConfig(config_file)
+        return SystematicRankingConfig(config_file, template_root)
     elif scan_type == 'pumplin-stability':
-        return PumplinStabilityConfig(config_file)
+        return PumplinStabilityConfig(config_file, template_root)
     elif scan_type == 'likelihood-scan':
-        return LikelihoodScanConfig(config_file)
+        return LikelihoodScanConfig(config_file, template_root)
     else:
         raise ValueError(f"Unknown scan_type: {scan_type}")

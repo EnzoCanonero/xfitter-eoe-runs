@@ -1,0 +1,68 @@
+#!/usr/bin/python3
+"""
+run-scan command
+Generates fits and submits to Condor for a scan study
+"""
+
+import argparse
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "src"))
+
+from xfitter_eoe_runs.scans.runner import run_scan
+
+
+TEMPLATE_ROOT = REPO_ROOT / "scans" / "templates"
+DATASET_ROOT = (REPO_ROOT / "datafiles" / "hera" / "h1zeusCombined" /
+                "inclusiveDis" / "1506.06042")
+SETUP_ENV = REPO_ROOT / "scripts" / "setup-env.sh"
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Generate fits and submit scan to Condor"
+    )
+    parser.add_argument(
+        'study_dir',
+        type=Path,
+        help="Study directory containing config.yaml"
+    )
+    parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help="Preview what would be done without creating files"
+    )
+    parser.add_argument(
+        '--no-submit',
+        action='store_true',
+        help="Generate fits but do not submit to Condor"
+    )
+    args = parser.parse_args()
+
+    study_dir = args.study_dir.expanduser().resolve()
+    config_file = study_dir / "config.yaml"
+
+    if not config_file.exists():
+        print(f"Error: No config.yaml found in study directory: {study_dir}")
+        sys.exit(1)
+
+    try:
+        run_scan(
+            study_dir,
+            template_root=TEMPLATE_ROOT,
+            dataset_root=DATASET_ROOT,
+            setup_env=SETUP_ENV,
+            dry_run=args.dry_run,
+            submit=not args.no_submit,
+        )
+    except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

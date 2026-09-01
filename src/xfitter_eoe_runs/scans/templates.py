@@ -53,7 +53,7 @@ class TemplateManager:
 def _xfitter_tree_export(xfitter_tree: Optional[str]) -> str:
     """`export XFITTER_TREE=...` line for a generated run script, or ''.
 
-    setup_env.sh honours XFITTER_TREE to pick the build under $XFITTER_ROOT, but
+    setup-env.sh honours XFITTER_TREE to pick the build under $XFITTER_ROOT, but
     the condor job does not inherit the submitting shell's environment, so the
     export has to be written into the script itself. Without it a scan silently
     uses whatever .env defaults to -- which is how scans were run against the
@@ -67,13 +67,15 @@ def create_fit_structure(fit_dir: Path,
                          parameters_content: str,
                          datafiles: List[str],
                          template_dir: Path,
+                         dataset_root: Path,
+                         setup_env: Path,
                          do_errors: Optional[str] = None,
                          xfitter_tree: Optional[str] = None):
     """Create a fit directory from a template folder.
 
-    template_dir is a folder under scans/templates/ (e.g. hera-baseline/, giuli/)
-    holding parameters.yaml.j2, constants.yaml and unpolarised.wgt. It is required —
-    the study config selects it via its `template:` field (config.template_dir).
+    template_dir is selected by the study config and contains parameters.yaml.j2,
+    constants.yaml and unpolarised.wgt. dataset_root and setup_env are supplied
+    by the command layer so this module has no repository-layout dependency.
     """
     import shutil
 
@@ -92,32 +94,29 @@ def create_fit_structure(fit_dir: Path,
     shutil.copy(template_dir / "constants.yaml", config_dir / "constants.yaml")
     shutil.copy(template_dir / "unpolarised.wgt", config_dir / "unpolarised.wgt")
 
-    repo_root = Path(__file__).parent.parent.parent
-    datafiles_source = repo_root / "datafiles" / "hera" / "h1zeusCombined" / "inclusiveDis" / "1506.06042"
     for datafile in datafiles:
-        src = datafiles_source / datafile
+        src = dataset_root / datafile
         if src.exists():
             shutil.copy2(src, config_dir / datafile)
 
     submit_script_path = fit_dir / "condor" / "submit.sh"
-    submit_script_path.write_text(generate_submit_script(fit_dir, xfitter_tree))
+    submit_script_path.write_text(
+        generate_submit_script(fit_dir, setup_env, xfitter_tree)
+    )
     submit_script_path.chmod(0o755)
 
 
-def generate_submit_script(fit_dir: Path, xfitter_tree: Optional[str] = None) -> str:
+def generate_submit_script(fit_dir: Path, setup_env: Path,
+                           xfitter_tree: Optional[str] = None) -> str:
+    setup_env = setup_env.resolve()
+    setup_env_assignment = f'SETUP_ENV="{setup_env}"\n'
     return r"""#!/bin/bash
 # Generate condor scripts with correct absolute paths and submit.
 set -e
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 FIT_DIR="$(cd "$DIR/.." && pwd)"
-
-# Find setup_env.sh at the repo root
-REPO_ROOT="$DIR"
-while [ ! -f "$REPO_ROOT/setup_env.sh" ] && [ "$REPO_ROOT" != "/" ]; do
-    REPO_ROOT="$(dirname "$REPO_ROOT")"
-done
-[ -f "$REPO_ROOT/setup_env.sh" ] || { echo "Cannot find setup_env.sh" >&2; exit 1; }
+""" + setup_env_assignment + r"""[ -f "$SETUP_ENV" ] || { echo "Cannot find $SETUP_ENV" >&2; exit 1; }
 
 mkdir -p "$DIR/logs" "$FIT_DIR/output"
 
@@ -126,7 +125,7 @@ cat > "$DIR/run_fit.sh" << EOF
 #!/bin/bash
 set -e
 export HOME="\${HOME:-/tmp}"
-""" + _xfitter_tree_export(xfitter_tree) + r"""source "$REPO_ROOT/setup_env.sh"
+""" + _xfitter_tree_export(xfitter_tree) + r"""source "$SETUP_ENV"
 
 # Record exact executable/library provenance. The selected tree may contain
 # local changes, so its name and Git commit alone are insufficient.
@@ -178,17 +177,8 @@ condor_submit "$DIR/job.sub"
 """
 
 
-def _find_repo_root(start: Path) -> Path:
-    """Walk up from `start` to the directory containing setup_env.sh."""
-    repo_root = start.resolve()
-    while repo_root != repo_root.parent:
-        if (repo_root / "setup_env.sh").exists():
-            return repo_root
-        repo_root = repo_root.parent
-    raise FileNotFoundError(f"setup_env.sh not found above {start}")
-
-
 def generate_batch_submit(fits_dir: Path, fit_dirs: List[Path],
+                          setup_env: Path,
                           xfitter_tree: Optional[str] = None,
                           request_memory: str = "2GB") -> Path:
     """
@@ -203,33 +193,32 @@ def generate_batch_submit(fits_dir: Path, fit_dirs: List[Path],
     Returns:
         Path to runs/submit.sh
     """
-    repo_root = _find_repo_root(fits_dir)
+    setup_env = setup_env.resolve()
     tree_export = _xfitter_tree_export(xfitter_tree)
     smallx_guard = ""
     smallx_provenance = ""
     if xfitter_tree == "xfitter-bartlett-apfel306-hell3":
-        expected_tree = repo_root.parent / "PDF" / xfitter_tree
-        apfel_prefix = repo_root.parent / "PDF" / "deps" / "apfel"
-        smallx_guard = f'''\
-EXPECTED_TREE="{expected_tree}"
+        smallx_guard = '''\
+EXPECTED_TREE="$XFITTER_ROOT/$XFITTER_TREE"
 if [ "$XFITTER_TREE_DIR" != "$EXPECTED_TREE" ]; then
     echo "Unexpected xFitter tree: $XFITTER_TREE_DIR" >&2
     exit 2
 fi
 
+APFEL_PREFIX="$XFITTER_ROOT/deps/apfel"
 APFEL_MODULE="$XFITTER_TREE_DIR/lib/xfitter/libevolutionAPFEL.so"
-APFEL_LIB=$(ldd "$APFEL_MODULE" | awk '$1 ~ /^libAPFEL/ {{print $3; exit}}')
+APFEL_LIB=$(ldd "$APFEL_MODULE" | awk '$1 ~ /^libAPFEL/ {print $3; exit}')
 case "$APFEL_LIB" in
-    {apfel_prefix}/lib/*) ;;
+    "$APFEL_PREFIX"/lib/*) ;;
     *)
-        echo "Unexpected APFEL library: ${{APFEL_LIB:-not resolved}}" >&2
+        echo "Unexpected APFEL library: ${APFEL_LIB:-not resolved}" >&2
         exit 3
         ;;
 esac
 '''
-        smallx_provenance = f'''\
+        smallx_provenance = '''\
   echo "apfel_library=$APFEL_LIB"
-  echo "apfel_version=$({apfel_prefix}/bin/apfel-config --version)"
+  echo "apfel_version=$("$APFEL_PREFIX/bin/apfel-config" --version)"
   sha256sum "$APFEL_LIB"
   echo "[APFEL module linkage]"
   ldd "$APFEL_MODULE"
@@ -246,7 +235,7 @@ esac
 set -eo pipefail
 FIT_DIR="$1"
 export HOME="${{HOME:-/tmp}}"
-{tree_export}source "{repo_root}/setup_env.sh"
+{tree_export}source "{setup_env}"
 
 # Record exact executable/library provenance. The selected tree may be dirty.
 XFITTER_BIN=$(command -v xfitter)

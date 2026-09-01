@@ -1,6 +1,6 @@
 #!/bin/bash
 # Create a new xfitter fit directory.
-# Usage: ./new_fit.sh <path> [template_dir]
+# Usage: scripts/new-fit <path> [template_dir]
 #
 # path:         Nested path under fits/ (e.g. hera-baseline/my-study/variant-a)
 # template_dir: Directory containing steering.txt and parameters.yaml.
@@ -9,8 +9,9 @@
 
 set -e
 
-FITSDIR="$(cd "$(dirname "$0")" && pwd)"
-BASEDIR="$(dirname "$FITSDIR")"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+FITSDIR="$REPO_ROOT/fits"
 NAME="$1"
 TEMPLATE="${2:-$FITSDIR/hera-baseline/nominal-bartlett2-pumplin/config}"
 
@@ -72,7 +73,7 @@ done
 
 # ── 4. Copy data files into config/ ─────────────────────────
 # Parse steering.txt for InputFileNames and copy the .dat files
-DATAROOT="$BASEDIR/datafiles"
+DATAROOT="$REPO_ROOT/datafiles"
 if [ -f "$CONFIGDIR/steering.txt" ]; then
     while IFS= read -r line; do
         # Extract each filename between single quotes ending in .dat.
@@ -120,12 +121,12 @@ set -e
 DIR="$(cd "$(dirname "$0")" && pwd)"
 FIT_DIR="$(cd "$DIR/.." && pwd)"
 
-# Find setup_env.sh at the repo root
+# Find scripts/setup-env.sh at the repo root
 REPO_ROOT="$DIR"
-while [ ! -f "$REPO_ROOT/setup_env.sh" ] && [ "$REPO_ROOT" != "/" ]; do
+while [ ! -f "$REPO_ROOT/scripts/setup-env.sh" ] && [ "$REPO_ROOT" != "/" ]; do
     REPO_ROOT="$(dirname "$REPO_ROOT")"
 done
-[ -f "$REPO_ROOT/setup_env.sh" ] || { echo "Cannot find setup_env.sh" >&2; exit 1; }
+[ -f "$REPO_ROOT/scripts/setup-env.sh" ] || { echo "Cannot find scripts/setup-env.sh" >&2; exit 1; }
 
 mkdir -p "$DIR/logs" "$FIT_DIR/output"
 
@@ -133,7 +134,7 @@ mkdir -p "$DIR/logs" "$FIT_DIR/output"
 cat > "$DIR/run_fit.sh" << EOF
 #!/bin/bash
 set -e
-source "$REPO_ROOT/setup_env.sh"
+source "$REPO_ROOT/scripts/setup-env.sh"
 
 # flexiblas shim (condor nodes miss libflexiblas, map to openblas)
 SHIM_DIR=\$(mktemp -d)

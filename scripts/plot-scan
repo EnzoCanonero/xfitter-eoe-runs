@@ -1,5 +1,5 @@
 #!/bin/bash
-# plot command
+# plot-scan command
 # Extracts results and generates plots for a scan study
 # Sources LCG_106 from CVMFS for matplotlib/pandas/numpy only if needed
 
@@ -13,4 +13,4 @@ fi
 # Resolve the directory containing this script (handles symlinks)
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 
-exec python3 "$SCRIPT_DIR/plot.py" "$@"
+exec python3 "$SCRIPT_DIR/plot-scan.py" "$@"

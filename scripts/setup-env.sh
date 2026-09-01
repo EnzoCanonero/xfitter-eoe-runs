@@ -3,7 +3,7 @@
 # Used by condor job scripts and for interactive testing.
 
 fail_setup() {
-    echo "setup_env.sh: $1" >&2
+    echo "setup-env.sh: $1" >&2
     return 1 2>/dev/null || exit 1
 }
 
@@ -15,9 +15,9 @@ if [ "${XFITTER_TREE+x}" = x ]; then
     _XFITTER_TREE_WAS_SET=1
     _XFITTER_TREE_CALLER_VALUE="$XFITTER_TREE"
 fi
-_SETUP_ENV_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-[ -f "$_SETUP_ENV_DIR/.env" ] && source "$_SETUP_ENV_DIR/.env"
-unset _SETUP_ENV_DIR
+_SETUP_ENV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+[ -f "$_SETUP_ENV_ROOT/.env" ] && source "$_SETUP_ENV_ROOT/.env"
+unset _SETUP_ENV_ROOT
 if [ "$_XFITTER_TREE_WAS_SET" -eq 1 ]; then
     export XFITTER_TREE="$_XFITTER_TREE_CALLER_VALUE"
 fi
@@ -57,12 +57,12 @@ if [ -n "${XFITTER_TREE:-}" ]; then
     # binary. fail_setup's return is swallowed inside its function when sourced,
     # so abort here at top level.
     if [ ! -x "$_xf_tree/bin/xfitter" ]; then
-        echo "setup_env.sh: XFITTER_TREE=$XFITTER_TREE: no built xfitter at $_xf_tree/bin/xfitter" >&2
+        echo "setup-env.sh: XFITTER_TREE=$XFITTER_TREE: no built xfitter at $_xf_tree/bin/xfitter" >&2
         unset _xf_tree
         return 1 2>/dev/null || exit 1
     fi
     export PATH="$_xf_tree/bin:$PATH"
     export LD_LIBRARY_PATH="$_xf_tree/lib:$_xf_tree/lib/xfitter:${LD_LIBRARY_PATH}"
-    echo "setup_env.sh: using xFitter tree $_xf_tree ($(command -v xfitter))" >&2
+    echo "setup-env.sh: using xFitter tree $_xf_tree ($(command -v xfitter))" >&2
     unset _xf_tree
 fi

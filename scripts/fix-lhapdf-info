@@ -15,8 +15,8 @@
 # Mislabelling a Hesse set as 'hessian' makes consumers pair up unrelated
 # eigenvectors and underestimate the band by ~1/sqrt(2).
 #
-# Usage: fix_lhapdf_info.sh <fit-dir-or-proton-dir> [more ...]
-#   e.g. fix_lhapdf_info.sh hera-baseline/baseline-7-sources
+# Usage: fix-lhapdf-info <fit-dir-or-proton-dir> [more ...]
+#   e.g. fix-lhapdf-info hera-baseline/baseline-7-sources
 set -e
 for arg in "$@"; do
     if   [ -f "$arg/proton.info" ];               then pdir="$arg"

@@ -5,14 +5,14 @@ set -e
 DIR="$(cd "$(dirname "$0")" && pwd)"
 FIT_DIR="$(cd "$DIR/.." && pwd)"
 
-# Find setup_env.sh at the repo root
+# Find scripts/setup-env.sh at the repo root
 REPO_ROOT="$DIR"
-while [ ! -f "$REPO_ROOT/setup_env.sh" ] && [ "$REPO_ROOT" != "/" ]; do
+while [ ! -f "$REPO_ROOT/scripts/setup-env.sh" ] && [ "$REPO_ROOT" != "/" ]; do
     REPO_ROOT="$(dirname "$REPO_ROOT")"
 done
-[ -f "$REPO_ROOT/setup_env.sh" ] || { echo "Cannot find setup_env.sh" >&2; exit 1; }
-[ -x "$REPO_ROOT/fits/fix_lhapdf_info.sh" ] || {
-    echo "Cannot find executable fits/fix_lhapdf_info.sh" >&2
+[ -f "$REPO_ROOT/scripts/setup-env.sh" ] || { echo "Cannot find scripts/setup-env.sh" >&2; exit 1; }
+[ -x "$REPO_ROOT/scripts/fix-lhapdf-info" ] || {
+    echo "Cannot find executable scripts/fix-lhapdf-info" >&2
     exit 1
 }
 
@@ -24,7 +24,7 @@ cat > "$DIR/run_fit.sh" << EOF
 set -e
 export HOME="\${HOME:-/tmp}"
 export XFITTER_TREE=xfitter-bartlett-fixes
-source "$REPO_ROOT/setup_env.sh"
+source "$REPO_ROOT/scripts/setup-env.sh"
 
 # Record the exact executable and libraries used by the fit.
 XFITTER_BIN=\$(command -v xfitter)
@@ -51,7 +51,7 @@ export LD_LIBRARY_PATH="\$SHIM_DIR:\$LD_LIBRARY_PATH"
 
 cd "$FIT_DIR/config"
 xfitter
-"$REPO_ROOT/fits/fix_lhapdf_info.sh" "$FIT_DIR"
+"$REPO_ROOT/scripts/fix-lhapdf-info" "$FIT_DIR"
 cp "$DIR/logs/xfitter_provenance.txt" \
    "$FIT_DIR/output/xfitter_provenance.txt"
 EOF

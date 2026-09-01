@@ -225,17 +225,21 @@ def _order_systematics_by_e_reference(systematics: Sequence[Dict],
     return [next(ordered_iter) if s.get('type') == 'E' else s for s in systematics]
 
 
-def run_scan(study_dir: Path, dry_run: bool = False, submit: bool = True):
+def run_scan(study_dir: Path, template_root: Path, dataset_root: Path,
+             setup_env: Path, dry_run: bool = False, submit: bool = True):
     """
     Generate fits for a scan study and optionally submit to Condor
 
     Args:
         study_dir: Path to study directory containing config.yaml
+        template_root: Path containing the named study templates
+        dataset_root: Path containing the configured dataset files
+        setup_env: Environment setup script to source in generated jobs
         dry_run: If True, only print what would be done without creating files
         submit: If True, automatically submit jobs to Condor after generating fits
     """
     # Load configuration
-    config = load_study_config(study_dir)
+    config = load_study_config(study_dir, template_root)
 
     print(f"Scan type: {config.scan_type}")
     print(f"Study directory: {study_dir}")
@@ -247,13 +251,21 @@ def run_scan(study_dir: Path, dry_run: bool = False, submit: bool = True):
     fits_dir = study_dir / "runs"
 
     if config.scan_type == 'lambda-scan':
-        submit_script = _generate_lambda_scan_fits(config, fits_dir, dry_run)
+        submit_script = _generate_lambda_scan_fits(
+            config, fits_dir, dry_run, dataset_root, setup_env
+        )
     elif config.scan_type == 'systematic-ranking':
-        submit_script = _generate_systematic_ranking_fits(config, fits_dir, dry_run)
+        submit_script = _generate_systematic_ranking_fits(
+            config, fits_dir, dry_run, dataset_root, setup_env
+        )
     elif config.scan_type == 'pumplin-stability':
-        submit_script = _generate_pumplin_stability_fits(config, fits_dir, dry_run)
+        submit_script = _generate_pumplin_stability_fits(
+            config, fits_dir, dry_run, dataset_root, setup_env
+        )
     elif config.scan_type == 'likelihood-scan':
-        submit_script = _generate_likelihood_scan_fits(config, fits_dir, dry_run)
+        submit_script = _generate_likelihood_scan_fits(
+            config, fits_dir, dry_run, dataset_root, setup_env
+        )
     else:
         raise ValueError(f"Unknown scan type: {config.scan_type}")
 
@@ -293,7 +305,9 @@ def _pumplin_grid_name(errdef: float, iterate: int) -> str:
     return f"errdef{errdef:.1f}".replace('.', 'p') + f"_iter{int(iterate):02d}"
 
 
-def _generate_pumplin_stability_fits(config: PumplinStabilityConfig, fits_dir: Path, dry_run: bool):
+def _generate_pumplin_stability_fits(config: PumplinStabilityConfig,
+                                     fits_dir: Path, dry_run: bool,
+                                     dataset_root: Path, setup_env: Path):
     """Generate fits for a pumplin-stability scan: lambda x errdef x iterate.
 
     A Gaussian fit (no &Systematics source) is always added as the lambda_0.0 group.
@@ -350,19 +364,25 @@ def _generate_pumplin_stability_fits(config: PumplinStabilityConfig, fits_dir: P
                     q2_cut=config.get('q2_cut', 3.5),
                 )
                 create_fit_structure(fit_dir, steering, "", config.datafiles,
-                                     template_dir=template_dir, do_errors=do_errors,
-                             xfitter_tree=config.xfitter_tree)
+                                     template_dir=template_dir,
+                                     dataset_root=dataset_root,
+                                     setup_env=setup_env,
+                                     do_errors=do_errors,
+                                     xfitter_tree=config.xfitter_tree)
                 _apply_source_inits(fit_dir, syslist)
                 all_fit_dirs.append(fit_dir.resolve())
 
     print(f"\nCreated {len(all_fit_dirs)} fits in {fits_dir}")
     return generate_batch_submit(
-        fits_dir, all_fit_dirs, config.xfitter_tree,
+        fits_dir, all_fit_dirs, setup_env=setup_env,
+        xfitter_tree=config.xfitter_tree,
         request_memory=str(config.get('request_memory', '2GB')),
     )
 
 
-def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path, dry_run: bool):
+def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path,
+                               dry_run: bool, dataset_root: Path,
+                               setup_env: Path):
     """Generate fits for lambda-scan"""
 
     # Template folder selected by the study config's `template:` field
@@ -434,19 +454,24 @@ def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path, dry_run
         )
 
         create_fit_structure(fit_dir, steering, "", config.datafiles,
-                             template_dir=template_dir, do_errors=do_errors,
+                             template_dir=template_dir,
+                             dataset_root=dataset_root,
+                             setup_env=setup_env, do_errors=do_errors,
                              xfitter_tree=config.xfitter_tree)
         _apply_source_inits(fit_dir, systematics)
         all_fit_dirs.append(fit_dir.resolve())
 
     print(f"\nCreated {len(lambda_vals)} fits in {fits_dir}")
     return generate_batch_submit(
-        fits_dir, all_fit_dirs, config.xfitter_tree,
+        fits_dir, all_fit_dirs, setup_env=setup_env,
+        xfitter_tree=config.xfitter_tree,
         request_memory=str(config.get('request_memory', '2GB')),
     )
 
 
-def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir: Path, dry_run: bool):
+def _generate_systematic_ranking_fits(config: SystematicRankingConfig,
+                                      fits_dir: Path, dry_run: bool,
+                                      dataset_root: Path, setup_env: Path):
     """Generate fits for systematic-ranking"""
 
     # Template folder selected by the study config's `template:` field
@@ -491,8 +516,9 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir:
     # this is the usual Gaussian nominal; with a base set it is the lower-order fit.
     print(f"Generating nominal...")
     create_fit_structure(fits_dir / "nominal", _render(base_sources), "", config.datafiles,
-                         template_dir=template_dir, do_errors=do_errors,
-                             xfitter_tree=config.xfitter_tree)
+                         template_dir=template_dir,
+                         dataset_root=dataset_root, setup_env=setup_env,
+                         do_errors=do_errors, xfitter_tree=config.xfitter_tree)
     _apply_source_inits(fits_dir / "nominal", base)
     all_fit_dirs: List[Path] = [(fits_dir / "nominal").resolve()]
 
@@ -507,14 +533,17 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig, fits_dir:
         sources = [(s['name'], s['type'], s['epsilon']) for s in fit_systematics]
 
         create_fit_structure(fit_dir, _render(sources), "", config.datafiles,
-                             template_dir=template_dir, do_errors=do_errors,
+                             template_dir=template_dir,
+                             dataset_root=dataset_root, setup_env=setup_env,
+                             do_errors=do_errors,
                              xfitter_tree=config.xfitter_tree)
         _apply_source_inits(fit_dir, fit_systematics)
         all_fit_dirs.append(fit_dir.resolve())
 
     print(f"\nCreated {len(systematics) + 1} fits in {fits_dir} (including nominal)")
     return generate_batch_submit(
-        fits_dir, all_fit_dirs, config.xfitter_tree,
+        fits_dir, all_fit_dirs, setup_env=setup_env,
+        xfitter_tree=config.xfitter_tree,
         request_memory=str(config.get('request_memory', '2GB')),
     )
 
@@ -609,7 +638,9 @@ def _build_reference_params(ref_fit_dir: Path,
 
 
 def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
-                                    fits_dir: Path, dry_run: bool) -> Optional[Path]:
+                                    fits_dir: Path, dry_run: bool,
+                                    dataset_root: Path,
+                                    setup_env: Path) -> Optional[Path]:
     """
     Generate fits for profile likelihood scans.
 
@@ -751,8 +782,11 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
             )
 
             create_fit_structure(fit_dir, steering, "", config.datafiles,
-                                 template_dir=template_dir, do_errors=do_errors,
-                             xfitter_tree=config.xfitter_tree)
+                                 template_dir=template_dir,
+                                 dataset_root=dataset_root,
+                                 setup_env=setup_env,
+                                 do_errors=do_errors,
+                                 xfitter_tree=config.xfitter_tree)
 
             if is_systematic:
                 # E-type: fixed via MINUIT SET PAR / FIX commands
@@ -870,8 +904,11 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
                         q2_cut=config.get('q2_cut', 3.5),
                     )
                     create_fit_structure(fit_dir, steering, "", config.datafiles,
-                                         template_dir=template_dir, do_errors=do_errors,
-                             xfitter_tree=config.xfitter_tree)
+                                         template_dir=template_dir,
+                                         dataset_root=dataset_root,
+                                         setup_env=setup_env,
+                                         do_errors=do_errors,
+                                         xfitter_tree=config.xfitter_tree)
 
                     pdf_fixed: Dict[str, float] = {}
                     fix_cmds: Dict[str, Tuple[int, float]] = {}
@@ -917,7 +954,8 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
 
     # Generate single-cluster batch submission
     submit_script = generate_batch_submit(
-        fits_dir, all_fit_dirs, config.xfitter_tree,
+        fits_dir, all_fit_dirs, setup_env=setup_env,
+        xfitter_tree=config.xfitter_tree,
         request_memory=str(config.get('request_memory', '2GB')),
     )
 

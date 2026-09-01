@@ -5,11 +5,11 @@ import unittest
 import warnings
 from pathlib import Path
 
-from scans.lib.extract import (
+from xfitter_eoe_runs.scans.extract import (
     _resolve_ordered_minuit_definitions,
     extract_pumplin_widths,
 )
-from scans.lib.runner import (
+from xfitter_eoe_runs.scans.runner import (
     _build_reference_params,
     _order_systematics_by_e_reference,
     _reference_e_source_order,

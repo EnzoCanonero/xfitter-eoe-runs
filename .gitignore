@@ -52,7 +52,7 @@ fits/**/condor/job.sub
 fits/**/condor/logs/
 fits/**/batch/*.log
 
-# Data files in config/ (copied by new_fit.sh)
+# Data files in config/ (copied by scripts/new-fit)
 fits/**/*.dat
 
 # Local one-off study grids
@@ -84,10 +84,6 @@ scans/studies/**/plots_invalid_*/
 scans/studies/**/results_legacy_*/
 scans/studies/**/results_retained_*/
 scans/studies/**/results_invalid_*/
-
-# Shared pipeline symlinks in study folders (point to scans/bin/)
-scans/studies/**/plot
-scans/studies/**/run-scan
 
 # Python cache
 __pycache__/
