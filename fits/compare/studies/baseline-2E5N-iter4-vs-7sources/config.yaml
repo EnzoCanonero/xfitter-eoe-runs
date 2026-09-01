@@ -8,5 +8,5 @@ error_type: symmetric
 observables: [uv, dv, gluon, sea]
 ratio_reference: 0
 fits:
-  - {label: "7-sources (all E) [target]", path: ../../../hera-baseline/baseline-7-sources-bartlett2-pumplin}
-  - {label: "2E5N iter4 (5 N)",          path: ../../../hera-baseline/baseline-2E5N-niter4-bartlett2-pumplin}
+  - {label: "Numerical", path: ../../../hera-baseline/baseline-7-sources-bartlett2-pumplin}
+  - {label: "Iterative", path: ../../../hera-baseline/baseline-2E5N-niter4-bartlett2-pumplin}

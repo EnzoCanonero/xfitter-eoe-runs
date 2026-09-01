@@ -8,5 +8,5 @@ error_type: symmetric
 observables: [uv, dv, gluon, sea]
 ratio_reference: 0
 fits:
-  - {label: "nominal (no EoE)",       path: ../../../hera-giuli-param/gaussian-bartlett2-pumplin}
-  - {label: "5-sources (EoE, all E)", path: ../../../hera-giuli-param/giuli-5-sources-bartlett2-pumplin}
+  - {label: "BG baseline", path: ../../../hera-giuli-param/gaussian-bartlett2-pumplin}
+  - {label: "BG + EoE",   path: ../../../hera-giuli-param/giuli-5-sources-bartlett2-pumplin}

@@ -8,5 +8,5 @@ error_type: symmetric
 observables: [uv, dv, gluon, sea]
 ratio_reference: 0
 fits:
-  - {label: "nominal (no EoE)",       path: ../../../hera-baseline/nominal-bartlett2-pumplin}
-  - {label: "7-sources (EoE, all E)", path: ../../../hera-baseline/baseline-7-sources-bartlett2-pumplin}
+  - {label: "HERA baseline", path: ../../../hera-baseline/nominal-bartlett2-pumplin}
+  - {label: "HERA + EoE",   path: ../../../hera-baseline/baseline-7-sources-bartlett2-pumplin}

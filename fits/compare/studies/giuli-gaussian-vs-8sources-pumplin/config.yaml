@@ -9,6 +9,6 @@ fits:
   - label: "BG baseline"
     path: ../../../hera-giuli-param/gaussian-bartlett2-pumplin
     source: xfitter-grid
-  - label: "BG + EoE (8 sources)"
+  - label: "BG + EoE"
     path: ../../../hera-giuli-param/giuli-8-sources-bartlett2-pumplin
     source: xfitter-grid

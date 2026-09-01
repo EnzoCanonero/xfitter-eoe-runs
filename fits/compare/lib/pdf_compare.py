@@ -76,6 +76,12 @@ _DEFAULT_COLORS = [
     "#8c564b", "#e377c2", "#17becf", "#bcbd22", "#7f7f7f",
 ]
 
+# Publication typography shared by every PDF-comparison layout.
+TICK_LABEL_SIZE = 16
+AXIS_LABEL_SIZE = 20
+TITLE_SIZE = 20
+LEGEND_SIZE = 13
+
 
 # =========================================================================
 # Configuration
@@ -412,15 +418,16 @@ def _draw_main(ax, obs, curves, Q2, x_min, x_max, legend=True):
                             central + data["err_plus"],
                             color=c["color"], alpha=0.25, linewidth=0)
 
-    ax.set_ylabel(YLABELS[obs], fontsize=14)
-    ax.set_xlabel("x", fontsize=13)
+    ax.set_ylabel(YLABELS[obs], fontsize=AXIS_LABEL_SIZE)
+    ax.set_xlabel("x", fontsize=AXIS_LABEL_SIZE)
     ax.set_xlim(x_min, x_max)
+    ax.tick_params(axis="both", which="both", labelsize=TICK_LABEL_SIZE)
     ax.grid(True, which="both", ls="--", lw=0.5)
     if legend:
         # Q^2 rides along as a label-only (invisible) legend entry
         ax.plot([], [], ' ', label=rf'$Q^2 = {Q2:g}\ \mathrm{{GeV}}^2$')
-        ax.legend(fontsize=11)
-    ax.set_title(f"{TITLES[obs]}", fontsize=14)
+        ax.legend(fontsize=LEGEND_SIZE)
+    ax.set_title(f"{TITLES[obs]}", fontsize=TITLE_SIZE)
 
 
 def _draw_ratio(ax, obs, curves, ref_idx, Q2, ratio_ylim, x_min, x_max, legend=False):
@@ -445,9 +452,11 @@ def _draw_ratio(ax, obs, curves, ref_idx, Q2, ratio_ylim, x_min, x_max, legend=F
                                 alpha=0.25, linewidth=0)
 
     ax.axhline(1, color="black", linestyle=":", lw=1)
-    ax.set_xlabel("x", fontsize=13)
-    ax.set_ylabel(f"Ratio to {curves[ref_idx]['label']}", fontsize=13)
+    ax.set_xlabel("x", fontsize=AXIS_LABEL_SIZE)
+    ax.set_ylabel(f"Ratio to {curves[ref_idx]['label']}",
+                  fontsize=AXIS_LABEL_SIZE)
     ax.set_xlim(x_min, x_max)
+    ax.tick_params(axis="both", which="both", labelsize=TICK_LABEL_SIZE)
     if ratio_ylim is not None:
         ax.set_ylim(*ratio_ylim)
     ax.grid(True, which="both", ls="--", lw=0.5)
@@ -455,8 +464,8 @@ def _draw_ratio(ax, obs, curves, ref_idx, Q2, ratio_ylim, x_min, x_max, legend=F
         # standalone ratio pages carry the legend + Q^2 themselves, since the
         # absolute panel that normally hosts them is absent
         ax.plot([], [], ' ', label=rf'$Q^2 = {Q2:g}\ \mathrm{{GeV}}^2$')
-        ax.legend(fontsize=9)
-        ax.set_title(f"{TITLES[obs]}", fontsize=14)
+        ax.legend(fontsize=LEGEND_SIZE)
+        ax.set_title(f"{TITLES[obs]}", fontsize=TITLE_SIZE)
 
 
 def _plot_observable(pdf_pages, obs, curves, ref_idx, Q2, ratio_ylim, x_min, x_max,
@@ -484,6 +493,17 @@ def _plot_observable(pdf_pages, obs, curves, ref_idx, Q2, ratio_ylim, x_min, x_m
         raise ValueError(f"unknown mode '{mode}'")
 
     fig.tight_layout()
+    # Mathtext's glyph extents can protrude slightly beyond tight_layout's
+    # estimate at publication font sizes.  Reserve a small explicit margin so
+    # titles and rotated y labels are never clipped at the PDF page boundary.
+    fig.subplots_adjust(top=0.90)
+    if mode == "both":
+        # Paper figures crop the 12-inch page at its exact midpoint to compose
+        # the absolute and ratio panels independently.  Keep the larger ratio
+        # ylabel wholly inside the right half.
+        fig.subplots_adjust(left=0.11, wspace=0.30)
+    else:
+        fig.subplots_adjust(left=0.18)
     pdf_pages.savefig(fig)
     plt.close(fig)
 
