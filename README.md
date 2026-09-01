@@ -1,7 +1,7 @@
 # xFitter EoE Runs
 
 Collaborative workspace for xFitter runs from scratch space.
-Code/binaries stay in `~/PDF/xfitter-master`; this repo tracks fit configs and run scaffolding.
+Code and binaries stay outside this repository; it tracks fit configurations and run scaffolding.
 
 ## Setup
 
@@ -15,25 +15,32 @@ Code/binaries stay in `~/PDF/xfitter-master`; this repo tracks fit configs and r
 xfitter-eoe-runs/
 ├── setup_env.sh                # environment for xfitter (CVMFS + NFS deps)
 ├── datafiles/                  # canonical source data (copied into fits by scripts)
-├── studies/                    # study notes/logbook (one file per study family)
 ├── fits/                       # individual fits (manual)
 │   ├── new_fit.sh
-│   ├── hera-baseline/          # HERAPDF baseline fits
-│   ├── hera-giuli-param/       # Giuli-parametrization fits
-│   ├── Q2cut/                  # Q2-cut variation fits
+│   ├── hera-baseline/          # paper HERAPDF baseline fits
+│   ├── hera-giuli-param/       # paper Giuli-parametrization fits
+│   ├── smallx-resummation/     # paper fixed-order/resummed fits
 │   ├── compare/                # PDF-comparison tool (overlay fits' PDFs)
 │   │   ├── bin/                #   plot
 │   │   ├── lib/                #   Python framework
-│   │   └── studies/            #   comparison studies (config.yaml)
+│   │   └── studies/            #   paper comparison studies (config.yaml)
 │   └── sandbox/                # throwaway work (gitignored)
-└── scans/                      # systematic scans (automated)
-    ├── bin/                    # run-scan, plot
-    ├── lib/                    # Python framework
-    ├── templates/              # named template folders (one per setup)
-    │   ├── hera-baseline/      #   14-param HERAPDF: steering + parameters + constants + weights
-    │   └── giuli-param/        #   18-param Giuli parametrization (arXiv:1902.11125)
-    └── studies/                # scan studies: <scan-family>/<setup>/<study>/
+├── scans/                      # systematic scans (automated)
+│   ├── bin/                    # run-scan, plot
+│   ├── lib/                    # Python framework
+│   ├── templates/              # named template folders (one per setup)
+│   │   ├── hera-baseline/      # 14-param HERAPDF setup
+│   │   ├── giuli-param/        # 18-param Giuli setup
+│   │   └── bg-param-nnlo-nllx-fonll/ # NNLO+NLLx FONLL-C setup
+│   └── studies/                # retained and planned paper studies
+└── legacy/                     # local ignored archive (not present in fresh clones)
 ```
+
+Only configurations used by the paper or explicitly planned for it remain in
+the active `fits/` and `scans/studies/` trees. Inactive material is preserved
+locally under `legacy/<original-path>`. The entire archive is Git-ignored; its
+relocation and provenance are recorded in `legacy-artifacts.yaml`, while the
+original tracked versions remain recoverable from Git history.
 
 ### Templates
 
@@ -59,11 +66,11 @@ xFitter runs from `config/` — all files it needs are there. `run_fit.sh` sourc
 ```bash
 cd fits/
 
-# From default template (eoe)
+# From the retained HERAPDF baseline template
 ./new_fit.sh hera-baseline/my-study/variant-a
 
 # Clone from another existing fit
-./new_fit.sh hera-baseline/my-study/variant-b hera-baseline/nominal/config
+./new_fit.sh hera-baseline/my-study/variant-b hera-baseline/baseline-7-sources-bartlett2-pumplin/config
 ```
 
 `new_fit.sh` creates the full directory structure, copies data files into `config/`,
@@ -73,7 +80,7 @@ automatically at runtime by `run_fit.sh`.
 ### Run a fit
 
 ```bash
-fits/hera-baseline/eoe/condor/submit.sh
+fits/hera-baseline/nominal-bartlett2-pumplin/condor/submit.sh
 ```
 
 ## Scans
@@ -96,6 +103,9 @@ Automated framework for running systematic PDF fitting scans on Condor.
 - Config: `reference_fit`, `systematics`, `datafiles`, `scan_defaults`, and any of
   `scan_params_1d` / `scan_systematics_1d` (1D) and `scan_params_2d` (2D). A study may
   contain 1D and 2D scans simultaneously.
+- Generation requires both `reference_fit/config/steering.txt` and
+  `reference_fit/output/minuit.out.txt`. Since outputs are Git-ignored, restore
+  or regenerate the canonical reference output locally before running the scan.
 - **1D**: each parameter fixed on a grid (`±n_sigma`, `npoints`), the rest profiled →
   `profiles_1d.pdf` (Δχ² vs parameter).
 - **2D**: `scan_params_2d: [{pair: [X, Y]}, ...]` jointly fixes a pair on an
@@ -172,8 +182,8 @@ observables: [uv, dv, gluon, sea]
 error_type: asymmetric        # symmetric | asymmetric (used only when a set carries errors)
 ratio_reference: 0            # ratio-panel denominator: fit index or label
 fits:
-  - {label: "Q2 > 2.0", path: ../../../Q2cut/q2cut-2.0}
-  - {label: "Q2 > 5.0", path: ../../../Q2cut/q2cut-5.0}
+  - {label: "HERA baseline", path: ../../../hera-baseline/nominal-bartlett2-pumplin}
+  - {label: "HERA + EoE", path: ../../../hera-baseline/baseline-7-sources-bartlett2-pumplin}
   # Read xFitter's native central and Pumplin grids when no LHAPDF set was written:
   # - {label: "4 iterations", path: ../../../my-fit-niter4, source: xfitter-grid}
   # An installed LHAPDF set can be overlaid instead of a fit dir:
@@ -189,6 +199,8 @@ Each fit entry uses either `path` (a local fit dir, relative to the study) or
 For a local fit, `source: xfitter-grid` reads the `pdfs_q2val` central grid and
 Pumplin `sNNp`/`sNNm` pairs at the requested `Q2` directly from `output/`;
 otherwise the local `proton` LHAPDF set is used.
+Local comparisons therefore require a populated `<fit>/output/`; the cleanup
+does not choose or promote one of the historical `output_*` snapshots.
 Uncertainty bands are **auto-detected**: a set with `1+2N` members gets a Hessian band
 computed from its error members, honouring its `ErrorType`; a single-member set is
 drawn as a central line only. Comparisons may freely mix the two.
@@ -196,5 +208,7 @@ drawn as a central line only. Comparisons may freely mix the two.
 ## Git workflow
 
 - Branch per study, e.g. `study/hera-baseline-eoe-v2`.
-- Study rationale in `studies/<study>.md`.
+- Keep the study rationale in its local `README.md` or `config.yaml` comments.
 - Commit only configs/scripts/docs; `output/`, `condor/logs/`, and `*.dat` data files are gitignored.
+- Do not add `legacy/`: it is a workspace-local archive whose tracked source
+  paths are recorded in `legacy-artifacts.yaml` and Git history.

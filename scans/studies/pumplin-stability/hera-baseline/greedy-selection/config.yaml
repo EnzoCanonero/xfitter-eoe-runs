@@ -1,0 +1,32 @@
+# Pumplin stability grid for the seven-source HERA greedy selection.
+# The runner also supplies the implicit lambda=0 Gaussian group.
+scan_type: pumplin-stability
+xfitter_tree: xfitter-master
+template: hera-baseline
+eps: 0.6
+lambda: [0.5, 1.0]
+errdef: [0.5, 1.0]
+iterate: [10, 20]
+errdef_ref: 0.5
+n_iterations: 2
+enable_bartlett: true
+q2_cut: 3.5
+
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+
+# Warm starts are the joint minimum used by the final HERA stopping round.
+systematics:
+  - {name: sysHZComb1053, type: E, init: -16.4095}
+  - {name: proc_tb21,     type: E, init: -6.3118}
+  - {name: sysHZComb1064, type: E, init: 9.9370}
+  - {name: sysHZComb1114, type: E, init: 4.2443}
+  - {name: sysHZComb1144, type: E, init: 4.0798}
+  - {name: sysHZComb1111, type: E, init: -2.5331}
+  - {name: sysHZComb1113, type: E, init: 3.8119}

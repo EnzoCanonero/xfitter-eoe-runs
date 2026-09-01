@@ -5,14 +5,14 @@
 # path:         Nested path under fits/ (e.g. hera-baseline/my-study/variant-a)
 # template_dir: Directory containing steering.txt and parameters.yaml.
 #               Can be an existing fit's config/ dir or an xfitter example dir.
-#               Defaults to hera-baseline/eoe/config/ (relative to fits/).
+#               Defaults to the retained HERA nominal Pumplin configuration.
 
 set -e
 
 FITSDIR="$(cd "$(dirname "$0")" && pwd)"
 BASEDIR="$(dirname "$FITSDIR")"
 NAME="$1"
-TEMPLATE="${2:-$FITSDIR/hera-baseline/eoe/config}"
+TEMPLATE="${2:-$FITSDIR/hera-baseline/nominal-bartlett2-pumplin/config}"
 
 # Resolve relative template paths against FITSDIR
 if [ "${TEMPLATE:0:1}" != "/" ]; then
@@ -23,11 +23,12 @@ if [ -z "$NAME" ]; then
     echo "Usage: $0 <path> [template_dir]"
     echo ""
     echo "  path:         Nested path under fits/ (e.g. hera-baseline/my-study/variant-a)"
-    echo "  template_dir: Directory with steering.txt + parameters.yaml (default: eoe config)"
+    echo "  template_dir: Directory with steering.txt + parameters.yaml"
+    echo "                (default: hera-baseline/nominal-bartlett2-pumplin/config)"
     echo ""
     echo "Examples:"
     echo "  $0 hera-baseline/my-study/variant-a"
-    echo "  $0 hera-baseline/my-study/variant-b hera-baseline/nominal/config"
+    echo "  $0 hera-baseline/my-study/variant-b hera-baseline/baseline-7-sources-bartlett2-pumplin/config"
     exit 1
 fi
 

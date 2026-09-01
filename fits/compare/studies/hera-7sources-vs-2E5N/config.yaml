@@ -1,9 +1,0 @@
-# HERA EoE: all 7 sources as E vs 2 sources E (1053, proc_tb21) + 5 as N
-type: pdf-comparison
-Q2: 4.0
-error_type: symmetric
-observables: [uv, dv, gluon, sea]
-ratio_reference: 0
-fits:
-  - {label: "7-sources (all E)",   path: ../../../hera-baseline/baseline-7-sources}
-  - {label: "2E-5N (1053,tb21 E)", path: ../../../hera-baseline/baseline-2E5N}

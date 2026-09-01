@@ -1,8 +1,0 @@
-type: pdf-comparison
-Q2: 4.0
-error_type: symmetric
-observables: [uv, dv, gluon, sea]
-ratio_reference: 0
-fits:
-  - {label: "nominal (baseline)", path: ../../../hera-baseline/nominal}
-  - {label: "baseline-2E5N",      path: ../../../hera-baseline/baseline-2E5N}

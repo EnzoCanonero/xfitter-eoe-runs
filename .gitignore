@@ -61,3 +61,7 @@ scans/studies/**/run-scan
 __pycache__/
 *.pyc
 *.pyo
+
+# Local archive of inactive studies and fits.  The tracked relocation manifest
+# records what was moved; the archived payload itself remains on this workspace.
+/legacy/

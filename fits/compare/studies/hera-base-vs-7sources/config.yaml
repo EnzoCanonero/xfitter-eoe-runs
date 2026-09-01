@@ -1,9 +1,0 @@
-# HERAPDF baseline (nominal) vs 7-source errors-on-errors fit
-type: pdf-comparison
-Q2: 4.0
-error_type: symmetric
-observables: [uv, dv, gluon, sea]
-ratio_reference: 0
-fits:
-  - {label: "HERA baseline (nominal)", path: ../../../hera-baseline/nominal}
-  - {label: "HERA 7-sources (EoE)",    path: ../../../hera-baseline/baseline-7-sources}

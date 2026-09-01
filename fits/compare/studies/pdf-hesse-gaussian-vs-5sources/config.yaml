@@ -1,9 +1,0 @@
-# PDFs: no-EoE gaussian vs 5-source all-E EoE (giuli param), fresh Hesse refits.
-type: pdf-comparison
-Q2: 4.0
-error_type: symmetric
-observables: [uv, dv, gluon, sea]
-ratio_reference: 0
-fits:
-  - {label: "gaussian (no EoE)",      path: ../../../hera-giuli-param/gaussian-bartlett2-hesse}
-  - {label: "5-sources (EoE, all E)", path: ../../../hera-giuli-param/giuli-5-sources-bartlett2-hesse}

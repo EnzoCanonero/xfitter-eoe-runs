@@ -1,4 +1,4 @@
-schema_version: 1
+schema_version: 2
 snapshot: "premerge_20260818"
 assessed_at: "2026-08-18"
 runs_repository_commit: "b409aba80edf4e2f2378ae35c7ebd8b9986c670f"
@@ -8,6 +8,97 @@ notes:
   - "Archive names are ignored by .gitignore; this manifest is tracked."
   - "Pre-existing output_bkp archives and runs_output_bkp tarballs were left untouched."
   - "Residual empty or stale output_OLD directories were left for a separate cleanup pass."
+  - "On 2026-09-01 inactive study trees were moved, without deletion, under the ignored root legacy/<original-path>."
+  - "The legacy payload is workspace-local and is not distributed by Git; its original tracked state remains recoverable from source commit 53522078349ad29f586ee6ff56ecf5e958f4fe81."
+  - "The historical artifact classifications below describe the 2026-08-18 snapshot; layout_cleanup_20260901 is authoritative for the current active layout."
+
+layout_cleanup_20260901:
+  source_repository_commit: "53522078349ad29f586ee6ff56ecf5e958f4fe81"
+  legacy_root: "legacy"
+  legacy_payload_tracked: false
+  jobs_submitted: false
+  paper_plots_modified: false
+  archive_rule: "Every fit, comparison, or scan study not listed below was moved to legacy/<original-path>."
+  archived_inventory:
+    fit_configurations: 117
+    comparison_studies: 26
+    scan_study_configurations:
+      total: 76
+      lambda: 14
+      likelihood: 12
+      pumplin_stability: 5
+      systematic_ranking: 45
+    tracked_deletions_mirrored: 707
+    fits_and_comparisons_payload:
+      files: 36685
+      bytes: 14879505682
+  active_manual_fits:
+    - "fits/hera-baseline/nominal-bartlett2-pumplin"
+    - "fits/hera-baseline/baseline-7-sources-bartlett2-pumplin"
+    - "fits/hera-baseline/baseline-2E5N-bartlett2-pumplin"
+    - "fits/hera-baseline/baseline-2E5N-niter4-bartlett2-pumplin"
+    - "fits/hera-baseline/baseline-2E5N-niter8-bartlett2-pumplin"
+    - "fits/hera-giuli-param/gaussian-bartlett2-pumplin"
+    - "fits/hera-giuli-param/giuli-8-sources-bartlett2-pumplin"
+    - "fits/smallx-resummation/gaussian/bg-param-nnlo-fonll"
+    - "fits/smallx-resummation/gaussian/bg-param-nnlo-nllx-fonll"
+    - "fits/smallx-resummation/eoe/bg-param-nnlo-nllx-fonll-greedy-top5"
+  active_comparisons:
+    - "fits/compare/studies/baseline-nominal-vs-7sources"
+    - "fits/compare/studies/baseline-2E5N-iter2-vs-7sources"
+    - "fits/compare/studies/baseline-2E5N-iter4-vs-7sources"
+    - "fits/compare/studies/baseline-2E5N-iter8-vs-7sources"
+    - "fits/compare/studies/giuli-gaussian-vs-8sources-pumplin"
+    - "fits/compare/studies/giuli-eoe8-vs-smallx-eoe5-pumplin"
+    - "fits/compare/studies/xsec-nc-cc-nominal-vs-7sources-pumplin"
+    - "fits/compare/studies/xsec-lowq2-giuli-gaussian-vs-8sources-pumplin"
+    - "fits/compare/studies/xsec-region-nominal-vs-7sources"
+  active_scans:
+    systematic_ranking:
+      hera_baseline_eps0p6:
+        root: "scans/studies/syst-ranking/hera-baseline"
+        rounds:
+          - "baseline"
+          - "2nd-1053"
+          - "3rd-1053-tb21"
+          - "4th-1053-tb21-1064"
+          - "5th-1053-tb21-1064-1114"
+          - "6th-1053-tb21-1064-1114-1144"
+          - "7th-1053-tb21-1064-1114-1144-1111"
+          - "8th-1053-tb21-1064-1114-1144-1111-1113"
+        selected_sources: [sysHZComb1053, proc_tb21, sysHZComb1064, sysHZComb1114, sysHZComb1144, sysHZComb1111, sysHZComb1113]
+      giuli_eps0p6:
+        root: "scans/studies/syst-ranking/giuli-param"
+        rounds:
+          - "baseline"
+          - "2nd-1053"
+          - "3rd-1053-1062"
+          - "4th-1053-1062-1111"
+          - "5th-1053-1062-1111-1114"
+          - "6th-1053-1062-1111-1114-1144"
+          - "7th-1053-1062-1111-1114-1144-tb21"
+          - "8th-1053-1062-1111-1114-1144-tb21-1064"
+          - "9th-1053-1062-1111-1114-1144-tb21-1064-1113"
+        selected_sources: [sysHZComb1053, sysHZComb1062, sysHZComb1111, sysHZComb1114, sysHZComb1144, proc_tb21, sysHZComb1064, sysHZComb1113]
+      bg_param_nnlo_nllx_fonll_eps0p6:
+        root: "scans/studies/syst-ranking/bg-param-nnlo-nllx-fonll-eps0.6"
+        rounds:
+          - "baseline"
+          - "2nd-1053"
+          - "3rd-1053-1062"
+          - "4th-1053-1062-1111"
+          - "5th-1053-1062-1111-1114"
+          - "6th-1053-1062-1111-1114-1144"
+        selected_sources: [sysHZComb1053, sysHZComb1062, sysHZComb1111, sysHZComb1114, sysHZComb1144]
+    lambda:
+      - "scans/studies/lambda/hera-baseline/greedy-selection"
+      - "scans/studies/lambda/giuli-param/greedy-selection"
+      - "scans/studies/lambda/bg-param-nnlo-nllx-fonll/greedy-selection"
+    likelihood:
+      - "scans/studies/likelihood/hera-baseline/baseline"
+      - "scans/studies/likelihood/hera-baseline/greedy-selection"
+    pumplin_stability:
+      - "scans/studies/pumplin-stability/hera-baseline/greedy-selection"
 current_targets:
   standard:
     tree: "xfitter-master"

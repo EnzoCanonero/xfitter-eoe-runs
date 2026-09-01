@@ -4,7 +4,8 @@ template: hera-baseline
 epsilon: 0.6
 
 # Eighth-order forward-selection scan (Q2cut = 3.5, baseline parametrization), threshold dchi2 > 1
-# (next source 1113 had dchi2 = 1.05). Base held ON in every fit (eps 0.6), warm-started at the
+# (next source proc_nrl had dchi2_B = 0.81, so selection stops). Base held ON in every fit
+# (eps 0.6), warm-started at the
 # JOINT converged values from the 7th-order {1053,proc_tb21,1064,1114,1144,1111,1113} fit
 # (baseline-7th-.../runs/sysHZComb1113).
 base_systematics:
