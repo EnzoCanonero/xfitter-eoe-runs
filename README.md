@@ -1,5 +1,7 @@
 # xFitter EoE Runs
 
+[![Tests](https://github.com/EnzoCanonero/xfitter-eoe-runs/actions/workflows/tests.yml/badge.svg?branch=master)](https://github.com/EnzoCanonero/xfitter-eoe-runs/actions/workflows/tests.yml)
+
 Workspace for the xFitter errors-on-errors studies. The repository keeps
 reusable code, commands, templates, datasets, and execution workspaces in
 separate top-level directories. Each scan or comparison configuration lives
