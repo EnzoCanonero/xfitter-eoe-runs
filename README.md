@@ -1,214 +1,214 @@
 # xFitter EoE Runs
 
-Collaborative workspace for xFitter runs from scratch space.
-Code and binaries stay outside this repository; it tracks fit configurations and run scaffolding.
-
-## Setup
-
-1. Clone the repo to any NFS-accessible location.
-2. Edit `.env` and set `XFITTER_ROOT` to your xFitter install path.
-   The path must be accessible from Condor worker nodes (e.g. on NFS).
+Workspace for the xFitter errors-on-errors studies. The repository keeps
+reusable code, commands, templates, datasets, and execution workspaces in
+separate top-level directories. Each scan or comparison configuration lives
+with its generated products under `runs/`; generated results and local
+historical artifacts are not tracked by Git.
 
 ## Layout
 
-```
+```text
 xfitter-eoe-runs/
-├── setup_env.sh                # environment for xfitter (CVMFS + NFS deps)
-├── datafiles/                  # canonical source data (copied into fits by scripts)
-├── fits/                       # individual fits (manual)
-│   ├── new_fit.sh
-│   ├── hera-baseline/          # paper HERAPDF baseline fits
-│   ├── hera-giuli-param/       # paper Giuli-parametrization fits
-│   ├── smallx-resummation/     # paper fixed-order/resummed fits
-│   ├── compare/                # PDF-comparison tool (overlay fits' PDFs)
-│   │   ├── bin/                #   plot
-│   │   ├── lib/                #   Python framework
-│   │   └── studies/            #   paper comparison studies (config.yaml)
-│   └── sandbox/                # throwaway work (gitignored)
-├── scans/                      # systematic scans (automated)
-│   ├── bin/                    # run-scan, plot
-│   ├── lib/                    # Python framework
-│   ├── templates/              # named template folders (one per setup)
-│   │   ├── hera-baseline/      # 14-param HERAPDF setup
-│   │   ├── giuli-param/        # 18-param Giuli setup
-│   │   └── bg-param-nnlo-nllx-fonll/ # NNLO+NLLx FONLL-C setup
-│   └── studies/                # retained and planned paper studies
-└── legacy/                     # local ignored archive (not present in fresh clones)
+├── src/                         # reusable Python implementation
+│   └── xfitter_eoe_runs/
+│       ├── scans/
+│       └── comparisons/
+├── scripts/                     # user-facing commands and environment setup
+├── templates/                   # named xFitter scan templates
+├── runs/                        # tracked configurations and local artifacts
+│   ├── fits/                    # manual fit configs, launchers, and outputs
+│   ├── scans/<study>/           # config.yaml, generated fits, results, plots
+│   └── comparisons/<study>/     # config.yaml, generated results and plots
+├── datasets/                    # canonical input data
+├── tests/
+├── legacy-artifacts.yaml        # provenance for local historical material
+└── legacy/                      # ignored local archive; absent in fresh clones
 ```
 
-Only configurations used by the paper or explicitly planned for it remain in
-the active `fits/` and `scans/studies/` trees. Inactive material is preserved
-locally under `legacy/<original-path>`. The entire archive is Git-ignored; its
-relocation and provenance are recorded in `legacy-artifacts.yaml`, while the
-original tracked versions remain recoverable from Git history.
+Generated directories under `runs/` may be absent in a fresh clone; commands
+create them when needed. The enclosing workspaces and their `config.yaml` files
+are tracked.
 
-### Templates
+## Boundaries
 
-Each folder under `scans/templates/<name>/` is a self-contained xFitter setup:
-`steering.txt.j2`, `parameters.yaml.j2`, `constants.yaml`, `unpolarised.wgt`.
-Every study `config.yaml` **must** select one by name via a required `template:` field
-(e.g. `template: hera-baseline` or `template: giuli-param`); it is resolved against
-`scans/templates/`, so studies can be moved without breaking. To add a setup, drop a
-new folder under `scans/templates/` and reference it by name.
+- `src/` contains path-agnostic implementation code. It does not import from or
+  discover `scripts/`, `templates/`, `runs/`, or `datasets/`.
+- `scripts/` contains the entry points. Commands import `src/`, read the selected
+  workspace configuration, templates, and datasets, then write generated data
+  back into that workspace.
+- `templates/` contains reusable scan inputs only. Generated fits, plots, tables,
+  logs, and results do not belong there.
+- `datasets/` is input-only. Commands may copy data into a run workspace but do
+  not write results back into the dataset tree.
+- `runs/` owns execution workspaces. Each scan and comparison workspace keeps
+  its tracked `config.yaml` beside its ignored runtime products. Comparison
+  configurations and likelihood references may consume fit workspaces under
+  `runs/fits/`; reusable code never lives under `runs/`.
 
-## Fits
+The flow remains one way: commands call reusable code; workspace configurations,
+templates, and datasets feed executions; executions write only to their
+workspace under `runs/`.
 
-Each fit directory under `fits/` contains:
-- `config/` — `steering.txt`, `parameters.yaml`, `constants.yaml`, `unpolarised.wgt`, and data files (`*.dat`)
-- `condor/` — `submit.sh` (generates `run_fit.sh` + `job.sub` and submits)
-- `output/` — xFitter output (gitignored)
+## Setup
 
-xFitter runs from `config/` — all files it needs are there. `run_fit.sh` sources
-`setup_env.sh` and adds the flexiblas shim needed on condor worker nodes.
-
-### Create a new fit
+1. Clone the repository to an NFS-accessible location.
+2. Set `XFITTER_ROOT` in `.env` to the xFitter installation visible to Condor
+   worker nodes.
+3. For interactive xFitter use, source the environment:
 
 ```bash
-cd fits/
-
-# From the retained HERAPDF baseline template
-./new_fit.sh hera-baseline/my-study/variant-a
-
-# Clone from another existing fit
-./new_fit.sh hera-baseline/my-study/variant-b hera-baseline/baseline-7-sources-bartlett2-pumplin/config
+source scripts/setup-env.sh
 ```
 
-`new_fit.sh` creates the full directory structure, copies data files into `config/`,
-and generates condor scripts. `OutputDirectory` in `parameters.yaml` is set
-automatically at runtime by `run_fit.sh`.
+Commands resolve the repository root from their own location, so run them from
+the repository root without creating per-workspace symlinks.
 
-### Run a fit
+## Commands
 
-```bash
-fits/hera-baseline/nominal-bartlett2-pumplin/condor/submit.sh
+| Command | Purpose |
+| --- | --- |
+| `scripts/new-fit` | Create a manual workspace under `runs/fits/` |
+| `scripts/run-scan` | Preview, generate, or submit a scan workspace |
+| `scripts/plot-scan` | Extract completed scan results and create plots |
+| `scripts/plot-pdf-comparison` | Plot a configured PDF comparison |
+| `scripts/plot-xsec` | Plot a cross-section comparison or create a region table |
+| `scripts/fix-lhapdf-info` | Repair metadata for an existing xFitter LHAPDF output |
+
+## Manual fits
+
+Fits created by `scripts/new-fit` and the retained HERA workspaces have this
+shape:
+
+```text
+runs/fits/<group>/<fit>/
+├── config/                      # xFitter inputs
+├── condor/submit.sh             # tracked launcher
+└── output/                      # generated and ignored
 ```
 
-## Scans
-
-Automated framework for running systematic PDF fitting scans on Condor.
-
-### Scan types
-
-**Lambda-scan** — tests different epsilon scaling factors (λ):
-- Config: `lambda: {min, max, step}`, `epsilon` or per-source `epsilon`, `systematics`, `datafiles`
-- By default every source is scaled. Set `scale_with_lambda: false` on a
-  systematic to hold its epsilon fixed while the other sources are scanned.
-- Output: chi2-vs-lambda plots, parameter heatmaps, convergence charts
-
-**Systematic-ranking** — tests each systematic source individually:
-- Config: `epsilon`, `systematics`, `datafiles`
-- Output: rankings by goodness-of-fit contribution
-
-**Likelihood-scan** — profile Δχ² scans around a reference fit (1D and/or 2D):
-- Config: `reference_fit`, `systematics`, `datafiles`, `scan_defaults`, and any of
-  `scan_params_1d` / `scan_systematics_1d` (1D) and `scan_params_2d` (2D). A study may
-  contain 1D and 2D scans simultaneously.
-- Generation requires both `reference_fit/config/steering.txt` and
-  `reference_fit/output/minuit.out.txt`. Since outputs are Git-ignored, restore
-  or regenerate the canonical reference output locally before running the scan.
-- **1D**: each parameter fixed on a grid (`±n_sigma`, `npoints`), the rest profiled →
-  `profiles_1d.pdf` (Δχ² vs parameter).
-- **2D**: `scan_params_2d: [{pair: [X, Y]}, ...]` jointly fixes a pair on an
-  `npoints_2d × npoints_2d` grid (axes `±n_sigma_2d`), the rest profiled. Contours are
-  drawn at `sigma_levels` (default `[1,2,3]`) using **2-parameter joint** Δχ² levels
-  (1σ=2.30, 2σ=6.18, 3σ=11.83) → `contours_2d.pdf`. Each axis may be a PDF parameter or
-  an E-type systematic (inferred from `systematics`).
-
-**Pumplin-stability** — Pumplin uncertainty stability over a `lambda × errdef × iterate` grid:
-- Config: `eps` (base; source eps = `eps * lambda`), `lambda` (vector; a Gaussian
-  fit with no `&Systematics` source is always added as `lambda_0.0`), `errdef` and
-  `iterate` (Pumplin `SET ERRDEF` / `ITERATE` grids set per fit), `errdef_ref`
-  (normalization, default 0.5), `systematics` (each with `type: E` or `N`), `datafiles`.
-- Run dirs: `runs/lambda_<v>/errdef<X>p<Y>_iter<NN>/`.
-- Output: per-parameter pages with **one panel per lambda** (≤4 panels/page, paginates
-  beyond 4) — `pumplin_iteration_convergence.pdf` (interval vs ITERATE, line per ERRDEF)
-  and `pumplin_errdef_invariance.pdf` (interval vs ERRDEF, line per ITERATE).
-
-### Create and run a scan
+Create a fit from the retained HERA baseline configuration:
 
 ```bash
-mkdir -p scans/studies/lambda/hera-baseline/my-scan
-cd scans/studies/lambda/hera-baseline/my-scan
-
-# Create config.yaml (see examples in existing studies)
-cat > config.yaml << 'EOF'
-scan_type: lambda-scan
-template: hera-baseline       # required: a folder under scans/templates/
-epsilon: 0.5
-lambda: {min: 0.0, max: 1.2, step: 0.1}
-datafiles:
-  - HERA1+2_NCep_920-thexp.dat
-  - HERA1+2_CCep-thexp.dat
-systematics:
-  - {name: sysHZComb1042, type: N}
-  - {name: proc_tb21, type: E}
-EOF
-
-# Create symlinks to commands
-ln -s ../../../../bin/run-scan .
-ln -s ../../../../bin/plot .
-
-# Preview, then generate and submit
-./run-scan --dry-run
-./run-scan
-
-# After fits complete, extract results and plot
-./plot
+scripts/new-fit hera-baseline/my-study/variant-a
 ```
 
-Each study is self-contained: `config.yaml`, `runs/`, `results/`, `plots/`.
-
-## Comparing fits (PDF plots)
-
-`fits/compare/` overlays the parton distributions of an arbitrary number of **individual
-fits** into one multi-page PDF (one page per observable), with a 2-panel layout: central
-distributions + uncertainty band on the left, ratio-to-reference on the right. Each fit is
-read from its own LHAPDF set at `<fit>/output/<set>` (default set `proton`).
-
-It is config-driven, mirroring the scans UX (`cd <study> && plot`).
-
-### Create and run a comparison
+Or use another fit configuration as the template:
 
 ```bash
-cd fits/compare/studies/
-mkdir my-comparison && cd my-comparison
+scripts/new-fit \
+  hera-baseline/my-study/variant-b \
+  hera-baseline/baseline-7-sources-bartlett2-pumplin/config
+```
 
-cat > config.yaml << 'EOF'
-type: pdf-comparison
-Q2: 10.0                      # observables evaluated at Q = sqrt(Q2) [GeV]
-x_min: 1.0e-4
-x_max: 0.9
-observables: [uv, dv, gluon, sea]
-error_type: asymmetric        # symmetric | asymmetric (used only when a set carries errors)
-ratio_reference: 0            # ratio-panel denominator: fit index or label
+`scripts/new-fit` copies the configuration and required files from `datasets/`.
+The generated `submit.sh` creates the ignored Condor files, sets the absolute
+output path, and submits the job:
+
+```bash
+runs/fits/hera-baseline/my-study/variant-a/condor/submit.sh
+```
+
+The retained small-x studies keep their existing grouped batch launchers under
+`runs/fits/smallx-resummation/`.
+
+## Scan workspaces
+
+Each scan workspace contains its tracked definition and local generated
+products:
+
+```text
+runs/scans/<study>/
+├── config.yaml                  # tracked definition
+├── runs/                        # generated xFitter jobs
+├── results/                     # generated extracted results
+└── plots/                       # generated figures
+```
+
+Each `config.yaml` selects a named template from root `templates/`. Pass the
+workspace directory directly to the commands:
+
+```bash
+workspace=runs/scans/lambda/hera-baseline/greedy-selection
+
+scripts/run-scan --dry-run "$workspace"   # preview only
+scripts/run-scan "$workspace"             # generate and submit
+scripts/plot-scan "$workspace"            # extract results and plot
+```
+
+Use `scripts/run-scan --no-submit "$workspace"` instead of the submission
+command when the run directories should be generated without submitting Condor
+jobs.
+
+The existing scan types are:
+
+- `lambda-scan`: scan epsilon scaling factors.
+- `systematic-ranking`: test systematic sources individually.
+- `likelihood-scan`: profile one- or two-dimensional chi-squared grids around a
+  reference fit.
+- `pumplin-stability`: scan lambda, `ERRDEF`, and `ITERATE` settings.
+
+Likelihood generation requires the configured reference fit's
+`config/steering.txt` and `output/minuit.out.txt`. Outputs are ignored, so the
+reference output must exist locally before running the workspace.
+
+## Comparison workspaces
+
+Each comparison workspace keeps its tracked `config.yaml` beside its ignored
+plots or tables under `runs/comparisons/<study>/`.
+
+The supported definition types and commands are:
+
+- `pdf-comparison` — `scripts/plot-pdf-comparison <workspace-dir>`
+- `xsec-comparison` — `scripts/plot-xsec <workspace-dir>`
+- `xsec-region-table` — `scripts/plot-xsec <workspace-dir>`
+
+For example:
+
+```bash
+scripts/plot-pdf-comparison \
+  runs/comparisons/baseline-nominal-vs-7sources
+
+scripts/plot-xsec \
+  runs/comparisons/xsec-nc-cc-nominal-vs-7sources-pumplin
+```
+
+Local fit paths in a comparison config are resolved relative to its workspace.
+A typical entry therefore looks like:
+
+```yaml
 fits:
-  - {label: "HERA baseline", path: ../../../hera-baseline/nominal-bartlett2-pumplin}
-  - {label: "HERA + EoE", path: ../../../hera-baseline/baseline-7-sources-bartlett2-pumplin}
-  # Read xFitter's native central and Pumplin grids when no LHAPDF set was written:
-  # - {label: "4 iterations", path: ../../../my-fit-niter4, source: xfitter-grid}
-  # An installed LHAPDF set can be overlaid instead of a fit dir:
-  # - {label: "HERAPDF2.0 NNLO", lhapdf_set: HERAPDF20_NNLO_EIG}
-EOF
-
-ln -s ../../bin/plot .
-./plot                        # writes plots/pdf_comparison.pdf
+  - label: HERA baseline
+    path: ../../fits/hera-baseline/nominal-bartlett2-pumplin
 ```
 
-Each fit entry uses either `path` (a local fit dir, relative to the study) or
-`lhapdf_set` (an installed set); optional `set`, `color`, `linestyle`, `label`.
-For a local fit, `source: xfitter-grid` reads the `pdfs_q2val` central grid and
-Pumplin `sNNp`/`sNNm` pairs at the requested `Q2` directly from `output/`;
-otherwise the local `proton` LHAPDF set is used.
-Local comparisons therefore require a populated `<fit>/output/`; the cleanup
-does not choose or promote one of the historical `output_*` snapshots.
-Uncertainty bands are **auto-detected**: a set with `1+2N` members gets a Hessian band
-computed from its error members, honouring its `ErrorType`; a single-member set is
-drawn as a central line only. Comparisons may freely mix the two.
+Local comparisons require a populated `<fit>/output/`. Historical directories
+such as `output_legacy_*` or `output_retained_*` are not promoted automatically.
+PDF comparisons write combined, ratio-only, and absolute-only PDFs beneath the
+workspace's `plots/` directory.
+
+## Datasets and historical material
+
+Canonical xFitter tables live under `datasets/`; see `datasets/README` for the
+upstream data repository. Runtime copies belong under `runs/` and are ignored.
+
+Inactive fits, studies, and other historical material are retained locally
+under the ignored `legacy/` tree. `legacy-artifacts.yaml` records their original
+locations and provenance. Historical manifest sections intentionally retain
+the paths that were current when each snapshot was classified.
+
+## Validation
+
+Run the repository tests directly from the source tree:
+
+```bash
+PYTHONPATH=src python3 -m unittest discover -s tests -v
+```
 
 ## Git workflow
 
-- Branch per study, e.g. `study/hera-baseline-eoe-v2`.
-- Keep the study rationale in its local `README.md` or `config.yaml` comments.
-- Commit only configs/scripts/docs; `output/`, `condor/logs/`, and `*.dat` data files are gitignored.
-- Do not add `legacy/`: it is a workspace-local archive whose tracked source
-  paths are recorded in `legacy-artifacts.yaml` and Git history.
+- Use a branch per change or study.
+- Keep study rationale in its workspace `config.yaml` comments or a local
+  `README.md`.
+- Commit configurations, templates, source, commands, tests, and documentation.
+- Do not commit outputs, Condor logs, copied data tables, or `legacy/` payloads.

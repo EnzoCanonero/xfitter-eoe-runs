@@ -1,0 +1,113 @@
+Minimizer: MINUIT
+MINUIT:
+  Commands: |
+    set par 24 -15.750686
+    set par 25 -4.344630
+    set par 26 -2.708127
+    set par 27 4.550454
+    set par 28 4.552733
+    set par 29 -3.929330
+    set par 30 7.807512
+    set par 31 3.601972
+    call fcn 1
+    set str 2
+    migrad 100000
+    call fcn 3
+
+  doErrors: |
+    Pumplin
+    SET ERRDEF 0.5
+    ITERATE 10
+
+# 18-parameter Giuli parametrization (arXiv:1902.11125), warm-started from
+# the converged final eight-source eps=0.6 greedy-selection minimum in
+# runs/scans/syst-ranking/giuli-param/9th-1053-1062-1111-1114-1144-
+# tb21-1064-1113/runs/nominal/output/parsout_1.
+Parameters:
+  Ag   :  DEPENDENT
+  Auv  :  DEPENDENT
+  Adv  :  DEPENDENT
+  ZERO : 0
+  fs   : [ 0.4, 0.0 ]
+  Adbar: [ 0.051328,  0.011630 ]
+  Bdbar: [ -0.385659, 0.041497 ]
+  Bdv  : [ 1.008972,  0.092914 ]
+  Bg   : [ -0.454089, 0.053593 ]
+  Buv  : [ 0.701751,  0.123104 ]
+  Cdbar: [ 25.745313, 4.022488 ]
+  Cdv  : [ 4.594530,  0.421942 ]
+  Cg   : [ 4.396524,  0.638498 ]
+  Cubar: [ 10.533541, 1.432511 ]
+  Cuv  : [ 4.550349,  0.141926 ]
+  Ddbar: [ 60.025629, 16.721162 ]
+  Dubar: [ 28.549614, 8.889109 ]
+  Euv  : [ 3.443769,  1.912767 ]
+  Fdbar: [ 0.076551,  0.005708 ]
+  Fg   : [ 0.236047,  0.006310 ]
+  Fuv  : [ 0.354799,  0.051537 ]
+  Gg   : [ 0.013532,  0.000824 ]
+  Guv  : [ 0.046615,  0.013644 ]
+
+Parameterisations:
+  par_uv:
+    class: Expression
+    expression: "Auv*(x^Buv*(1-x)^Cuv)*(1+Euv*x^2+Fuv*ln(x)+Guv*ln(x)^2)"
+  par_dv:
+    class: Expression
+    expression: "Adv*(x^Bdv*(1-x)^Cdv)"
+  par_ubar:
+    class: Expression
+    expression: "Adbar*(x^Bdbar*(1-x)^Cubar)*(1+Dubar*x+Fdbar*ln(x))"
+  par_dbar:
+    class: Expression
+    expression: "Adbar*(x^Bdbar*(1-x)^Cdbar)*(1+Ddbar*x+Fdbar*ln(x))"
+  par_s:
+    class: Expression
+    expression: "Adbar*fs/(1-fs)*(x^Bdbar*(1-x)^Cdbar)*(1+Ddbar*x+Fdbar*ln(x))"
+  par_g:
+    class: Expression
+    expression: "Ag*(x^Bg*(1-x)^Cg)*(1+Fg*ln(x)+Gg*ln(x)^2)"
+
+DefaultDecomposition: proton
+Decompositions:
+  proton:
+    class: UvDvUbarDbarS
+    xuv: par_uv
+    xdv: par_dv
+    xubar: par_ubar
+    xdbar: par_dbar
+    xs: par_s
+    xg: par_g
+
+DefaultEvolution: proton-QCDNUM
+Evolutions:
+  proton-QCDNUM:
+    ? !include evolutions/QCDNUM.yaml
+    decomposition: proton
+
+Q0 : 1.378404875209  # sqrt(1.9) GeV
+
+? !include constants.yaml
+
+alphas : 0.118
+
+byReaction:
+  RT_DISNC:
+    ? !include reactions/RT_DISNC.yaml
+
+hf_scheme_DISNC:
+  defaultValue: 'RT_DISNC'
+
+hf_scheme_DISCC:
+  defaultValue: 'BaseDISCC'
+
+WriteLHAPDF6:
+  name: "proton"
+  description: "Bonvini--Giuli fit with eight greedy-selected errors-on-errors sources"
+  authors: "Enzo Canonero"
+  reference: ""
+  preferInternalGrid:
+
+MaxErrAllowed: 4
+# Output directory (patched at runtime by run_fit.sh)
+OutputDirectory: "../output"

@@ -1,0 +1,11 @@
+universe              = vanilla
+executable            = /nfs/scratch2/ecanoner/xfitter-eoe-runs/runs/fits/smallx-resummation/eoe/batch/run_fit.sh
+arguments             = $(fitdir)
+output                = $(fitdir)/condor/logs/output.log
+error                 = $(fitdir)/condor/logs/error.log
+log                   = /nfs/scratch2/ecanoner/xfitter-eoe-runs/runs/fits/smallx-resummation/eoe/batch/batch.log
+should_transfer_files = NO
+initialdir            = $(fitdir)/config
+request_cpus          = 1
+request_memory        = 4GB
+queue fitdir from /nfs/scratch2/ecanoner/xfitter-eoe-runs/runs/fits/smallx-resummation/eoe/batch/fit_dirs.txt

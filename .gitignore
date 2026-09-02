@@ -1,61 +1,35 @@
-# xfitter output (created at runtime), including backups
-fits/**/output/
-fits/**/output_OLD/
-fits/**/output_bkp*/
-fits/**/bkpref/
+# Run workspaces retain tracked configurations and launchers, not runtime payloads.
+# Manual fit products are generated beneath their workspace.
+runs/fits/**/output/
+runs/fits/**/output_OLD/
+runs/fits/**/output_bkp*/
+runs/fits/**/bkpref/
+runs/fits/**/output_legacy_*/
+runs/fits/**/output_retained_*/
+runs/fits/**/condor/run_fit.sh
+runs/fits/**/condor/job.sub
+runs/fits/**/condor/logs/
+runs/fits/**/batch/*.log
+runs/fits/**/*.dat
+runs/fits/sandbox/*
+!runs/fits/sandbox/.gitkeep
 
-# Classified pre-merge fit artifacts
-fits/**/output_legacy_*/
-fits/**/output_retained_*/
-
-# PDF-comparison plot and table outputs
-fits/compare/**/plots/
-fits/compare/**/results/
-fits/compare/**/plots_legacy_*/
-fits/compare/**/results_legacy_*/
-
-# Condor generated files (created by submit.sh)
-fits/**/condor/run_fit.sh
-fits/**/condor/job.sub
-fits/**/condor/logs/
-fits/**/batch/*.log
-
-# Data files in config/ (copied by new_fit.sh)
-fits/**/*.dat
-
-# Local one-off study grids
-fits/hera/hera-pumplin-stability-sysHZComb1053/
-
-# Sandbox (personal throwaway fits), keep folder tracked
-fits/sandbox/*
-!fits/sandbox/.gitkeep
-
-# Scan framework generated files
-extra plots/
-scans/fits/lambda-scans/*/fits/
-scans/fits/lambda-scans/*/results/
-scans/fits/lambda-scans/*/plots/
-scans/fits/systematic-ranking/*/fits/
-scans/fits/systematic-ranking/*/results/
-scans/fits/systematic-ranking/*/plots/
-scans/studies/**/runs/
-scans/studies/**/plots/
-scans/studies/**/results/
-scans/studies/**/runs_bkp*/
-scans/studies/**/runs_output_bkp*.tar.gz
-scans/studies/**/runs_legacy_*/
-scans/studies/**/runs_retained_*/
-scans/studies/**/runs_invalid_*/
-scans/studies/**/plots_legacy_*/
-scans/studies/**/plots_retained_*/
-scans/studies/**/plots_invalid_*/
-scans/studies/**/results_legacy_*/
-scans/studies/**/results_retained_*/
-scans/studies/**/results_invalid_*/
-
-# Shared pipeline symlinks in study folders (point to scans/bin/)
-scans/studies/**/plot
-scans/studies/**/run-scan
+# Scan and comparison config.yaml files are tracked in their run workspaces;
+# their generated products are ignored below.
+runs/scans/**/fits/
+runs/scans/**/fits_*/
+runs/scans/**/runs/
+runs/scans/**/runs_*/
+runs/scans/**/runs_output_bkp*.tar.gz
+runs/scans/**/plots/
+runs/scans/**/plots_*/
+runs/scans/**/results/
+runs/scans/**/results_*/
+runs/comparisons/**/plots/
+runs/comparisons/**/plots_*/
+runs/comparisons/**/results/
+runs/comparisons/**/results_*/
+runs/comparisons/**/.xfdraw-staging/
 
 # Python cache
 __pycache__/

@@ -1,0 +1,183 @@
+#!/bin/bash
+# Create a new xfitter fit directory.
+# Usage: scripts/new-fit <path> [template_dir]
+#
+# path:         Nested path under runs/fits/ (e.g. hera-baseline/my-study/variant-a)
+# template_dir: Directory containing steering.txt and parameters.yaml.
+#               Can be an existing fit's config/ dir or an xfitter example dir.
+#               Defaults to the retained HERA nominal Pumplin configuration.
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+FITSDIR="$REPO_ROOT/runs/fits"
+NAME="$1"
+TEMPLATE="${2:-$FITSDIR/hera-baseline/nominal-bartlett2-pumplin/config}"
+
+# Resolve relative template paths against FITSDIR
+if [ "${TEMPLATE:0:1}" != "/" ]; then
+    TEMPLATE="$FITSDIR/$TEMPLATE"
+fi
+
+if [ -z "$NAME" ]; then
+    echo "Usage: $0 <path> [template_dir]"
+    echo ""
+    echo "  path:         Nested path under runs/fits/ (e.g. hera-baseline/my-study/variant-a)"
+    echo "  template_dir: Directory with steering.txt + parameters.yaml"
+    echo "                (default: hera-baseline/nominal-bartlett2-pumplin/config)"
+    echo ""
+    echo "Examples:"
+    echo "  $0 hera-baseline/my-study/variant-a"
+    echo "  $0 hera-baseline/my-study/variant-b hera-baseline/baseline-7-sources-bartlett2-pumplin/config"
+    exit 1
+fi
+
+FITDIR="$FITSDIR/$NAME"
+CONFIGDIR="$FITDIR/config"
+
+if [ ! -d "$TEMPLATE" ]; then
+    echo "Error: template directory not found: $TEMPLATE"
+    exit 1
+fi
+
+if [ -d "$FITDIR" ]; then
+    echo "Error: $FITDIR already exists"
+    exit 1
+fi
+
+echo "Creating fit: $FITDIR"
+echo "Template:     $TEMPLATE"
+
+# ── 1. Create directory structure ────────────────────────────
+mkdir -p "$CONFIGDIR" "$FITDIR/condor/logs" "$FITDIR/output"
+
+# ── 2. Copy editable config files ───────────────────────────
+for f in steering.txt parameters.yaml; do
+    if [ -f "$TEMPLATE/$f" ]; then
+        cp "$TEMPLATE/$f" "$CONFIGDIR/"
+    fi
+done
+
+# ── 3. Copy read-only shared files into config/ ─────────────
+for f in constants.yaml unpolarised.wgt; do
+    src="$TEMPLATE/$f"
+    # Resolve symlinks so we copy the real file
+    if [ -L "$src" ]; then
+        src="$(readlink -f "$src")"
+    fi
+    if [ -f "$src" ]; then
+        cp "$src" "$CONFIGDIR/$f"
+    fi
+done
+
+# ── 4. Copy data files into config/ ─────────────────────────
+# Parse steering.txt for InputFileNames and copy the .dat files
+DATAROOT="$REPO_ROOT/datasets"
+if [ -f "$CONFIGDIR/steering.txt" ]; then
+    while IFS= read -r line; do
+        # Extract each filename between single quotes ending in .dat.
+        while IFS= read -r fname; do
+            [ -n "$fname" ] || continue
+            base=$(basename "$fname")
+            # Find the file in datasets/
+            src=$(find -L "$DATAROOT" -name "$base" -type f 2>/dev/null | head -1)
+            if [ -n "$src" ]; then
+                cp "$src" "$CONFIGDIR/$base"
+            else
+                echo "Warning: data file not found in datasets/: $base"
+            fi
+        done < <(echo "$line" | grep -oP "'\K[^']*\.dat" || true)
+    done < "$CONFIGDIR/steering.txt"
+fi
+
+# ── 5. Convert data paths in steering.txt to bare filenames ─
+# Replace 'path/to/file.dat' with 'file.dat'
+if [ -f "$CONFIGDIR/steering.txt" ]; then
+    sed -i "s|'[^']*\/\([^']*\.dat\)'|'\1'|g" "$CONFIGDIR/steering.txt"
+fi
+
+# ── 6. Add OutputDirectory placeholder to parameters.yaml ───
+if [ -f "$CONFIGDIR/parameters.yaml" ]; then
+    # Remove any existing OutputDirectory line
+    sed -i '/^OutputDirectory:/d' "$CONFIGDIR/parameters.yaml"
+    # Remove any comment line immediately before it
+    sed -i '/^# Output directory.*xfitter/d' "$CONFIGDIR/parameters.yaml"
+    cat >> "$CONFIGDIR/parameters.yaml" << 'EOF'
+
+# Output directory (patched by condor/submit.sh before submission)
+OutputDirectory: "__SET_AT_RUNTIME__"
+EOF
+fi
+
+# ── 7. Generate condor/submit.sh ────────────────────────────
+# submit.sh is the single entry point: it generates run_fit.sh
+# and job.sub with correct absolute paths, then submits to Condor.
+cat > "$FITDIR/condor/submit.sh" << 'SUBMITEOF'
+#!/bin/bash
+# Generate condor scripts with correct absolute paths and submit.
+set -e
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+FIT_DIR="$(cd "$DIR/.." && pwd)"
+
+# Find scripts/setup-env.sh at the repo root
+REPO_ROOT="$DIR"
+while [ ! -f "$REPO_ROOT/scripts/setup-env.sh" ] && [ "$REPO_ROOT" != "/" ]; do
+    REPO_ROOT="$(dirname "$REPO_ROOT")"
+done
+[ -f "$REPO_ROOT/scripts/setup-env.sh" ] || { echo "Cannot find scripts/setup-env.sh" >&2; exit 1; }
+
+mkdir -p "$DIR/logs" "$FIT_DIR/output"
+
+# ── Generate run_fit.sh ──────────────────────────────────────
+cat > "$DIR/run_fit.sh" << EOF
+#!/bin/bash
+set -e
+source "$REPO_ROOT/scripts/setup-env.sh"
+
+# flexiblas shim (condor nodes miss libflexiblas, map to openblas)
+SHIM_DIR=\$(mktemp -d)
+trap "rm -rf \$SHIM_DIR" EXIT
+ln -s /cvmfs/sft.cern.ch/lcg/views/LCG_105/x86_64-el9-gcc13-opt/lib/libopenblas.so \\
+      "\$SHIM_DIR/libflexiblas.so.3"
+export LD_LIBRARY_PATH="\$SHIM_DIR:\$LD_LIBRARY_PATH"
+
+cd "$FIT_DIR/config"
+xfitter
+EOF
+chmod +x "$DIR/run_fit.sh"
+
+# ── Generate job.sub ─────────────────────────────────────────
+cat > "$DIR/job.sub" << EOF
+universe            = vanilla
+executable          = $DIR/run_fit.sh
+output              = $DIR/logs/output.log
+error               = $DIR/logs/error.log
+log                 = $DIR/logs/run.log
+should_transfer_files = NO
+initialdir          = $FIT_DIR/config
+request_cpus        = 1
+request_memory      = 2GB
+queue 1
+EOF
+
+# ── Set OutputDirectory in parameters.yaml ───────────────────
+sed -i "s|^OutputDirectory:.*|OutputDirectory: \"$FIT_DIR/output\"|" "$FIT_DIR/config/parameters.yaml"
+
+# ── Submit ───────────────────────────────────────────────────
+condor_submit "$DIR/job.sub"
+SUBMITEOF
+chmod +x "$FITDIR/condor/submit.sh"
+
+echo ""
+echo "Done. Structure:"
+echo "  $FITDIR/"
+echo "    config/    -- steering.txt, parameters.yaml, copied data files"
+echo "    condor/    -- submit.sh (generates run_fit.sh + job.sub)"
+echo "    output/    -- (xfitter writes here)"
+echo ""
+echo "To run:"
+echo "  $FITDIR/condor/submit.sh"
+echo ""
+echo "Edit configs in: $CONFIGDIR/"

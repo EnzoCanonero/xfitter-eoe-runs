@@ -1,0 +1,34 @@
+scan_type: systematic-ranking
+xfitter_tree: xfitter-bartlett-fixes
+template: hera-baseline
+epsilon: 0.6
+
+# Fourth-order forward-selection scan (Q2cut = 3.5, baseline parametrization).
+# sysHZComb1053 + proc_tb21 + sysHZComb1064 are held ON in every fit (eps 0.6),
+# warm-started at their JOINT converged values from the 3rd-order {1053,proc_tb21,1064}
+# fit (runs/scans/syst-ranking/hera-baseline/3rd-1053-tb21/runs/sysHZComb1064). Every candidate is ranked by its
+# marginal impact on top of {1053, proc_tb21, 1064}. The nominal fit is the
+# {1053, proc_tb21, 1064}-only fit. All three base sources are auto-excluded from the
+# candidate list.
+base_systematics:
+  - {name: sysHZComb1053, type: E, init: -16.6551}
+  - {name: proc_tb21,     type: E, init: -6.1244}
+  - {name: sysHZComb1064, type: E, init: 8.6801}
+
+# HERA datafiles (all 7 files)
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+
+# Candidate systematic sources to rank (the three base sources are removed automatically).
+systematics:
+  - {name: sysHZComb, range: "1001-1162", type: E}
+  - {name: proc_nrl, type: E}
+  - {name: proc_tb, range: "21-24", type: E}
+  - {name: proc_gp, type: E}
+  - {name: proc_had, type: E}

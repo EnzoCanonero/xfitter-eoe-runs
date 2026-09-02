@@ -1,0 +1,14 @@
+# Final Bonvini--Giuli comparison for Sec. 4 of the paper.
+type: pdf-comparison
+Q2: 4.0
+error_type: symmetric
+observables: [uv, dv, gluon]
+ratio_reference: 0
+ratio_ylim: [0.6, 1.6]
+fits:
+  - label: "BG baseline"
+    path: ../../fits/hera-giuli-param/gaussian-bartlett2-pumplin
+    source: xfitter-grid
+  - label: "BG + EoE"
+    path: ../../fits/hera-giuli-param/giuli-8-sources-bartlett2-pumplin
+    source: xfitter-grid
