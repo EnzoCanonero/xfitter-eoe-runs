@@ -17,7 +17,7 @@ xfitter-eoe-runs/
 │       ├── cli/                 # repository-aware command adapters
 │       ├── comparisons/
 │       └── scans/
-├── scripts/                     # thin command wrappers and environment setup
+├── scripts/                     # user-facing commands and environment setup
 ├── templates/                   # named xFitter scan templates
 ├── runs/                        # tracked configurations and local artifacts
 │   ├── fits/                    # manual fit configs, launchers, and outputs
@@ -37,9 +37,9 @@ are tracked.
 
 - `src/xfitter_eoe_runs/scans/` and `comparisons/` contain the path-agnostic
   reusable implementation.
-- `src/xfitter_eoe_runs/cli/` contains thin repository-aware command adapters.
-  `scripts/` keeps the public launchers and environment setup; its wrappers
-  prepare external runtimes where needed and invoke those adapters.
+- `src/xfitter_eoe_runs/cli/` contains the repository-aware plotting command
+  adapters. `scripts/` keeps all public commands and environment setup; the
+  plotting wrappers prepare external runtimes and invoke those adapters.
 - `templates/` contains reusable scan inputs only. Generated fits, plots, tables,
   logs, and results do not belong there.
 - `datasets/` is input-only. Commands may copy data into a run workspace but do
@@ -49,9 +49,9 @@ are tracked.
   configurations and likelihood references may consume fit workspaces under
   `runs/fits/`; reusable code never lives under `runs/`.
 
-The flow remains one way: shell launchers call CLI adapters, adapters call
-reusable code, inputs feed executions, and executions write only to their
-workspace under `runs/`.
+The flow remains one way: entry points and CLI adapters call reusable code,
+inputs feed executions, and executions write only to their workspace under
+`runs/`.
 
 ## Requirements
 
@@ -62,10 +62,11 @@ workspace under `runs/`.
   submitted runs.
 
 `pip` installs this package and its Python dependencies. It does not install
-xFitter, HTCondor, LHAPDF, ROOT, or custom xFitter build trees. The current
-launchers also assume the CERN LCG views under `/cvmfs/sft.cern.ch` and a shared
-filesystem. Condor jobs do not transfer files, so the checkout, run workspaces,
-and xFitter installation must all be visible to worker nodes.
+xFitter, HTCondor, LHAPDF, ROOT, or custom xFitter build trees. Generated
+xFitter workers and environment-bootstrap wrappers assume the CERN LCG views
+under `/cvmfs/sft.cern.ch` and a shared filesystem. Condor jobs do not transfer
+files, so the checkout, run workspaces, and xFitter installation must all be
+visible to worker nodes.
 
 ## Setup
 
@@ -95,8 +96,10 @@ the repository root without creating per-workspace symlinks.
 
 Some workspace configurations set `xfitter_tree` and require that named build
 below `$XFITTER_ROOT`. In particular, the small-x runs require the dedicated
-`xfitter-bartlett-apfel306-hell3` build and its APFEL 3.0.6/HELL 3 dependencies;
-see the [small-x notes](runs/fits/smallx-resummation/README.md).
+`xfitter-bartlett-apfel306-hell3` build and its APFEL 3.0.6/HELL 3 dependencies.
+Their retained batch launchers and descriptors contain site-specific absolute
+paths that must be adapted for a different checkout or installation; see the
+[small-x notes](runs/fits/smallx-resummation/README.md).
 
 ## Commands
 
@@ -200,7 +203,9 @@ The supported definition types and commands are:
 PDF comparisons require the LHAPDF Python bindings (`import lhapdf`).
 Cross-section plots require `xfitter-draw` and ROOT. These external components
 are expected from the configured xFitter/LCG environment and are not installed
-by this Python package.
+by this Python package. `scripts/plot-xsec` defaults to the
+`xfitter-bartlett-fixes` tree; set `XFITTER_TREE` to select another compatible
+built tree when needed.
 
 For example:
 
