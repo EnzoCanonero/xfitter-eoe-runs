@@ -12,11 +12,12 @@ historical artifacts are not tracked by Git.
 
 ```text
 xfitter-eoe-runs/
-├── src/                         # reusable Python implementation
+├── src/                         # installable Python package
 │   └── xfitter_eoe_runs/
-│       ├── scans/
-│       └── comparisons/
-├── scripts/                     # user-facing commands and environment setup
+│       ├── cli/                 # repository-aware command adapters
+│       ├── comparisons/
+│       └── scans/
+├── scripts/                     # thin command wrappers and environment setup
 ├── templates/                   # named xFitter scan templates
 ├── runs/                        # tracked configurations and local artifacts
 │   ├── fits/                    # manual fit configs, launchers, and outputs
@@ -34,11 +35,11 @@ are tracked.
 
 ## Boundaries
 
-- `src/` contains path-agnostic implementation code. It does not import from or
-  discover `scripts/`, `templates/`, `runs/`, or `datasets/`.
-- `scripts/` contains the entry points. Commands import `src/`, read the selected
-  workspace configuration, templates, and datasets, then write generated data
-  back into that workspace.
+- `src/xfitter_eoe_runs/scans/` and `comparisons/` contain the path-agnostic
+  reusable implementation.
+- `src/xfitter_eoe_runs/cli/` contains thin repository-aware command adapters.
+  `scripts/` keeps the public launchers and environment setup; its wrappers
+  prepare external runtimes where needed and invoke those adapters.
 - `templates/` contains reusable scan inputs only. Generated fits, plots, tables,
   logs, and results do not belong there.
 - `datasets/` is input-only. Commands may copy data into a run workspace but do
@@ -48,23 +49,54 @@ are tracked.
   configurations and likelihood references may consume fit workspaces under
   `runs/fits/`; reusable code never lives under `runs/`.
 
-The flow remains one way: commands call reusable code; workspace configurations,
-templates, and datasets feed executions; executions write only to their
+The flow remains one way: shell launchers call CLI adapters, adapters call
+reusable code, inputs feed executions, and executions write only to their
 workspace under `runs/`.
+
+## Requirements
+
+- Linux with Bash and Python 3.9 or newer.
+- [xFitter](https://gitlab.cern.ch/fitters/xfitter/-/wikis/Installation-script),
+  installed separately in a location visible to worker nodes.
+- HTCondor, with `condor_submit` on `PATH` and access to a configured pool, for
+  submitted runs.
+
+`pip` installs this package and its Python dependencies. It does not install
+xFitter, HTCondor, LHAPDF, ROOT, or custom xFitter build trees. The current
+launchers also assume the CERN LCG views under `/cvmfs/sft.cern.ch` and a shared
+filesystem. Condor jobs do not transfer files, so the checkout, run workspaces,
+and xFitter installation must all be visible to worker nodes.
 
 ## Setup
 
-1. Clone the repository to an NFS-accessible location.
-2. Set `XFITTER_ROOT` in `.env` to the xFitter installation visible to Condor
-   worker nodes.
-3. For interactive xFitter use, source the environment:
+1. Clone the repository to the shared filesystem and enter its root.
+2. Install the package and its Python dependencies:
 
-```bash
-source scripts/setup-env.sh
-```
+   ```bash
+   python3 -m pip install .
+   ```
+
+   For development, use an editable installation instead:
+
+   ```bash
+   python3 -m pip install -e .
+   ```
+
+3. Set `XFITTER_ROOT` in `.env` to the xFitter installation visible to Condor
+   worker nodes.
+4. For interactive xFitter use, source the environment:
+
+   ```bash
+   source scripts/setup-env.sh
+   ```
 
 Commands resolve the repository root from their own location, so run them from
 the repository root without creating per-workspace symlinks.
+
+Some workspace configurations set `xfitter_tree` and require that named build
+below `$XFITTER_ROOT`. In particular, the small-x runs require the dedicated
+`xfitter-bartlett-apfel306-hell3` build and its APFEL 3.0.6/HELL 3 dependencies;
+see the [small-x notes](runs/fits/smallx-resummation/README.md).
 
 ## Commands
 
@@ -165,6 +197,11 @@ The supported definition types and commands are:
 - `xsec-comparison` — `scripts/plot-xsec <workspace-dir>`
 - `xsec-region-table` — `scripts/plot-xsec <workspace-dir>`
 
+PDF comparisons require the LHAPDF Python bindings (`import lhapdf`).
+Cross-section plots require `xfitter-draw` and ROOT. These external components
+are expected from the configured xFitter/LCG environment and are not installed
+by this Python package.
+
 For example:
 
 ```bash
@@ -201,10 +238,10 @@ the paths that were current when each snapshot was classified.
 
 ## Validation
 
-Run the repository tests directly from the source tree:
+After installing the package, run:
 
 ```bash
-PYTHONPATH=src python3 -m unittest discover -s tests -v
+python3 -m unittest discover -s tests -v
 ```
 
 ## Git workflow
