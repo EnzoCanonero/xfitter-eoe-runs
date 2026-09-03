@@ -1,21 +1,13 @@
-#!/usr/bin/env python3
 """Plot a PDF comparison from an explicitly named run workspace."""
 
 import argparse
 import sys
 from pathlib import Path
 
-# Allow this source-tree command to run without installing the package.
-src_dir = Path(__file__).resolve().parent.parent / "src"
-sys.path.insert(0, str(src_dir))
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
-RUN_ROOT = REPO_ROOT / "runs" / "comparisons"
-
-from xfitter_eoe_runs.comparisons.pdf_compare import compare_pdfs
+from ._paths import repository_root
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Write PDF-comparison plots for a configured run workspace."
     )
@@ -26,6 +18,12 @@ def main():
     )
     args = parser.parse_args()
 
+    try:
+        repo_root = repository_root()
+    except RuntimeError as error:
+        parser.error(str(error))
+
+    run_root = repo_root / "runs" / "comparisons"
     run_dir = args.run_dir.expanduser().resolve()
     config_file = run_dir / "config.yaml"
 
@@ -33,15 +31,18 @@ def main():
         parser.error(f"no config.yaml found in comparison workspace: {run_dir}")
 
     try:
-        run_dir.relative_to(RUN_ROOT)
+        run_dir.relative_to(run_root)
     except ValueError:
-        parser.error(f"comparison workspace must be under {RUN_ROOT}: {run_dir}")
+        parser.error(f"comparison workspace must be under {run_root}: {run_dir}")
 
     try:
+        from ..comparisons.pdf_compare import compare_pdfs
+
         compare_pdfs(run_dir)
-    except Exception as e:
-        print(f"Error: {e}")
+    except Exception as error:
+        print(f"Error: {error}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 
