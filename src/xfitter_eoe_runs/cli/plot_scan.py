@@ -1,34 +1,30 @@
-#!/usr/bin/env python3
-"""
-plot-scan command
-Extracts results and generates plots for a scan workspace
-"""
+"""Extract results and generate plots for a scan workspace."""
 
 import argparse
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT / "src"))
-
-from xfitter_eoe_runs.scans.plotter import plot_scan
+from ._paths import repository_root
 
 
-RUN_ROOT = REPO_ROOT / "runs" / "scans"
-TEMPLATE_ROOT = REPO_ROOT / "templates"
-
-
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Extract results and generate plots for a scan workspace"
     )
     parser.add_argument(
-        'run_dir',
+        "run_dir",
         type=Path,
         help="scan workspace under runs/scans containing config.yaml",
     )
     args = parser.parse_args()
 
+    try:
+        repo_root = repository_root()
+    except RuntimeError as error:
+        parser.error(str(error))
+
+    run_root = repo_root / "runs" / "scans"
+    template_root = repo_root / "templates"
     run_dir = args.run_dir.expanduser().resolve()
     config_file = run_dir / "config.yaml"
 
@@ -37,11 +33,10 @@ def main():
         sys.exit(1)
 
     try:
-        run_dir.relative_to(RUN_ROOT)
+        run_dir.relative_to(run_root)
     except ValueError:
-        parser.error(f"scan workspace must be under {RUN_ROOT}: {run_dir}")
+        parser.error(f"scan workspace must be under {run_root}: {run_dir}")
 
-    # Check that the runtime fit directory exists
     fits_dir = run_dir / "runs"
     if not fits_dir.exists():
         print(f"Error: No runs/ directory found in {run_dir}")
@@ -49,13 +44,16 @@ def main():
         sys.exit(1)
 
     try:
-        plot_scan(run_dir, template_root=TEMPLATE_ROOT)
-    except Exception as e:
-        print(f"Error: {e}")
+        from ..scans.plotter import plot_scan
+
+        plot_scan(run_dir, template_root=template_root)
+    except Exception as error:
+        print(f"Error: {error}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -36,6 +36,11 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Python packaging artifacts
+/build/
+/dist/
+*.egg-info/
+
 # Local archive of inactive studies and fits.  The tracked relocation manifest
 # records what was moved; the archived payload itself remains on this workspace.
 /legacy/
