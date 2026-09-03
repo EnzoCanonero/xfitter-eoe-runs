@@ -369,7 +369,8 @@ def _generate_pumplin_stability_fits(config: PumplinStabilityConfig,
                                      dataset_root=dataset_root,
                                      setup_env=setup_env,
                                      do_errors=do_errors,
-                                     xfitter_tree=config.xfitter_tree)
+                                     xfitter_tree=config.xfitter_tree,
+                                     xfitter_commit=config.xfitter_commit)
                 _apply_source_inits(fit_dir, syslist)
                 all_fit_dirs.append(fit_dir.resolve())
 
@@ -377,6 +378,7 @@ def _generate_pumplin_stability_fits(config: PumplinStabilityConfig,
     return generate_batch_submit(
         fits_dir, all_fit_dirs, setup_env=setup_env,
         xfitter_tree=config.xfitter_tree,
+        xfitter_commit=config.xfitter_commit,
         request_memory=str(config.get('request_memory', '2GB')),
     )
 
@@ -458,7 +460,8 @@ def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path,
                              template_dir=template_dir,
                              dataset_root=dataset_root,
                              setup_env=setup_env, do_errors=do_errors,
-                             xfitter_tree=config.xfitter_tree)
+                             xfitter_tree=config.xfitter_tree,
+                             xfitter_commit=config.xfitter_commit)
         _apply_source_inits(fit_dir, systematics)
         all_fit_dirs.append(fit_dir.resolve())
 
@@ -466,6 +469,7 @@ def _generate_lambda_scan_fits(config: LambdaScanConfig, fits_dir: Path,
     return generate_batch_submit(
         fits_dir, all_fit_dirs, setup_env=setup_env,
         xfitter_tree=config.xfitter_tree,
+        xfitter_commit=config.xfitter_commit,
         request_memory=str(config.get('request_memory', '2GB')),
     )
 
@@ -519,7 +523,8 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig,
     create_fit_structure(fits_dir / "nominal", _render(base_sources), "", config.datafiles,
                          template_dir=template_dir,
                          dataset_root=dataset_root, setup_env=setup_env,
-                         do_errors=do_errors, xfitter_tree=config.xfitter_tree)
+                         do_errors=do_errors, xfitter_tree=config.xfitter_tree,
+                         xfitter_commit=config.xfitter_commit)
     _apply_source_inits(fits_dir / "nominal", base)
     all_fit_dirs: List[Path] = [(fits_dir / "nominal").resolve()]
 
@@ -537,7 +542,8 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig,
                              template_dir=template_dir,
                              dataset_root=dataset_root, setup_env=setup_env,
                              do_errors=do_errors,
-                             xfitter_tree=config.xfitter_tree)
+                             xfitter_tree=config.xfitter_tree,
+                             xfitter_commit=config.xfitter_commit)
         _apply_source_inits(fit_dir, fit_systematics)
         all_fit_dirs.append(fit_dir.resolve())
 
@@ -545,6 +551,7 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig,
     return generate_batch_submit(
         fits_dir, all_fit_dirs, setup_env=setup_env,
         xfitter_tree=config.xfitter_tree,
+        xfitter_commit=config.xfitter_commit,
         request_memory=str(config.get('request_memory', '2GB')),
     )
 
@@ -787,7 +794,8 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
                                  dataset_root=dataset_root,
                                  setup_env=setup_env,
                                  do_errors=do_errors,
-                                 xfitter_tree=config.xfitter_tree)
+                                 xfitter_tree=config.xfitter_tree,
+                                 xfitter_commit=config.xfitter_commit)
 
             if is_systematic:
                 # E-type: fixed via MINUIT SET PAR / FIX commands
@@ -909,7 +917,8 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
                                          dataset_root=dataset_root,
                                          setup_env=setup_env,
                                          do_errors=do_errors,
-                                         xfitter_tree=config.xfitter_tree)
+                                         xfitter_tree=config.xfitter_tree,
+                                         xfitter_commit=config.xfitter_commit)
 
                     pdf_fixed: Dict[str, float] = {}
                     fix_cmds: Dict[str, Tuple[int, float]] = {}
@@ -957,6 +966,7 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
     submit_script = generate_batch_submit(
         fits_dir, all_fit_dirs, setup_env=setup_env,
         xfitter_tree=config.xfitter_tree,
+        xfitter_commit=config.xfitter_commit,
         request_memory=str(config.get('request_memory', '2GB')),
     )
 

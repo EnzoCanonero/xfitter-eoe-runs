@@ -1,13 +1,12 @@
 #!/bin/bash
 # Correct NumMembers + ErrorType in an xFitter-written LHAPDF6 proton.info.
 #
-# Why: xFitter's getErrorType()/getNmembers() (src/lhapdf6_output.cc) compare the
-# `doErrors` value against the exact strings "Pumplin"/"Hesse". Our configs use a
-# multiline doErrors block ("Pumplin\nSET ERRDEF 0.5\nITERATE 10"), so the match
-# fails and the .info is written with NumMembers:1 / ErrorType:symmhessian even
-# though the band step produced the real member files. LHAPDF then loads only
-# member 0 -> no error band. This sets NumMembers to the true count and the
-# ErrorType matching the band method actually used:
+# Why: older xFitter builds compared the complete `doErrors` value with the
+# exact strings "Pumplin"/"Hesse". Multiline commands could therefore produce
+# incorrect NumMembers/ErrorType metadata even when the member files existed.
+# The pinned errors-on-errors build fixes that writer; keep this command for
+# repairing outputs made by older builds. It sets NumMembers to the true count
+# and ErrorType to the band method actually used:
 #   - Pumplin/ITERATE writes +/- eigenvector PAIRS  (pdfs_q2val_s01p_/s01m_)
 #       -> ErrorType: hessian      (pair formula)
 #   - Hesse/ErrBandsSym writes SINGLE symmetric displacements (pdfs_q2val_s01s_)

@@ -68,6 +68,23 @@ class StudyConfig:
         return self.data.get('xfitter_tree')
 
     @property
+    def xfitter_commit(self) -> Optional[str]:
+        """Exact Git HEAD required for the selected xFitter tree (optional).
+
+        Generated workers export this as ``XFITTER_COMMIT``. ``setup-env.sh``
+        compares it with the selected tree's full HEAD before starting xFitter.
+        """
+        commit = self.data.get('xfitter_commit')
+        if commit is None:
+            return None
+        if not isinstance(commit, str) or len(commit) != 40 or any(
+                char not in '0123456789abcdef' for char in commit):
+            raise ValueError(
+                "xfitter_commit must be a full lowercase 40-character Git SHA-1"
+            )
+        return commit
+
+    @property
     def do_errors(self) -> Optional[Dict]:
         """doErrors namespace (optional). Returns dict with method, errdef, iterate."""
         return self.data.get('doErrors')

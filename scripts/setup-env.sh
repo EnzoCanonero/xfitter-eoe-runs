@@ -7,28 +7,51 @@ fail_setup() {
     return 1 2>/dev/null || exit 1
 }
 
-# Load .env from repo root if it exists (sets XFITTER_ROOT, etc.).  An explicit
-# caller-provided XFITTER_TREE is authoritative: study-generated job scripts
-# use it to pin a build and must not be silently overridden by a local .env.
+# Load .env from repo root if it exists (sets XFITTER_ROOT, etc.). Explicit
+# caller-provided tree/commit values are authoritative: study-generated job
+# scripts use them to pin a build and must not be silently overridden by a
+# local .env.
 _XFITTER_TREE_WAS_SET=0
 if [ "${XFITTER_TREE+x}" = x ]; then
     _XFITTER_TREE_WAS_SET=1
     _XFITTER_TREE_CALLER_VALUE="$XFITTER_TREE"
+fi
+_XFITTER_COMMIT_WAS_SET=0
+if [ "${XFITTER_COMMIT+x}" = x ]; then
+    _XFITTER_COMMIT_WAS_SET=1
+    _XFITTER_COMMIT_CALLER_VALUE="$XFITTER_COMMIT"
 fi
 _SETUP_ENV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 [ -f "$_SETUP_ENV_ROOT/.env" ] && source "$_SETUP_ENV_ROOT/.env"
 unset _SETUP_ENV_ROOT
 if [ "$_XFITTER_TREE_WAS_SET" -eq 1 ]; then
     export XFITTER_TREE="$_XFITTER_TREE_CALLER_VALUE"
+    # A commit from .env belongs to its default tree. Do not accidentally apply
+    # it when a generated worker/caller explicitly selects another tree without
+    # also supplying that tree's own pin.
+    if [ "$_XFITTER_COMMIT_WAS_SET" -eq 0 ]; then
+        unset XFITTER_COMMIT
+    fi
+fi
+if [ "$_XFITTER_COMMIT_WAS_SET" -eq 1 ]; then
+    export XFITTER_COMMIT="$_XFITTER_COMMIT_CALLER_VALUE"
 fi
 unset _XFITTER_TREE_WAS_SET _XFITTER_TREE_CALLER_VALUE
+unset _XFITTER_COMMIT_WAS_SET _XFITTER_COMMIT_CALLER_VALUE
 
-# 1) Base LCG environment from CVMFS
-LCG_SETUP="/cvmfs/sft.cern.ch/lcg/views/LCG_105/x86_64-el9-gcc13-opt/setup.sh"
+# Values loaded from .env must also be visible to child processes such as the
+# Python plotting commands. Caller-provided values were already exported above.
+export XFITTER_ROOT
+[ -z "${XFITTER_TREE+x}" ] || export XFITTER_TREE
+[ -z "${XFITTER_COMMIT+x}" ] || export XFITTER_COMMIT
+
+# 1) Base LCG environment from CVMFS. The override is primarily useful for
+# testing and for installations providing an equivalent site-local setup.
+LCG_SETUP="${XFITTER_LCG_SETUP:-/cvmfs/sft.cern.ch/lcg/views/LCG_105/x86_64-el9-gcc13-opt/setup.sh}"
 [ -r "$LCG_SETUP" ] || fail_setup "cannot read $LCG_SETUP"
 source "$LCG_SETUP" || fail_setup "failed to source $LCG_SETUP"
 
-# Source the xFitter setup from NFS location (accessible to Condor workers)
+# 2) Source the xFitter setup from NFS location (accessible to Condor workers)
 # Set XFITTER_ROOT in .env or environment before sourcing this script.
 # Need to cd to the PDF directory first so the setup.sh can read the version file
 XFITTER_SETUP_ROOT="${XFITTER_ROOT:?Set XFITTER_ROOT in .env at the repo root}"
@@ -40,8 +63,8 @@ source "$XFITTER_SETUP" || { popd > /dev/null; fail_setup "failed to source $XFI
 popd > /dev/null || fail_setup "failed to return from $XFITTER_SETUP_ROOT"
 
 # 3) Optional: select a specific xFitter build tree (git worktree) instead of
-# the default one baked into $XFITTER_ROOT/setup.sh (xfitter-master, i.e. the
-# errors-on-errors branch). Set XFITTER_TREE in .env or the environment to:
+# the general-purpose default baked into $XFITTER_ROOT/setup.sh
+# (xfitter-master). Set XFITTER_TREE in .env or the environment to:
 #   - a directory name under $XFITTER_ROOT, e.g. XFITTER_TREE=xfitter-bartlett-fixes
 #   - an absolute path to a built tree
 # Leave it unset/empty to keep the default. Each tree's xfitter binary carries
@@ -63,6 +86,54 @@ if [ -n "${XFITTER_TREE:-}" ]; then
     fi
     export PATH="$_xf_tree/bin:$PATH"
     export LD_LIBRARY_PATH="$_xf_tree/lib:$_xf_tree/lib/xfitter:${LD_LIBRARY_PATH}"
-    echo "setup-env.sh: using xFitter tree $_xf_tree ($(command -v xfitter))" >&2
     unset _xf_tree
 fi
+
+# 4) Resolve the build actually selected above and, when requested, enforce an
+# exact Git commit. XFITTER_COMMIT must be a full 40-character SHA-1; branch
+# names and abbreviated hashes are intentionally rejected because they are not
+# immutable pins. Generated Condor workers export this value before sourcing
+# setup-env.sh, so a moved/reused build directory fails before xFitter starts.
+if ! _xf_bin="$(command -v xfitter 2>/dev/null)" || [ -z "$_xf_bin" ]; then
+    echo "setup-env.sh: xfitter is not on PATH after environment setup" >&2
+    unset _xf_bin
+    return 1 2>/dev/null || exit 1
+fi
+if ! _xf_selected_tree="$(cd "$(dirname "$_xf_bin")/.." && pwd)"; then
+    echo "setup-env.sh: cannot resolve the selected xFitter tree from $_xf_bin" >&2
+    unset _xf_bin _xf_selected_tree
+    return 1 2>/dev/null || exit 1
+fi
+if [ -n "${XFITTER_COMMIT:-}" ]; then
+    if [[ ! "$XFITTER_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+        echo "setup-env.sh: XFITTER_COMMIT must be a full lowercase 40-character Git SHA-1" >&2
+        unset _xf_bin _xf_selected_tree
+        return 1 2>/dev/null || exit 1
+    fi
+    if ! _xf_actual_commit="$(git -C "$_xf_selected_tree" rev-parse --verify HEAD 2>/dev/null)" || [ -z "$_xf_actual_commit" ]; then
+        echo "setup-env.sh: cannot determine Git HEAD for $_xf_selected_tree" >&2
+        unset _xf_bin _xf_selected_tree _xf_actual_commit
+        return 1 2>/dev/null || exit 1
+    fi
+    if [ "$_xf_actual_commit" != "$XFITTER_COMMIT" ]; then
+        echo "setup-env.sh: xFitter commit mismatch for $_xf_selected_tree" >&2
+        echo "setup-env.sh: expected $XFITTER_COMMIT, found $_xf_actual_commit" >&2
+        unset _xf_bin _xf_selected_tree _xf_actual_commit
+        return 1 2>/dev/null || exit 1
+    fi
+    if ! _xf_tracked_changes="$(git -C "$_xf_selected_tree" status --porcelain --untracked-files=no 2>/dev/null)"; then
+        echo "setup-env.sh: cannot inspect tracked changes in $_xf_selected_tree" >&2
+        unset _xf_bin _xf_selected_tree _xf_actual_commit _xf_tracked_changes
+        return 1 2>/dev/null || exit 1
+    fi
+    if [ -n "$_xf_tracked_changes" ]; then
+        echo "setup-env.sh: selected xFitter tree has tracked changes despite its commit pin:" >&2
+        printf '%s\n' "$_xf_tracked_changes" >&2
+        unset _xf_bin _xf_selected_tree _xf_actual_commit _xf_tracked_changes
+        return 1 2>/dev/null || exit 1
+    fi
+    echo "setup-env.sh: verified xFitter commit $_xf_actual_commit" >&2
+    unset _xf_actual_commit _xf_tracked_changes
+fi
+echo "setup-env.sh: using xFitter tree $_xf_selected_tree ($_xf_bin)" >&2
+unset _xf_bin _xf_selected_tree

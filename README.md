@@ -94,8 +94,25 @@ visible to worker nodes.
 Commands resolve the repository root from their own location, so run them from
 the repository root without creating per-workspace symlinks.
 
-Some workspace configurations set `xfitter_tree` and require that named build
-below `$XFITTER_ROOT`. In particular, the small-x runs require the dedicated
+Scan configurations may set `xfitter_tree` to select a build directory below
+`$XFITTER_ROOT`, and may pair it with `xfitter_commit`, a full 40-character Git
+SHA-1. Generated workers export both values; `scripts/setup-env.sh` stops before
+running xFitter if the selected tree's `HEAD` does not match the requested
+commit or if tracked files differ from that commit. Untracked build products do
+not invalidate the pin. Values exported by the caller or generated worker take
+precedence over repository `.env` defaults. Selecting a tree explicitly
+without a commit also suppresses any default-tree commit pin from `.env`, so
+retained jobs are not checked against an unrelated revision. For example:
+
+```yaml
+xfitter_tree: xfitter-master
+xfitter_commit: bd0470d93a433ebfb5d99f6c0fecda9c29141199
+```
+
+The value above pins the current pre-merge review commit. Replace it with the
+resulting `master` commit after GitLab merges the MR and the installation is
+rebuilt. A branch name is not a commit pin, and `XFITTER_TREE` names a directory
+rather than a Git branch. In particular, the small-x runs require the dedicated
 `xfitter-bartlett-apfel306-hell3` build and its APFEL 3.0.6/HELL 3 dependencies.
 Their retained batch launchers and descriptors contain site-specific absolute
 paths that must be adapted for a different checkout or installation; see the
@@ -203,9 +220,10 @@ The supported definition types and commands are:
 PDF comparisons require the LHAPDF Python bindings (`import lhapdf`).
 Cross-section plots require `xfitter-draw` and ROOT. These external components
 are expected from the configured xFitter/LCG environment and are not installed
-by this Python package. `scripts/plot-xsec` defaults to the
-`xfitter-bartlett-fixes` tree; set `XFITTER_TREE` to select another compatible
-built tree when needed.
+by this Python package. Fresh comparisons default to `xfitter-master`; set
+`xfitter_tree` in the comparison configuration or export `XFITTER_TREE` to use
+another compatible built tree. Retained historical and small-x studies should
+continue to select the build with which they were produced.
 
 For example:
 

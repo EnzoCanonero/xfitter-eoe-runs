@@ -12,8 +12,10 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 if ! command -v xfitter-draw >/dev/null 2>&1; then
     if [ -f "$REPO_ROOT/scripts/setup-env.sh" ]; then
-        export XFITTER_TREE="${XFITTER_TREE:-xfitter-bartlett-fixes}"
-        source "$REPO_ROOT/scripts/setup-env.sh" >/dev/null 2>&1
+        if ! source "$REPO_ROOT/scripts/setup-env.sh" >/dev/null; then
+            echo "plot-xsec: failed to initialize the requested xFitter build" >&2
+            exit 1
+        fi
     fi
 fi
 

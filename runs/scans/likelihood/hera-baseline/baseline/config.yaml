@@ -1,6 +1,7 @@
 # Profile-likelihood scans for the 14 free HERA PDF parameters without EoE.
 scan_type: likelihood-scan
 xfitter_tree: xfitter-master
+xfitter_commit: bd0470d93a433ebfb5d99f6c0fecda9c29141199
 template: hera-baseline
 reference_fit: ../../../../fits/hera-baseline/nominal-bartlett2-pumplin
 n_iterations: 2

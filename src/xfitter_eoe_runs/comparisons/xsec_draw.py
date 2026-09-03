@@ -15,8 +15,8 @@ Results.txt / minuit.out.txt / parsout_0 so the chi2 and parameter table pages
 reflect the full fits. xfitter-draw then draws exactly the requested panels.
 
 Theory error bands (--therr) come from the therr+/- columns, which are filled
-(and Bartlett-scaled) by fits run with the bartlett-fixes binary from
-2026-07-13 onwards; older outputs have zeros there and simply show no band.
+(and Bartlett-scaled) by current xFitter builds containing the Bartlett fixes;
+older outputs have zeros there and simply show no band.
 
 Config keys (runs/comparisons/<workspace>/config.yaml)
 ------------------------------------------------
@@ -48,7 +48,7 @@ filledbands: false         # filled instead of hatched bands (--filledbands)
 transparentbands: false    #                                 (--transparentbands)
 extra_options: []          # raw passthrough, e.g. ["--thicklines", "--bw"]
 
-xfitter_tree: xfitter-bartlett-fixes   # binary tree under $XFITTER_ROOT
+xfitter_tree: xfitter-master   # binary tree under $XFITTER_ROOT
 """
 
 import os
@@ -355,7 +355,7 @@ def _find_xfitter_draw(cfg: dict):
     """Resolve the xfitter-draw binary: config tree > env > PATH."""
     root = os.environ.get("XFITTER_ROOT", "/nfs/scratch2/ecanoner/PDF")
     tree = cfg.get("xfitter_tree",
-                   os.environ.get("XFITTER_TREE", "xfitter-bartlett-fixes"))
+                   os.environ.get("XFITTER_TREE", "xfitter-master"))
     cand = Path(tree)
     if not cand.is_absolute():
         cand = Path(root) / tree

@@ -3,6 +3,7 @@
 # is the nominal epsilon=0.6 EoE fit.
 scan_type: lambda-scan
 xfitter_tree: xfitter-master
+xfitter_commit: bd0470d93a433ebfb5d99f6c0fecda9c29141199
 template: giuli-param
 epsilon: 0.6
 lambda: {min: 0.0, max: 1.2, step: 0.1}

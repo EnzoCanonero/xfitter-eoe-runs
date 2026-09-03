@@ -1,6 +1,7 @@
 # Profile-likelihood scans for the HERA PDFs and seven greedy-selected sources.
 scan_type: likelihood-scan
 xfitter_tree: xfitter-master
+xfitter_commit: bd0470d93a433ebfb5d99f6c0fecda9c29141199
 template: hera-baseline
 reference_fit: ../../../../fits/hera-baseline/baseline-7-sources-bartlett2-pumplin
 epsilon: 0.6
