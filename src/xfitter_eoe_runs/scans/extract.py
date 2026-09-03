@@ -4,11 +4,34 @@ Extracts chi2, parameters, convergence status from fit results
 """
 
 from pathlib import Path
-from typing import Dict, Optional, List, Sequence
+from typing import Dict, Optional, List, Sequence, Tuple
 import json
 import re
 import numpy as np
 import pandas as pd
+
+
+_NUMERIC_FIELD = r'[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[EeDd][-+]?\d+)?'
+_MINIMISED_RESULT_PATTERN = re.compile(
+    rf'^\s*(?:Chi2\s+)?after\s+minimisation\s+'
+    rf'({_NUMERIC_FIELD})(?:\s+([+-]?\d+))?',
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _parse_minimised_result(content: str) -> Tuple[Optional[float], Optional[int]]:
+    """Return minimized chi2 and NDF from either xFitter result heading.
+
+    EoE output uses ``Chi2 after minimisation`` while ordinary fits retain the
+    legacy ``After minimisation`` heading.  Missing fields remain ``None`` so
+    scan callers can preserve their existing conversion to ``numpy.nan``.
+    """
+    match = _MINIMISED_RESULT_PATTERN.search(content)
+    if not match:
+        return None, None
+    chi2 = float(match.group(1).replace('D', 'E').replace('d', 'e'))
+    ndf = int(match.group(2)) if match.group(2) is not None else None
+    return chi2, ndf
 
 
 class MinuitOutputParser:
@@ -137,16 +160,12 @@ class ResultsParser:
         self.lines = self.content.splitlines()
 
     def parse_chi2(self) -> Optional[float]:
-        match = re.search(r'Chi2 after minimisation\s+([\d.]+)', self.content)
-        if match:
-            return float(match.group(1))
-        return None
+        chi2, _ = _parse_minimised_result(self.content)
+        return chi2
 
     def parse_ndf(self) -> Optional[int]:
-        match = re.search(r'Chi2 after minimisation\s+[\d.]+\s+(\d+)', self.content)
-        if match:
-            return int(match.group(1))
-        return None
+        _, ndf = _parse_minimised_result(self.content)
+        return ndf
 
     def parse_partial_chi2s(self) -> pd.DataFrame:
         rows = []
@@ -165,40 +184,70 @@ class ResultsParser:
     def parse_systematic_shifts(self) -> pd.DataFrame:
         """Parse the per-source table of Results.txt.
 
-        The two xfitter trees print different tables, so the field count is what
-        identifies the layout:
+        xFitter prints several table layouts, so punctuation and field count
+        identify them:
 
-          xfitter-bartlett-fixes (9 numbers)
+          extended EoE (9 numbers)
             index name shift error corr_err epsilon r b_tilde b_mutheta
                   gof_contrib lr_contrib type
-          xfitter-master (6 numbers)
+          compact EoE (6 numbers)
             index name shift error corr_err epsilon b_theta gof_contrib type
+          ordinary (``+/-`` separator)
+            index name shift +/- error type
 
-        Both are parseable for diagnostics. Scan extraction nevertheless
+        All are parseable for diagnostics. Scan extraction nevertheless
         requires the extended table for every active EoE fit, preventing stale
         pre-fix outputs from entering a new ranking silently. Columns absent
         from a legacy layout are left as None rather than aliased.
         """
         rows = []
-        pattern = re.compile(
-            r'^\s*(\d+)\s+(\S+)\s+((?:[-\d.eE+]+\s+)+)(:[\w:]+)\s*$'
+        eoe_pattern = re.compile(
+            rf'^\s*(\d+)\s+(\S+)\s+((?:{_NUMERIC_FIELD}\s+)+)(:\S+)\s*$'
+        )
+        ordinary_pattern = re.compile(
+            rf'^\s*(\d+)\s+(\S+)\s+({_NUMERIC_FIELD})\s+'
+            rf'\+/-\s+({_NUMERIC_FIELD})\s+(:\S+)\s*$'
         )
         for line in self.lines:
-            m = pattern.match(line)
-            if not m:
+            ordinary_match = ordinary_pattern.match(line)
+            if ordinary_match:
+                rows.append({
+                    'index': int(ordinary_match.group(1)),
+                    'name': ordinary_match.group(2),
+                    'shift': float(
+                        ordinary_match.group(3).replace('D', 'E').replace('d', 'e')
+                    ),
+                    'error': float(
+                        ordinary_match.group(4).replace('D', 'E').replace('d', 'e')
+                    ),
+                    'corr_err': None, 'epsilon': None,
+                    'b_theta': None, 'r': None, 'b_tilde': None,
+                    'b_mutheta': None, 'gof_contrib': None,
+                    'lr_contrib': None,
+                    'sys_type': ordinary_match.group(5),
+                })
+                continue
+
+            eoe_match = eoe_pattern.match(line)
+            if not eoe_match:
                 continue
             try:
-                nums = [float(x) for x in m.group(3).split()]
+                nums = [
+                    float(x.replace('D', 'E').replace('d', 'e'))
+                    for x in eoe_match.group(3).split()
+                ]
             except ValueError:
                 continue
+            if len(nums) not in (6, 9):
+                continue
             row = {
-                'index': int(m.group(1)),
-                'name': m.group(2),
+                'index': int(eoe_match.group(1)),
+                'name': eoe_match.group(2),
                 'shift': nums[0],
                 'error': nums[1],
                 'corr_err': nums[2],
                 'epsilon': nums[3],
-                'sys_type': m.group(4),
+                'sys_type': eoe_match.group(4),
                 'b_theta': None, 'r': None, 'b_tilde': None,
                 'b_mutheta': None, 'lr_contrib': None,
             }
@@ -207,8 +256,6 @@ class ResultsParser:
                             'gof_contrib': nums[7], 'lr_contrib': nums[8]})
             elif len(nums) == 6:
                 row.update({'b_theta': nums[4], 'gof_contrib': nums[5]})
-            else:
-                continue
             rows.append(row)
         columns = [
             'index', 'name', 'shift', 'error', 'corr_err', 'epsilon',
@@ -522,8 +569,8 @@ def _extract_likelihood_scan_results(fits_dir: Path) -> Dict:
                 results_file = fit_dir / "output" / "Results.txt"
                 with open(results_file) as f:
                     content = f.read()
-                m = re.search(r'Chi2 after minimisation\s+([\d.]+)', content)
-                chi2 = float(m.group(1)) if m else np.nan
+                chi2, _ = _parse_minimised_result(content)
+                chi2 = chi2 if chi2 is not None else np.nan
 
                 minuit_file = fit_dir / "output" / "minuit.out.txt"
                 conv = False
@@ -570,9 +617,10 @@ def _extract_likelihood_scan_results(fits_dir: Path) -> Dict:
         status = 'missing'
         final_fcn = np.nan
         try:
-            m = re.search(r'Chi2 after minimisation\s+([-+0-9.Ee]+)',
-                          (fit_dir / "output" / "Results.txt").read_text())
-            chi2 = float(m.group(1)) if m else np.nan
+            parsed_chi2, _ = _parse_minimised_result(
+                (fit_dir / "output" / "Results.txt").read_text()
+            )
+            chi2 = parsed_chi2 if parsed_chi2 is not None else np.nan
         except Exception:
             chi2 = np.nan
         try:
