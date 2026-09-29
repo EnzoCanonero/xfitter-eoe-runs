@@ -67,6 +67,7 @@ class SetupEnvironmentTests(unittest.TestCase):
         environment = os.environ.copy()
         environment.pop("XFITTER_TREE", None)
         environment.pop("XFITTER_COMMIT", None)
+        environment.pop("XFITTER_SETUP_ROOT", None)
         environment["XFITTER_LCG_SETUP"] = str(self.lcg_setup)
         environment.update(overrides)
         return subprocess.run(
@@ -105,6 +106,60 @@ class SetupEnvironmentTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("tree=alternate-tree\n", result.stdout)
         self.assertIn(f"commit={self.alternate_commit}\n", result.stdout)
+
+    def test_separate_setup_root_preserves_nested_and_sibling_trees(self):
+        setup_root = self.install / "merge-master"
+        setup_root.mkdir()
+        (self.install / "setup.sh").rename(setup_root / "setup.sh")
+        (self.install / "default-tree").rename(setup_root / "default-tree")
+        (self.repo / ".env").write_text(
+            f"XFITTER_ROOT={self.install}\n"
+            f"XFITTER_SETUP_ROOT={setup_root}\n"
+            "XFITTER_TREE=merge-master/default-tree\n"
+            f"XFITTER_COMMIT={self.default_commit}\n"
+        )
+        for tree, commit, overrides in [
+            ("merge-master/default-tree", self.default_commit, {}),
+            ("alternate-tree", self.alternate_commit, {
+                "XFITTER_TREE": "alternate-tree",
+                "XFITTER_COMMIT": self.alternate_commit,
+            }),
+            ("alternate-tree", self.alternate_commit, {
+                "XFITTER_TREE": str(self.install / "alternate-tree"),
+                "XFITTER_COMMIT": self.alternate_commit,
+            }),
+        ]:
+            with self.subTest(overrides=overrides):
+                result = self._source(**overrides)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f"commit={commit}\n", result.stdout)
+                self.assertIn(
+                    f"binary={self.install / tree / 'bin' / 'xfitter'}\n",
+                    result.stdout,
+                )
+
+    def test_missing_setup_stops_even_with_a_valid_binary_on_path(self):
+        (self.install / "setup.sh").unlink()
+        result = self._source(
+            PATH=f"{self.install / 'default-tree' / 'bin'}:{os.environ['PATH']}",
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(f"cannot read {self.install / 'setup.sh'}", result.stderr)
+        self.assertNotIn("using xFitter tree", result.stderr)
+        self.assertNotIn("directory stack empty", result.stderr)
+
+    def test_failed_environment_scripts_stop_setup(self):
+        for setup in [self.lcg_setup, self.install / "setup.sh"]:
+            with self.subTest(setup=setup):
+                original = setup.read_text()
+                setup.write_text("return 1\n")
+                try:
+                    result = self._source()
+                finally:
+                    setup.write_text(original)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(f"failed to source {setup}", result.stderr)
+                self.assertNotIn("using xFitter tree", result.stderr)
 
     def test_explicit_tree_without_commit_suppresses_default_tree_pin(self):
         result = self._source(XFITTER_TREE="alternate-tree")

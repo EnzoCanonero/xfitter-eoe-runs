@@ -352,20 +352,21 @@ def _build_options(cfg: dict):
 
 
 def _find_xfitter_draw(cfg: dict):
-    """Resolve the xfitter-draw binary: config tree > env > PATH."""
+    """Resolve the requested tree: config > environment > relocated default.
+
+    A missing build must fail instead of selecting an unrelated binary on PATH.
+    """
     root = os.environ.get("XFITTER_ROOT", "/nfs/scratch2/ecanoner/PDF")
-    tree = cfg.get("xfitter_tree",
-                   os.environ.get("XFITTER_TREE", "xfitter-master"))
+    tree = (cfg.get("xfitter_tree") or os.environ.get("XFITTER_TREE")
+            or "merge-master/xfitter-master")
     cand = Path(tree)
     if not cand.is_absolute():
         cand = Path(root) / tree
     exe = cand / "bin" / "xfitter-draw"
-    if exe.is_file():
+    if exe.is_file() and os.access(exe, os.X_OK):
         return str(exe)
-    found = shutil.which("xfitter-draw")
-    if found:
-        return found
-    raise FileNotFoundError(f"xfitter-draw not found (looked in {exe} and PATH)")
+    raise FileNotFoundError(
+        f"no executable xfitter-draw in selected xFitter tree: {exe}")
 
 
 def compare_xsec(run_dir: Path):
@@ -385,6 +386,7 @@ def compare_xsec(run_dir: Path):
     if len(fits) < 1:
         raise ValueError("need at least one entry under 'fits'")
 
+    exe = _find_xfitter_draw(cfg)
     run_dir.mkdir(parents=True, exist_ok=True)
     staging = run_dir / ".xfdraw-staging"
     if staging.exists():
@@ -407,7 +409,6 @@ def compare_xsec(run_dir: Path):
     outdir = staging / "out"
     outdir.mkdir()
 
-    exe = _find_xfitter_draw(cfg)
     cmd = [exe] + _build_options(cfg) + ["--outdir", str(outdir)] + args
     print("running:", " ".join(cmd))
     res = subprocess.run(cmd, capture_output=True, text=True)

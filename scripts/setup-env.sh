@@ -4,7 +4,7 @@
 
 fail_setup() {
     echo "setup-env.sh: $1" >&2
-    return 1 2>/dev/null || exit 1
+    return 1
 }
 
 # Load .env from repo root if it exists (sets XFITTER_ROOT, etc.). Explicit
@@ -48,22 +48,43 @@ export XFITTER_ROOT
 # 1) Base LCG environment from CVMFS. The override is primarily useful for
 # testing and for installations providing an equivalent site-local setup.
 LCG_SETUP="${XFITTER_LCG_SETUP:-/cvmfs/sft.cern.ch/lcg/views/LCG_105/x86_64-el9-gcc13-opt/setup.sh}"
-[ -r "$LCG_SETUP" ] || fail_setup "cannot read $LCG_SETUP"
-source "$LCG_SETUP" || fail_setup "failed to source $LCG_SETUP"
+[ -r "$LCG_SETUP" ] || {
+    fail_setup "cannot read $LCG_SETUP"
+    return 1 2>/dev/null || exit 1
+}
+source "$LCG_SETUP" || {
+    fail_setup "failed to source $LCG_SETUP"
+    return 1 2>/dev/null || exit 1
+}
 
 # 2) Source the xFitter setup from NFS location (accessible to Condor workers)
-# Set XFITTER_ROOT in .env or environment before sourcing this script.
-# Need to cd to the PDF directory first so the setup.sh can read the version file
-XFITTER_SETUP_ROOT="${XFITTER_ROOT:?Set XFITTER_ROOT in .env at the repo root}"
+# Worktrees are relative to XFITTER_ROOT; setup.sh and dependencies may live in
+# a separate XFITTER_SETUP_ROOT. Keep the old flat layout as the fallback.
+# Source from that directory for setup scripts that read files relative to PWD.
+: "${XFITTER_ROOT:?Set XFITTER_ROOT in .env at the repo root}"
+export XFITTER_SETUP_ROOT="${XFITTER_SETUP_ROOT:-$XFITTER_ROOT}"
 XFITTER_SETUP="$XFITTER_SETUP_ROOT/setup.sh"
-[ -r "$XFITTER_SETUP" ] || fail_setup "cannot read $XFITTER_SETUP"
+[ -r "$XFITTER_SETUP" ] || {
+    fail_setup "cannot read $XFITTER_SETUP"
+    return 1 2>/dev/null || exit 1
+}
 
-pushd "$XFITTER_SETUP_ROOT" > /dev/null || fail_setup "cannot cd to $XFITTER_SETUP_ROOT"
-source "$XFITTER_SETUP" || { popd > /dev/null; fail_setup "failed to source $XFITTER_SETUP"; }
-popd > /dev/null || fail_setup "failed to return from $XFITTER_SETUP_ROOT"
+pushd "$XFITTER_SETUP_ROOT" > /dev/null || {
+    fail_setup "cannot cd to $XFITTER_SETUP_ROOT"
+    return 1 2>/dev/null || exit 1
+}
+source "$XFITTER_SETUP" || {
+    popd > /dev/null
+    fail_setup "failed to source $XFITTER_SETUP"
+    return 1 2>/dev/null || exit 1
+}
+popd > /dev/null || {
+    fail_setup "failed to return from $XFITTER_SETUP_ROOT"
+    return 1 2>/dev/null || exit 1
+}
 
 # 3) Optional: select a specific xFitter build tree (git worktree) instead of
-# the general-purpose default baked into $XFITTER_ROOT/setup.sh
+# the general-purpose default baked into $XFITTER_SETUP_ROOT/setup.sh
 # (xfitter-master). Set XFITTER_TREE in .env or the environment to:
 #   - a directory name under $XFITTER_ROOT, e.g. XFITTER_TREE=xfitter-bartlett-fixes
 #   - an absolute path to a built tree
@@ -73,7 +94,7 @@ popd > /dev/null || fail_setup "failed to return from $XFITTER_SETUP_ROOT"
 if [ -n "${XFITTER_TREE:-}" ]; then
     case "$XFITTER_TREE" in
         /*) _xf_tree="$XFITTER_TREE" ;;
-        *)  _xf_tree="$XFITTER_SETUP_ROOT/$XFITTER_TREE" ;;
+        *)  _xf_tree="$XFITTER_ROOT/$XFITTER_TREE" ;;
     esac
     # Hard stop rather than silent fallback to the default tree: if the tree was
     # requested explicitly it must be built, else the run would use the wrong

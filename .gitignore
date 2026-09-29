@@ -31,6 +31,22 @@ runs/comparisons/**/results/
 runs/comparisons/**/results_*/
 runs/comparisons/**/.xfdraw-staging/
 
+# Local preview products and manuscript history for the retained comparison.
+runs/comparisons/smallx-gaussian-vs-5sources-pumplin-20260818/*.log
+runs/comparisons/smallx-gaussian-vs-5sources-pumplin-20260818/paper-before.sha256.json
+runs/comparisons/smallx-gaussian-vs-5sources-pumplin-20260818/preview/*.aux
+runs/comparisons/smallx-gaussian-vs-5sources-pumplin-20260818/preview/*.log
+runs/comparisons/smallx-gaussian-vs-5sources-pumplin-20260818/preview/*.pdf
+runs/comparisons/smallx-gaussian-vs-5sources-pumplin-20260818/preview/*.png
+runs/comparisons/smallx-gaussian-vs-5sources-pumplin-20260818/preview/figure4_caption.tex
+runs/comparisons/smallx-gaussian-vs-5sources-pumplin-20260818/preview/implemented_pdf_paragraph.tex
+runs/comparisons/smallx-gaussian-vs-5sources-pumplin-20260818/preview/unified_pdf_paragraph.tex
+
+# Local monitoring and historical submission files; the scan config is tracked.
+runs/scans/lambda/hera-baseline/final-selection-common-epsilon-20260918/monitoring/
+runs/scans/lambda/hera-baseline/final-selection-common-epsilon-20260918/submit-dry-run.ads
+runs/scans/lambda/hera-baseline/final-selection-common-epsilon-20260918/supplemental-epsilon-0.7/
+
 # Python cache
 __pycache__/
 *.pyc

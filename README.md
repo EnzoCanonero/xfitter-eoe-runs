@@ -83,13 +83,27 @@ visible to worker nodes.
    python3 -m pip install -e .
    ```
 
-3. Set `XFITTER_ROOT` in `.env` to the xFitter installation visible to Condor
-   worker nodes.
+3. Set the installation paths and default build in `.env`. `XFITTER_ROOT`
+   contains the worktrees; `XFITTER_SETUP_ROOT` contains `setup.sh` and shared
+   dependencies. Both locations must be visible to Condor worker nodes. If
+   `XFITTER_SETUP_ROOT` is omitted, it defaults to `XFITTER_ROOT`.
+
+   ```bash
+   XFITTER_ROOT=/nfs/scratch2/ecanoner/PDF
+   XFITTER_SETUP_ROOT=/nfs/scratch2/ecanoner/PDF/merge-master
+   XFITTER_TREE=merge-master/xfitter-master
+   XFITTER_COMMIT=67398b15571dff1e9ddce0bc88923554552c9c84
+   ```
+
 4. For interactive xFitter use, source the environment:
 
    ```bash
    source scripts/setup-env.sh
    ```
+
+   When switching an already configured shell to the repository default, first
+   run `unset XFITTER_TREE XFITTER_COMMIT`; otherwise those existing values
+   intentionally override `.env`.
 
 Commands resolve the repository root from their own location, so run them from
 the repository root without creating per-workspace symlinks.
@@ -105,14 +119,24 @@ without a commit also suppresses any default-tree commit pin from `.env`, so
 retained jobs are not checked against an unrelated revision. For example:
 
 ```yaml
-xfitter_tree: xfitter-master
-xfitter_commit: bd0470d93a433ebfb5d99f6c0fecda9c29141199
+xfitter_tree: merge-master/xfitter-master
+xfitter_commit: 67398b15571dff1e9ddce0bc88923554552c9c84
 ```
 
-The value above pins the current pre-merge review commit. Replace it with the
-resulting `master` commit after GitLab merges the MR and the installation is
-rebuilt. A branch name is not a commit pin, and `XFITTER_TREE` names a directory
-rather than a Git branch. In particular, the small-x runs require the dedicated
+The value above pins the build installed from `mr/errors-on-errors-20260903`
+on 2026-09-29. Update the pin after checking out and rebuilding another revision.
+A branch name is not a commit pin, and `XFITTER_TREE` names a directory relative
+to `XFITTER_ROOT` (or an absolute path), rather than a Git branch.
+
+Changing `.env` does not migrate existing studies: their configurations and
+generated launchers retain their own tree and commit selections. For a new run
+on the current build, create a separate workspace with the desired tree and
+commit and generate its launchers. Retained configurations using the old
+`xfitter-master` path and `bd0470d...` pin need a build of that revision to be
+reproduced; the relocated current build has a different commit. Preserve those
+historical configurations and results when creating a new study.
+
+In particular, the small-x runs require the dedicated
 `xfitter-bartlett-apfel306-hell3` build and its APFEL 3.0.6/HELL 3 dependencies.
 Their retained batch launchers and descriptors contain site-specific absolute
 paths that must be adapted for a different checkout or installation; see the
