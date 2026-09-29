@@ -1,0 +1,77 @@
+{
+  "cluster_id": 134382,
+  "submitted_utc": "2026-09-18T11:37:54Z",
+  "job_count": 8,
+  "epsilon_values": [
+    0.0,
+    0.1,
+    0.2,
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.7
+  ],
+  "jobs": [
+    {
+      "cluster_id": 134382,
+      "proc_id": 0,
+      "epsilon": 0.0,
+      "fit_directory": "/nfs/scratch2/ecanoner/xfitter-eoe-runs/runs/scans/lambda/hera-baseline/final-selection-common-epsilon-20260918/runs/lambda_0.0"
+    },
+    {
+      "cluster_id": 134382,
+      "proc_id": 1,
+      "epsilon": 0.1,
+      "fit_directory": "/nfs/scratch2/ecanoner/xfitter-eoe-runs/runs/scans/lambda/hera-baseline/final-selection-common-epsilon-20260918/runs/lambda_0.1"
+    },
+    {
+      "cluster_id": 134382,
+      "proc_id": 2,
+      "epsilon": 0.2,
+      "fit_directory": "/nfs/scratch2/ecanoner/xfitter-eoe-runs/runs/scans/lambda/hera-baseline/final-selection-common-epsilon-20260918/runs/lambda_0.2"
+    },
+    {
+      "cluster_id": 134382,
+      "proc_id": 3,
+      "epsilon": 0.3,
+      "fit_directory": "/nfs/scratch2/ecanoner/xfitter-eoe-runs/runs/scans/lambda/hera-baseline/final-selection-common-epsilon-20260918/runs/lambda_0.3"
+    },
+    {
+      "cluster_id": 134382,
+      "proc_id": 4,
+      "epsilon": 0.4,
+      "fit_directory": "/nfs/scratch2/ecanoner/xfitter-eoe-runs/runs/scans/lambda/hera-baseline/final-selection-common-epsilon-20260918/runs/lambda_0.4"
+    },
+    {
+      "cluster_id": 134382,
+      "proc_id": 5,
+      "epsilon": 0.5,
+      "fit_directory": "/nfs/scratch2/ecanoner/xfitter-eoe-runs/runs/scans/lambda/hera-baseline/final-selection-common-epsilon-20260918/runs/lambda_0.5"
+    },
+    {
+      "cluster_id": 134382,
+      "proc_id": 6,
+      "epsilon": 0.6,
+      "fit_directory": "/nfs/scratch2/ecanoner/xfitter-eoe-runs/runs/scans/lambda/hera-baseline/final-selection-common-epsilon-20260918/runs/lambda_0.6"
+    },
+    {
+      "cluster_id": 134383,
+      "proc_id": 0,
+      "epsilon": 0.7,
+      "fit_directory": "/nfs/scratch2/ecanoner/xfitter-eoe-runs/runs/scans/lambda/hera-baseline/final-selection-common-epsilon-20260918/runs/lambda_0.7"
+    }
+  ],
+  "clusters": [
+    {
+      "cluster_id": 134382,
+      "submitted_utc": "2026-09-18T11:37:54Z",
+      "job_count": 7
+    },
+    {
+      "cluster_id": 134383,
+      "submitted_utc": "2026-09-18T11:42:38Z",
+      "job_count": 1
+    }
+  ]
+}
