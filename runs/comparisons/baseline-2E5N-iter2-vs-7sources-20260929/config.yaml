@@ -1,0 +1,18 @@
+# Paper reproduction configuration prepared 2026-09-29.
+# Source template: runs/comparisons/baseline-2E5N-iter2-vs-7sources/config.yaml
+type: pdf-comparison
+Q2: 4.0
+error_type: symmetric
+observables:
+- uv
+- dv
+- gluon
+- sea
+ratio_reference: 0
+fits:
+- label: Numerical
+  path: ../../fits/hera-baseline/baseline-7-sources-bartlett2-pumplin-20260929
+  source: xfitter-grid
+- label: Iterative
+  path: ../../fits/hera-baseline/baseline-2E5N-niter2-bartlett2-pumplin-20260929
+  source: xfitter-grid
