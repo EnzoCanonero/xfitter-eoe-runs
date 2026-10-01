@@ -1,0 +1,30 @@
+xfitter_commit: 67398b15571dff1e9ddce0bc88923554552c9c84
+scan_type: systematic-ranking
+xfitter_tree: merge-master/xfitter-master
+template: bg-param-nnlo-nllx-fonll
+epsilon: 0.6
+n_iterations: 2
+enable_bartlett: true
+q2_cut: 3.5
+request_memory: 4GB
+
+# Second forward-selection round after selecting sysHZComb1053
+# from the NNLO+NLLx baseline (dchi2_B = 21.74 > 1).
+base_systematics:
+  - {name: sysHZComb1053, type: E, init: -14.264694}
+
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+
+systematics:
+  - {name: sysHZComb, range: "1001-1162", type: E}
+  - {name: proc_nrl, type: E}
+  - {name: proc_tb, range: "21-24", type: E}
+  - {name: proc_gp, type: E}
+  - {name: proc_had, type: E}

@@ -1,0 +1,37 @@
+xfitter_commit: 67398b15571dff1e9ddce0bc88923554552c9c84
+request_memory: 2GB
+n_iterations: 2
+enable_bartlett: true
+q2_cut: 3.5
+scan_type: systematic-ranking
+xfitter_tree: merge-master/xfitter-master
+template: giuli-param
+epsilon: 0.6
+
+# Second-order forward-selection scan with the Giuli parametrization (Q2cut = 3.5).
+# sysHZComb1053 is held ON in every fit (eps 0.6), warm-started at its single-source
+# minimum from the Giuli EoE scan (shift = -16.2802). Every candidate is ranked by its
+# marginal impact on top of an already-active 1053. The nominal fit is the 1053-only
+# fit. 1053 is auto-excluded from the candidate list.
+# Note: the Giuli parametrization has 23 PDF parameters, so 1053 is MINUIT param #24
+# (the framework computes this automatically from the rendered parameters.yaml).
+base_systematics:
+  - {name: sysHZComb1053, type: E, init: -16.2802}
+
+# HERA datafiles (all 7 files)
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+
+# Candidate systematic sources to rank (sysHZComb1053 removed automatically as a base source).
+systematics:
+  - {name: sysHZComb, range: "1001-1162", type: E}
+  - {name: proc_nrl, type: E}
+  - {name: proc_tb, range: "21-24", type: E}
+  - {name: proc_gp, type: E}
+  - {name: proc_had, type: E}
