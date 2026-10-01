@@ -60,3 +60,6 @@ __pycache__/
 # Local archive of inactive studies and fits.  The tracked relocation manifest
 # records what was moved; the archived payload itself remains on this workspace.
 /legacy/
+
+# Local paper reproduction plan.
+/paper-reproduction-plan.local.md
