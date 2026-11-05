@@ -10,9 +10,13 @@ observables:
 - sea
 ratio_reference: 0
 fits:
-- label: HERA baseline
+- label: Gaussian
+  setup: HERAPDF2.0, NNLO, RTOPT
+  treatment: Gaussian
   path: ../../fits/hera-baseline/nominal-bartlett2-pumplin-20260929
   source: xfitter-grid
-- label: HERA + EoE
+- label: EoE
+  setup: HERAPDF2.0, NNLO, RTOPT
+  treatment: EoE
   path: ../../fits/hera-baseline/baseline-7-sources-bartlett2-pumplin-20260929
   source: xfitter-grid

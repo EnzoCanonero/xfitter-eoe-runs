@@ -9,8 +9,8 @@ How it works
 xfitter-draw natively overlays several output directories, but always draws
 every dataset and every Q2 subplot. This pipeline gets panel selection by
 STAGING: for each fit it writes a temporary directory containing a FILTERED
-fittedresults.txt (only the requested dataset and Q2 bins; header and Plot
-metadata kept verbatim, so panel titles/axes are untouched) plus symlinks to
+fittedresults.txt (only the requested dataset and Q2 bins; numerical columns
+unchanged, with Q2 units and comparison annotations in Plot metadata) plus symlinks to
 Results.txt / minuit.out.txt / parsout_0 so the chi2 and parameter table pages
 reflect the full fits. xfitter-draw then draws exactly the requested panels.
 
@@ -31,6 +31,9 @@ panels:
 fits:                               # 2+ entries; first = reference/data holder
   - {label: "nominal",  path: ../../fits/hera-baseline/nominal-bartlett2-hesse}
   - {label: "EoE-7src", path: ../../fits/hera-baseline/baseline-7-sources-bartlett2-hesse}
+# Optional setup/treatment metadata separates a common heading from curve labels:
+#   setup: HERAPDF2.0, NNLO, RTOPT
+#   treatment: Gaussian             # or EoE (FS), EoE (INF), etc.
 
 # element toggles (defaults reproduce the Fig.2 / xfitter-draw look)
 therr: true                # theory uncertainty bands        (--therr)
@@ -40,6 +43,7 @@ logo: true                 # xFitter logo                    (off -> --no-logo)
 upband: true               # band in the upper (sigma) panel (off -> --noupband)
 
 # layout / style knobs
+show_setup_annotation: true # common setup/treatment heading above the curves
 ratio_to_theory: false     # ratio panel relative to theory  (--ratio-to-theory)
 ratiorange: null           # "0.9:1.1"                       (--ratiorange)
 xrange: null               # "5e-5:0.02"                     (--xrange)
@@ -166,7 +170,7 @@ def _is_data_row(line: str) -> bool:
         return False
 
 
-def _normalise_selected_plots(meta, rows):
+def _normalise_selected_plots(meta, rows, annotation=None):
     """Give each selected Q2 slice a valid Plot index and matching title.
 
     In some reduced-energy HERA blocks the plot index in the final data column
@@ -177,7 +181,7 @@ def _normalise_selected_plots(meta, rows):
     slices are assigned temporary indices in the staged file only.
     """
     plot_line = re.compile(r"^Plot(\d+)@")
-    title = re.compile(r"(@Title:Q\^\{2\} = )[^@]*(?=\s*@)")
+    title = re.compile(r"(@Title:Q\^\{2\}\s*=\s*)[^@]*")
     plot_meta = {}
     for i, line in enumerate(meta):
         match = plot_line.match(line)
@@ -233,9 +237,10 @@ def _normalise_selected_plots(meta, rows):
         q2 = next((q for q, p in assigned.items() if p == plot), None)
         if q2 is not None:
             line = title.sub(
-                lambda m: f"{m.group(1)}{q2:g} ",
+                lambda m: f"{m.group(1)}{q2:g} GeV^{{2}} ",
                 line,
             )
+            line = _annotate_plot(line, annotation)
         out.append(line)
 
     template = next(line for line in meta if plot_line.match(line))
@@ -244,7 +249,8 @@ def _normalise_selected_plots(meta, rows):
         if plot in plot_meta:
             continue
         line = plot_line.sub(f"Plot{plot}@", template)
-        line = title.sub(lambda m: f"{m.group(1)}{q2:g} ", line)
+        line = title.sub(lambda m: f"{m.group(1)}{q2:g} GeV^{{2}} ", line)
+        line = _annotate_plot(line, annotation)
         new_plot_lines.append(line)
     if new_plot_lines:
         # Plot metadata must precede the column-header line: xfitter-draw stops
@@ -255,7 +261,8 @@ def _normalise_selected_plots(meta, rows):
     return out, rewritten_rows
 
 
-def filter_fittedresults(src: Path, dst: Path, dataset: str, q2bins, panels=None):
+def filter_fittedresults(src: Path, dst: Path, dataset: str, q2bins, panels=None,
+                         annotation=None):
     """Copy src -> dst keeping only the matching dataset block(s), and within
     them only data rows whose Q2 (column 1) is in q2bins (all rows if q2bins
     is empty).  If panels is supplied, it instead selects the explicit
@@ -292,7 +299,7 @@ def filter_fittedresults(src: Path, dst: Path, dataset: str, q2bins, panels=None
                 rows = [r for r in rows if any(
                     abs(float(r.split()[0]) - q) < 1e-6 for q in q2bins)]
         if rows:
-            meta, rows = _normalise_selected_plots(meta, rows)
+            meta, rows = _normalise_selected_plots(meta, rows, annotation)
             blocks.append("\n".join(head + meta + rows))
             npts += len(rows)
     if not blocks:
@@ -310,8 +317,43 @@ def filter_fittedresults(src: Path, dst: Path, dataset: str, q2bins, panels=None
 _AUX_FILES = ["Results.txt", "minuit.out.txt", "parsout_0", "parsout_1"]
 
 
+def _root_label(text):
+    """Render the conventional small-x order in ROOT's label syntax."""
+    return re.sub(r"NLL_?x\b", "NLL_{x}", str(text))
+
+
+def _comparison_presentation(fits):
+    """Separate shared setup/treatment information from the curve legends."""
+    if not all(entry.get("setup") and entry.get("treatment") for entry in fits):
+        return [entry.get("label") for entry in fits], None
+    setups = [_root_label(entry["setup"]) for entry in fits]
+    treatments = [entry["treatment"] for entry in fits]
+    if len(set(setups)) == 1:
+        if len(set(treatments)) == 1:
+            return ([entry.get("label") for entry in fits],
+                    f"{setups[0]}; {treatments[0]}")
+        return treatments, setups[0]
+    if len(set(treatments)) == 1:
+        return setups, treatments[0]
+    return [f"{setup} ({treatment})"
+            for setup, treatment in zip(setups, treatments)], None
+
+
+def _annotate_plot(line, annotation):
+    """Use the renderer's second top annotation, retaining the reaction label."""
+    if not annotation:
+        return line
+    field = re.search(r"@Lumi:([^@]*)", line)
+    if field:
+        previous = field.group(1).strip()
+        text = (f"#splitline{{{annotation}}}{{{previous}}}"
+                if previous and previous != annotation else annotation)
+        return line[:field.start()] + f"@Lumi:{text}" + line[field.end():]
+    return line.rstrip() + f"@Lumi:{annotation}"
+
+
 def _stage_fit(entry: dict, index: int, workspace_dir: Path, staging: Path,
-               dataset: str, q2bins, panels=None):
+               dataset: str, q2bins, panels=None, annotation=None):
     label = entry.get("label")
     if "path" not in entry or not label:
         raise ValueError(f"fits[{index}] needs both 'label' and 'path'")
@@ -325,7 +367,7 @@ def _stage_fit(entry: dict, index: int, workspace_dir: Path, staging: Path,
     dst = staging / f"fit{index}"
     dst.mkdir(parents=True)
     n = filter_fittedresults(fr, dst / "fittedresults.txt", dataset, q2bins,
-                             panels)
+                             panels, annotation)
     for aux in _AUX_FILES:
         if (out / aux).is_file():
             (dst / aux).symlink_to(out / aux)
@@ -333,7 +375,7 @@ def _stage_fit(entry: dict, index: int, workspace_dir: Path, staging: Path,
     return dst, label
 
 
-def _build_options(cfg: dict):
+def _build_options(cfg: dict, reference_label=None):
     # data plots only: PDF pages and shift pages have their own pipelines
     opts = ["--no-pdfs", "--no-shifts"]
     if cfg.get("therr", True):            opts.append("--therr")
@@ -342,12 +384,16 @@ def _build_options(cfg: dict):
     if not cfg.get("logo", True):         opts.append("--no-logo")
     if not cfg.get("upband", True):       opts.append("--noupband")
     if cfg.get("ratio_to_theory"):        opts.append("--ratio-to-theory")
+    extra_options = [str(o) for o in cfg.get("extra_options", [])]
+    if (reference_label and "--theory" not in extra_options
+            and (cfg.get("ratio_to_theory") or "--ratio-to-theory" in extra_options)):
+        opts += ["--theory", reference_label]
     if cfg.get("filledbands"):            opts.append("--filledbands")
     if cfg.get("transparentbands"):       opts.append("--transparentbands")
     if cfg.get("ratiorange"):             opts += ["--ratiorange", str(cfg["ratiorange"])]
     if cfg.get("xrange"):                 opts += ["--xrange", str(cfg["xrange"])]
     if cfg.get("plots_per_page"):         opts += ["--plots-per-page", str(cfg["plots_per_page"])]
-    opts += [str(o) for o in cfg.get("extra_options", [])]
+    opts += extra_options
     return opts
 
 
@@ -399,9 +445,13 @@ def compare_xsec(run_dir: Path):
     else:
         print(f"dataset: '{dataset or '(all)'}'   Q2 bins: {q2bins or '(all)'}")
     args = []
-    for i, entry in enumerate(fits):
+    curve_labels, annotation = _comparison_presentation(fits)
+    if not cfg.get("show_setup_annotation", True):
+        annotation = None
+    for i, (entry, curve_label) in enumerate(zip(fits, curve_labels)):
+        entry = dict(entry, label=curve_label)
         dst, label = _stage_fit(entry, i, run_dir, staging, dataset, q2bins,
-                                panels)
+                                panels, annotation)
         args.append(f"{dst}:{label}")
 
     plots = run_dir / "plots"
@@ -409,7 +459,11 @@ def compare_xsec(run_dir: Path):
     outdir = staging / "out"
     outdir.mkdir()
 
-    cmd = [exe] + _build_options(cfg) + ["--outdir", str(outdir)] + args
+    reference_label = curve_labels[0]
+    if (fits[0].get("setup") and fits[0].get("treatment")
+            and len({entry.get("setup") for entry in fits}) > 1):
+        reference_label = f"{_root_label(fits[0]['setup'])}, {fits[0]['treatment']}"
+    cmd = [exe] + _build_options(cfg, reference_label) + ["--outdir", str(outdir)] + args
     print("running:", " ".join(cmd))
     res = subprocess.run(cmd, capture_output=True, text=True)
     tail = "\n".join((res.stdout + res.stderr).splitlines()[-6:])

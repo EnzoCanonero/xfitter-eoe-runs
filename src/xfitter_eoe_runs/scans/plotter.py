@@ -12,6 +12,7 @@ import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.text import Text
 from .config import load_study_config
 from .extract import (extract_scan_results, extract_pumplin_widths,
                       _resolve_ordered_minuit_definitions)
@@ -162,7 +163,9 @@ def plot_scan(run_dir: Path, template_root: Path):
 
     if config.scan_type == 'lambda-scan':
         _plot_lambda_scan(results, plots_dir, error_label=error_label,
-                          systematics=config.systematics)
+                          systematics=config.systematics,
+                          plot_style=config.get('plot_style'),
+                          font_size_offset=config.get('plot_font_size_offset', 0))
     elif config.scan_type == 'systematic-ranking':
         config_order = [s['name'] for s in config.systematics]
         _plot_systematic_ranking(results, plots_dir, results_dir, config_order,
@@ -239,7 +242,7 @@ def _save_wide_parameters(results: dict, params_file: Path):
 
 def _plot_herapdf_parameter_comparison(poi_df: pd.DataFrame,
                                        chi2_df: pd.DataFrame,
-                                       plots_dir: Path):
+                                       plots_dir: Path, font_size_offset: float = 0):
     """Paper-style comparison of the nominal EoE and Gaussian PDF parameters.
 
     The lambda scan is used only as the source of the Gaussian (lambda=0) and
@@ -304,6 +307,7 @@ def _plot_herapdf_parameter_comparison(poi_df: pd.DataFrame,
         handles=[gaussian_band, eoe_intervals], loc='upper center',
         ncol=2, frameon=True, fontsize=12,
     )
+    _increase_plot_text_sizes(fig, font_size_offset)
     fig.tight_layout(pad=0.8)
     output = plots_dir / "7_parameter_comparison.pdf"
     fig.savefig(output)
@@ -311,8 +315,66 @@ def _plot_herapdf_parameter_comparison(poi_df: pd.DataFrame,
     print(f"  ✓ {output.name}")
 
 
+def _increase_plot_text_sizes(fig, offset: float):
+    """Apply a display-only offset to every label, tick and legend text."""
+    if not offset:
+        return
+    fig.canvas.draw()
+    for text in fig.findobj(match=Text):
+        text.set_fontsize(text.get_fontsize() + offset)
+
+
+def _plot_paper_common_epsilon(chi2_df: pd.DataFrame, output: Path,
+                              font_size_offset: float = 0):
+    """Use the original manuscript Figure 1 format with current scan values."""
+    # Preserve the original PDF's page and axis geometry, measured in points.
+    width, height = 555.59952, 361.19952
+    with matplotlib.rc_context({
+        'font.family': 'serif',
+        'font.serif': ['DejaVu Serif'],
+        'mathtext.fontset': 'stix',
+        'pdf.fonttype': 42,
+        'axes.linewidth': 1.0,
+    }):
+        fig = plt.figure(figsize=(width / 72, height / 72))
+        ax = fig.add_axes([66.7625 / width, 45.278125 / height,
+                           481.63702 / width, 303.783895 / height])
+        ax.plot(chi2_df['lambda'], chi2_df['chi2_corrected'],
+                color='#1565a5', linewidth=2.1, marker='o', markersize=6.2,
+                markeredgecolor='white', markeredgewidth=0.65, zorder=3)
+        ax.set_xlim(-0.018, 0.718)
+        ax.set_ylim(1290, 1370)
+        ax.set_xticks(np.arange(0.0, 0.71, 0.1))
+        ax.set_yticks(np.arange(1290, 1371, 10))
+        ax.tick_params(direction='in', top=True, right=True,
+                       length=3.5, width=0.8, labelsize=13)
+        ax.set_axisbelow(True)
+        ax.grid(True, linestyle=':', linewidth=0.75, color='#d9d9d9')
+        ax.set_xlabel(r'Common errors-on-errors parameter $\epsilon$', fontsize=18)
+        ax.set_ylabel(r'Corrected minimum $\chi^2$', fontsize=18)
+        _increase_plot_text_sizes(fig, font_size_offset)
+        if font_size_offset:
+            # Keep the original page size and margin when larger labels need room.
+            margin_x, margin_y = 7.2 / width, 7.2 / height
+            for _ in range(3):
+                fig.canvas.draw()
+                bounds = ax.get_tightbbox(fig.canvas.get_renderer()).transformed(
+                    fig.transFigure.inverted())
+                left = max(0, margin_x - bounds.x0)
+                bottom = max(0, margin_y - bounds.y0)
+                right = max(0, bounds.x1 - (1 - margin_x))
+                top = max(0, bounds.y1 - (1 - margin_y))
+                position = ax.get_position()
+                ax.set_position([position.x0 + left, position.y0 + bottom,
+                                 position.width - left - right,
+                                 position.height - bottom - top])
+        fig.savefig(output)
+        plt.close(fig)
+
+
 def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
-                      systematics: list = None):
+                      systematics: list = None, plot_style: str = None,
+                      font_size_offset: float = 0):
     """Generate 5 standard plots for lambda-scan"""
 
     chi2_df = results['chi2']
@@ -323,17 +385,22 @@ def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
     print("\nGenerating lambda-scan plots...")
 
     # 1. Chi2 vs lambda
-    plt.figure(figsize=(10, 6))
     # Bartlett-corrected chi2: the goodness-of-fit statistic that follows a
     # chi2 distribution, so that points at different lambda are comparable.
-    plt.plot(chi2_df['lambda'], chi2_df['chi2_corrected'], 'o-', linewidth=2, markersize=8)
-    plt.xlabel(r'$\lambda$', fontsize=14)
-    plt.ylabel(r'Bartlett-corrected $\chi^2$', fontsize=14)
-    plt.title(r'Bartlett-corrected $\chi^2$ vs $\lambda$', fontsize=16)
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(plots_dir / "1_chi2_vs_lambda.pdf")
-    plt.close()
+    if plot_style == 'paper-common-epsilon':
+        _plot_paper_common_epsilon(chi2_df, plots_dir / "1_chi2_vs_lambda.pdf",
+                                   font_size_offset=font_size_offset)
+    else:
+        plt.figure(figsize=(10, 6))
+        plt.plot(chi2_df['lambda'], chi2_df['chi2_corrected'], 'o-', linewidth=2, markersize=8)
+        plt.xlabel(r'$\lambda$', fontsize=14)
+        plt.ylabel(r'Bartlett-corrected $\chi^2$', fontsize=14)
+        plt.title(r'Bartlett-corrected $\chi^2$ vs $\lambda$', fontsize=16)
+        plt.grid(True, alpha=0.3)
+        _increase_plot_text_sizes(plt.gcf(), font_size_offset)
+        plt.tight_layout()
+        plt.savefig(plots_dir / "1_chi2_vs_lambda.pdf")
+        plt.close()
     print("  ✓ 1_chi2_vs_lambda.pdf")
 
     # 2. Convergence status
@@ -345,6 +412,7 @@ def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
             color=['green', 'red'], alpha=0.7)
     plt.ylabel('Number of fits', fontsize=14)
     plt.title(f'Convergence Status ({converged_count}/{total_count} converged)', fontsize=16)
+    _increase_plot_text_sizes(plt.gcf(), font_size_offset)
     plt.tight_layout()
     plt.savefig(plots_dir / "2_convergence_status.pdf")
     plt.close()
@@ -411,6 +479,7 @@ def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
                  label=r'$(value(\lambda)-value(0))\,/\,\sigma(0)$')
     ax.set_xlabel('Lambda', fontsize=13)
     ax.set_title('Parameter Central Values vs Lambda (normalized to λ=0)', fontsize=14)
+    _increase_plot_text_sizes(fig, font_size_offset)
     plt.tight_layout()
     plt.savefig(plots_dir / "3_parameter_central_values.pdf")
     plt.close()
@@ -430,6 +499,7 @@ def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
                  label=r'$\sigma(\lambda)\,/\,\sigma(0)$')
     ax.set_xlabel('Lambda', fontsize=13)
     ax.set_title(f'Parameter Errors vs Lambda (normalized to λ=0){err_suffix}', fontsize=14)
+    _increase_plot_text_sizes(fig, font_size_offset)
     plt.tight_layout()
     plt.savefig(plots_dir / "4_parameter_errors.pdf")
     plt.close()
@@ -463,6 +533,7 @@ def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
             ax.set_ylabel(p, fontsize=13)
             ax.set_title(f'{p}  —  value(λ) ± σ(λ)', fontsize=14)
             ax.grid(True, alpha=0.3)
+            _increase_plot_text_sizes(fig, font_size_offset)
             plt.tight_layout()
             pdf.savefig(fig)
             plt.close(fig)
@@ -516,6 +587,7 @@ def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
                 subtitle += f'  [errors: {error_label}]'
             ax.set_title(f'$\\lambda = {lam:.1f}$\n{subtitle}', fontsize=14)
             ax.grid(axis='x', alpha=0.3)
+            _increase_plot_text_sizes(fig, font_size_offset)
             plt.tight_layout()
             pdf.savefig(fig)
             plt.close(fig)
@@ -524,7 +596,8 @@ def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
 
     # Additional single-page figure for the nominal seven-source comparison.
     # The existing lambda diagnostics above are retained unchanged.
-    _plot_herapdf_parameter_comparison(poi_df, chi2_df, plots_dir)
+    _plot_herapdf_parameter_comparison(poi_df, chi2_df, plots_dir,
+                                       font_size_offset=font_size_offset)
 
 
 def _plot_systematic_ranking(results: dict, plots_dir: Path, results_dir: Path,

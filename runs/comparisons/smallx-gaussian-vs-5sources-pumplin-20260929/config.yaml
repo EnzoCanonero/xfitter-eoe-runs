@@ -15,9 +15,13 @@ ratio_ylim:
 - 0.6
 - 1.6
 fits:
-- label: Resummed baseline
+- label: Gaussian
+  setup: HERAPDF-BG, NNLO+NLL_x, FONLL-C
+  treatment: Gaussian
   path: ../../fits/smallx-resummation/gaussian/bg-param-nnlo-nllx-fonll-20260929
   source: xfitter-grid
-- label: Resummed + EoE
+- label: EoE
+  setup: HERAPDF-BG, NNLO+NLL_x, FONLL-C
+  treatment: EoE
   path: ../../fits/smallx-resummation/eoe/bg-param-nnlo-nllx-fonll-greedy-top5-20260929
   source: xfitter-grid

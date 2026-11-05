@@ -9,10 +9,16 @@ observables:
 - gluon
 - sea
 ratio_reference: 0
+presentation:
+  title: HERAPDF2.0, NNLO, RTOPT
 fits:
 - label: Numerical
+  setup: HERAPDF2.0, NNLO, RTOPT
+  treatment: EoE
   path: ../../fits/hera-baseline/baseline-7-sources-bartlett2-pumplin-20260929
   source: xfitter-grid
 - label: Iterative
+  setup: HERAPDF2.0, NNLO, RTOPT
+  treatment: EoE
   path: ../../fits/hera-baseline/baseline-2E5N-niter8-bartlett2-pumplin-20260929
   source: xfitter-grid

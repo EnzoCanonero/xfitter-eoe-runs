@@ -249,14 +249,17 @@ by this Python package. Fresh comparisons default to `xfitter-master`; set
 another compatible built tree. Retained historical and small-x studies should
 continue to select the build with which they were produced.
 
-For example:
+For the current paper workspaces:
 
 ```bash
 scripts/plot-pdf-comparison \
-  runs/comparisons/baseline-nominal-vs-7sources
+  runs/comparisons/baseline-nominal-vs-7sources-20260929
 
 scripts/plot-xsec \
-  runs/comparisons/xsec-nc-cc-nominal-vs-7sources-pumplin
+  runs/comparisons/xsec-nc-cc-nominal-vs-7sources-pumplin-20260929
+
+scripts/plot-scan \
+  runs/scans/lambda/hera-baseline/final-selection-common-epsilon-20260929
 ```
 
 Local fit paths in a comparison config are resolved relative to its workspace.
@@ -264,14 +267,74 @@ A typical entry therefore looks like:
 
 ```yaml
 fits:
-  - label: HERA baseline
-    path: ../../fits/hera-baseline/nominal-bartlett2-pumplin
+  - label: Gaussian
+    setup: HERAPDF2.0, NNLO, RTOPT
+    treatment: Gaussian
+    path: ../../fits/hera-baseline/nominal-bartlett2-pumplin-20260929
+    source: xfitter-grid
+  - label: EoE
+    setup: HERAPDF2.0, NNLO, RTOPT
+    treatment: EoE
+    path: ../../fits/hera-baseline/baseline-7-sources-bartlett2-pumplin-20260929
+    source: xfitter-grid
 ```
 
 Local comparisons require a populated `<fit>/output/`. Historical directories
 such as `output_legacy_*` or `output_retained_*` are not promoted automatically.
 PDF comparisons write combined, ratio-only, and absolute-only PDFs beneath the
 workspace's `plots/` directory.
+
+### Current paper plots and individual panels
+
+The source code and the following configurations define the final paper
+presentation. The native PDFs in each workspace's `plots/` directory use the
+same labels and typography as the assembled paper figures.
+
+| Figure | Workspace configuration | Presentation |
+| --- | --- | --- |
+| 1 | [Common epsilon scan](runs/scans/lambda/hera-baseline/final-selection-common-epsilon-20260929/config.yaml) | Original titleless format; axis labels 20 pt, ticks 15 pt |
+| 2 | [HERAPDF2.0 comparison](runs/comparisons/baseline-nominal-vs-7sources-20260929/config.yaml) | HERAPDF2.0, NNLO, RTOPT; Gaussian/EoE |
+| 3 | [Cross sections](runs/comparisons/xsec-nc-cc-nominal-vs-7sources-pumplin-20260929/config.yaml) | Gaussian/EoE; no setup heading; Q² labels include GeV²; original text sizes |
+| 4 | [HERAPDF-BG comparison](runs/comparisons/giuli-gaussian-vs-8sources-pumplin-20260929/config.yaml) | HERAPDF-BG, NNLO, RTOPT; Gaussian/EoE |
+| 5 | [Resummed comparison](runs/comparisons/smallx-gaussian-vs-5sources-pumplin-20260929/config.yaml) | HERAPDF-BG, NNLO+NLLₓ, FONLL-C; Gaussian/EoE |
+| 6 | [Three informed setups](runs/comparisons/informed-three-set-20260929/config.yaml) | No heading; HERAPDF2.0 / HERAPDF-BG / HERAPDF-BG NNLO+NLL; 13 pt legend; Ratio to HERAPDF2.0 |
+| 7 | [2 iterations](runs/comparisons/baseline-2E5N-iter2-vs-7sources-20260929/config.yaml), [4 iterations](runs/comparisons/baseline-2E5N-iter4-vs-7sources-20260929/config.yaml), [8 iterations](runs/comparisons/baseline-2E5N-iter8-vs-7sources-20260929/config.yaml) | HERAPDF2.0, NNLO, RTOPT; Numerical/Iterative; Ratio to Numerical |
+
+Every PDF-comparison workspace writes three files with the same observable page
+order from its `observables` configuration:
+
+- `plots/pdf_comparison.pdf`: absolute and ratio panels side by side.
+- `plots/pdf_comparison_absolute.pdf`: individual absolute panels.
+- `plots/pdf_comparison_ratio.pdf`: individual ratio panels.
+
+PDF-comparison panel titles and axis labels are 22 pt, ticks 18 pt, and legends
+15 pt. Setup headings remain 16 pt. Figure 6 overrides only its legend size to
+13 pt, including the Q² entry, in all three output variants. The Gaussian/EoE
+comparisons label ratios as `Ratio to Gaussian`.
+
+Fit entries keep the full physical `setup` separate from the displayed
+`treatment`. Use `NLL_x` in setup metadata to render a subscript. The optional
+`presentation` mapping controls `title` (`null` hides the shared heading),
+`use_fit_labels`, `ratio_reference_label`, and `legend_fontsize`. Figure 6 uses:
+
+```yaml
+presentation:
+  title: null
+  use_fit_labels: true
+  ratio_reference_label: HERAPDF2.0
+  legend_fontsize: 13
+```
+
+The cross-section configuration sets `show_setup_annotation: false`. The common
+epsilon scan selects `plot_style: paper-common-epsilon` and
+`plot_font_size_offset: 2`; generic lambda scans retain their own coordinates
+and layout.
+
+Assemble paper layouts separately from the repository. The native files retain
+their filenames, dimensions and page order; generated plots remain ignored by
+Git. Older workspace names retain historical configurations and outputs and
+may reference unavailable archived inputs. Use the dated configurations above
+for the current paper rather than substituting current fits into old studies.
 
 ## Datasets and historical material
 

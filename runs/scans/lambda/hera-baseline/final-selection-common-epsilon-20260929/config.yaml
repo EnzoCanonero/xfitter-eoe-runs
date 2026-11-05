@@ -39,3 +39,7 @@ systematics:
   - {name: sysHZComb1144, type: E, init: 4.0798,   scale_with_lambda: true}
   - {name: sysHZComb1111, type: E, init: -2.5331,  scale_with_lambda: true}
   - {name: sysHZComb1113, type: E, init: 3.8119,   scale_with_lambda: true}
+
+# Original manuscript Figure 1 format; the scan coordinate equals common epsilon.
+plot_style: paper-common-epsilon
+plot_font_size_offset: 2

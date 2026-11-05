@@ -76,10 +76,11 @@ _DEFAULT_COLORS = [
 ]
 
 # Publication typography shared by every PDF-comparison layout.
-TICK_LABEL_SIZE = 16
-AXIS_LABEL_SIZE = 20
-TITLE_SIZE = 20
-LEGEND_SIZE = 13
+TICK_LABEL_SIZE = 18
+AXIS_LABEL_SIZE = 22
+TITLE_SIZE = 22
+LEGEND_SIZE = 15
+SETUP_HEADING_SIZE = 16
 
 
 # =========================================================================
@@ -403,7 +404,50 @@ def _evaluate_xfitter_grids(fit_dir: Path, observables, x_vals, Q2, error_type):
 # =========================================================================
 # Plotting
 # =========================================================================
-def _draw_main(ax, obs, curves, Q2, x_min, x_max, legend=True):
+def _format_setup(setup, wrap=False):
+    """Render optional setup metadata without changing legacy fit labels."""
+    text = re.sub(r"NLL_?x", lambda _: r"NLL$_x$", str(setup))
+    return text.replace(", ", ",\n", 1) if wrap else text
+
+
+def _comparison_labels(curves, ref_idx):
+    """Separate the physical setup, EoE treatment and algorithm labels.
+
+    Metadata is optional. Comparisons without complete metadata retain their
+    historical labels, including string-based ratio-reference resolution.
+    """
+    original = [curve["label"] for curve in curves]
+    if not all(curve.get("setup") and curve.get("treatment") for curve in curves):
+        return None, original, original[ref_idx]
+
+    setups = [curve["setup"] for curve in curves]
+    treatments = [curve["treatment"] for curve in curves]
+    same_setup = len(set(setups)) == 1
+    same_treatment = len(set(treatments)) == 1
+
+    if same_setup:
+        heading = _format_setup(setups[0])
+        if same_treatment:
+            # Numerical/Iterative identify the algorithms, not distinct
+            # physical setups or uncertainty treatments.
+            heading += f" · {treatments[0]}"
+            return heading, original, original[ref_idx]
+        return heading, treatments, treatments[ref_idx]
+
+    labels = [_format_setup(setup, wrap=True) for setup in setups]
+    if same_treatment:
+        heading = treatments[0]
+    else:
+        heading = None
+        labels = [f"{setup} · {treatment}"
+                  for setup, treatment in zip(labels, treatments)]
+    reference = (_format_setup(setups[ref_idx], wrap=True)
+                 + f" · {treatments[ref_idx]}")
+    return heading, labels, reference
+
+
+def _draw_main(ax, obs, curves, Q2, x_min, x_max, legend=True,
+               legend_fontsize=LEGEND_SIZE):
     """Draw the absolute-PDF panel: one curve (+ band) per fit."""
     x_vals = curves[0]["x"]
     for c in curves:
@@ -426,11 +470,12 @@ def _draw_main(ax, obs, curves, Q2, x_min, x_max, legend=True):
     if legend:
         # Q^2 rides along as a label-only (invisible) legend entry
         ax.plot([], [], ' ', label=rf'$Q^2 = {Q2:g}\ \mathrm{{GeV}}^2$')
-        ax.legend(fontsize=LEGEND_SIZE)
+        ax.legend(fontsize=legend_fontsize)
     ax.set_title(f"{TITLES[obs]}", fontsize=TITLE_SIZE)
 
 
-def _draw_ratio(ax, obs, curves, ref_idx, Q2, ratio_ylim, x_min, x_max, legend=False):
+def _draw_ratio(ax, obs, curves, ref_idx, Q2, ratio_ylim, x_min, x_max, legend=False,
+                reference_label=None, legend_fontsize=LEGEND_SIZE):
     """Draw the ratio-to-reference panel: one curve (+ band) per fit."""
     x_vals = curves[0]["x"]
     ref_central = curves[ref_idx]["obs"][obs]["central"]
@@ -453,7 +498,8 @@ def _draw_ratio(ax, obs, curves, ref_idx, Q2, ratio_ylim, x_min, x_max, legend=F
 
     ax.axhline(1, color="black", linestyle=":", lw=1)
     ax.set_xlabel("x", fontsize=AXIS_LABEL_SIZE)
-    ax.set_ylabel(f"Ratio to {curves[ref_idx]['label']}",
+    denominator = curves[ref_idx]["label"] if reference_label is None else reference_label
+    ax.set_ylabel(f"Ratio to {denominator}",
                   fontsize=AXIS_LABEL_SIZE)
     ax.set_xlim(x_min, x_max)
     ax.tick_params(axis="both", which="both", labelsize=TICK_LABEL_SIZE)
@@ -464,12 +510,12 @@ def _draw_ratio(ax, obs, curves, ref_idx, Q2, ratio_ylim, x_min, x_max, legend=F
         # standalone ratio pages carry the legend + Q^2 themselves, since the
         # absolute panel that normally hosts them is absent
         ax.plot([], [], ' ', label=rf'$Q^2 = {Q2:g}\ \mathrm{{GeV}}^2$')
-        ax.legend(fontsize=LEGEND_SIZE)
+        ax.legend(fontsize=legend_fontsize)
         ax.set_title(f"{TITLES[obs]}", fontsize=TITLE_SIZE)
 
 
 def _plot_observable(pdf_pages, obs, curves, ref_idx, Q2, ratio_ylim, x_min, x_max,
-                     mode="both"):
+                     mode="both", presentation=None):
     """Render one observable page into the open PdfPages.
 
     mode: 'both'     -> absolute + ratio side by side (the default layout)
@@ -477,26 +523,50 @@ def _plot_observable(pdf_pages, obs, curves, ref_idx, Q2, ratio_ylim, x_min, x_m
           'absolute' -> absolute panel only, single panel
     The single-panel modes are meant to be composed into grids in LaTeX with
     \\includegraphics[page=N], so they carry their own legend/title.
+    Optional presentation settings override ``title`` (null hides it),
+    ``use_fit_labels``, ``ratio_reference_label`` and ``legend_fontsize``
+    without changing curves.
+    Hiding a shared title retains its margin for consistent panel placement.
     """
+    heading, labels, reference = _comparison_labels(curves, ref_idx)
+    reserve_heading = bool(heading)
+    presentation = presentation or {}
+    if "title" in presentation:
+        heading = presentation["title"]
+    if presentation.get("use_fit_labels", False):
+        labels = [curve["label"] for curve in curves]
+    reference = presentation.get("ratio_reference_label", reference)
+    legend_fontsize = presentation.get("legend_fontsize", LEGEND_SIZE)
+    curves = [{**curve, "label": label} for curve, label in zip(curves, labels)]
     if mode == "both":
         fig, (ax_main, ax_ratio) = plt.subplots(1, 2, figsize=(12, 6))
-        _draw_main(ax_main, obs, curves, Q2, x_min, x_max, legend=True)
+        _draw_main(ax_main, obs, curves, Q2, x_min, x_max, legend=True,
+                   legend_fontsize=legend_fontsize)
         _draw_ratio(ax_ratio, obs, curves, ref_idx, Q2, ratio_ylim, x_min, x_max,
-                    legend=False)
+                    legend=False, reference_label=reference,
+                    legend_fontsize=legend_fontsize)
     elif mode == "ratio":
         fig, ax = plt.subplots(figsize=(7, 6))
-        _draw_ratio(ax, obs, curves, ref_idx, Q2, ratio_ylim, x_min, x_max, legend=True)
+        _draw_ratio(ax, obs, curves, ref_idx, Q2, ratio_ylim, x_min, x_max,
+                    legend=True, reference_label=reference,
+                    legend_fontsize=legend_fontsize)
     elif mode == "absolute":
         fig, ax = plt.subplots(figsize=(7, 6))
-        _draw_main(ax, obs, curves, Q2, x_min, x_max, legend=True)
+        _draw_main(ax, obs, curves, Q2, x_min, x_max, legend=True,
+                   legend_fontsize=legend_fontsize)
     else:
         raise ValueError(f"unknown mode '{mode}'")
 
+    if heading:
+        # Keep the shared heading inside the absolute-panel half: manuscript
+        # layouts also reuse each half of the combined page independently.
+        fig.suptitle(heading, fontsize=SETUP_HEADING_SIZE, y=0.98,
+                     x=0.25 if mode == "both" else 0.5)
     fig.tight_layout()
     # Mathtext's glyph extents can protrude slightly beyond tight_layout's
     # estimate at publication font sizes.  Reserve a small explicit margin so
     # titles and rotated y labels are never clipped at the PDF page boundary.
-    fig.subplots_adjust(top=0.90)
+    fig.subplots_adjust(top=0.865 if heading or reserve_heading else 0.90)
     if mode == "both":
         # Paper figures crop the 12-inch page at its exact midpoint to compose
         # the absolute and ratio panels independently.  Keep the larger ratio
@@ -570,7 +640,9 @@ def compare_pdfs(run_dir: Path):
                     f"unknown source '{source}' in fit entry #{i}; "
                     "choose 'lhapdf' or 'xfitter-grid'"
                 )
-            curves.append({"label": label, "color": color, "linestyle": linestyle,
+            curves.append({"label": label, "setup": entry.get("setup"),
+                           "treatment": entry.get("treatment"),
+                           "color": color, "linestyle": linestyle,
                            "x": x_vals, "obs": obs_data})
 
         labels = [c["label"] for c in curves]
@@ -592,7 +664,8 @@ def compare_pdfs(run_dir: Path):
                 for obs in config.observables:
                     _plot_observable(pdf_pages, obs, curves, ref_idx, config.Q2,
                                      config.ratio_ylim, config.x_min, config.x_max,
-                                     mode=mode)
+                                     mode=mode,
+                                     presentation=config.data.get("presentation"))
             outputs.append(out_pdf)
 
         n = len(config.observables)
