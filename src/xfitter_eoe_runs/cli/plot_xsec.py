@@ -1,4 +1,4 @@
-"""Plot or tabulate a configured cross-section comparison workspace."""
+"""Plot a configured cross-section comparison workspace."""
 
 import argparse
 import sys
@@ -9,7 +9,7 @@ from ._paths import repository_root
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Write cross-section plots or tables for a configured run workspace."
+        description="Write cross-section plots for a configured run workspace."
     )
     parser.add_argument(
         "run_dir",
@@ -36,22 +36,9 @@ def main() -> None:
         parser.error(f"comparison workspace must be under {run_root}: {run_dir}")
 
     try:
-        from ..comparisons.xsec_draw import compare_xsec, _load_config
-        from ..comparisons.xsec_region import region_table
+        from ..comparisons.xsec_draw import compare_xsec
 
-        handlers = {
-            "xsec-comparison": compare_xsec,
-            "xsec-region-table": region_table,
-        }
-        study_type = _load_config(config_file).get("type")
-        handler = handlers.get(study_type)
-        if handler is None:
-            print(
-                f"Error: config type '{study_type}' is not handled by plot-xsec "
-                f"(expected one of: {', '.join(handlers)})"
-            )
-            sys.exit(1)
-        handler(run_dir)
+        compare_xsec(run_dir)
     except Exception as error:
         print(f"Error: {error}")
         import traceback

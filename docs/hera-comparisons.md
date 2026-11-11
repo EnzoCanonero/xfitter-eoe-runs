@@ -2,14 +2,13 @@
 
 This document records the supplied HERA comparison configurations, their paper
 roles and their presentation conventions. The general interfaces are described
-in the [PDF](../runs/comparisons/pdf/README.md),
-[cross-section](../runs/comparisons/xsec/README.md) and
-[region-table](../runs/comparisons/regions/README.md) guides. See the
+in the [PDF](../runs/comparisons/pdf/README.md) and
+[cross-section](../runs/comparisons/xsec/README.md) guides. See the
 [HERA study definitions](hera-study.md) for setup and treatment terminology,
 and [paper reproduction](reproducing-paper.md) for the full execution order.
 
 The commands below run from the repository root, use completed fit outputs and
-replace derived plots or tables. They do not submit jobs. The configurations
+replace derived plots. They do not submit jobs. The configurations
 select particular HERA examples; the comparison tools also accept other
 compatible inputs and kinematic ranges.
 
@@ -142,54 +141,11 @@ pdftotext -f 1 -l 2 -layout "$workspace/plots/xsec_comparison.pdf" -
 Check the page geometry, both Q² labels, legends and visible bands. The staging
 report should contain 29 selected points per fit across these two slices.
 
-## Regional table
-
-The [HERAPDF2.0 region configuration](../runs/comparisons/regions/herapdf20-nnlo-rtopt/gaussian-vs-eoe-selected/config.yaml)
-uses the same Gaussian and selected EoE `fittedresults.txt` inputs to reproduce
-Table 2. Its labels are `nominal` and `EoE-7src`, with the Gaussian reference
-first. It selects all fitted datasets, Q² edges
-`[0, 10, 30, 100, 1000, 1e9]` in GeV² and x edges
-`[0, 0.001, 0.01, 0.1, 1]`.
-
-```bash
-workspace=runs/comparisons/regions/herapdf20-nnlo-rtopt/gaussian-vs-eoe-selected
-scripts/plot-xsec "$workspace"
-```
-
-Outputs are `results/region_table.csv` and `results/region_table.tex`.
-Each cell sums `pull_EoE² - pull_Gaussian²`; negative values indicate an
-improvement in the data term. Nuisance constraints, the prediction-dependent
-logarithmic term and the Bartlett correction are excluded. The total therefore
-differs from the change in full or corrected fit χ².
-
-For these paper inputs, the CSV has 20 cells containing 1145 points. The sum of
-the four-decimal CSV values is −57.6606, giving the Table 2 total −57.7:
-
-```bash
-python3 - <<'PY'
-import csv
-from pathlib import Path
-
-path = Path('runs/comparisons/regions/herapdf20-nnlo-rtopt/'
-            'gaussian-vs-eoe-selected/results/region_table.csv')
-with path.open() as stream:
-    rows = list(csv.DictReader(stream))
-assert len(rows) == 20
-assert sum(int(row['npoints']) for row in rows) == 1145
-total = sum(float(row['dchi2']) for row in rows)
-assert abs(total - (-57.6606)) < 0.002
-print(f'{len(rows)} cells, 1145 points, Δχ²_data = {total:.4f}')
-PY
-```
-
-Check that no points were excluded by the edge arrays and compare the row and
-column totals in the TeX fragment. State Q² units in the manuscript caption.
-
 ## Auxiliary comparisons
 
 The [selected BG versus resummed PDF comparison](../runs/comparisons/pdf/cross-setups/eoe-selected-bg-vs-resummed/config.yaml)
 and [BG low-Q² cross-section comparison](../runs/comparisons/xsec/herapdf-bg-nnlo-rtopt/gaussian-vs-eoe-selected-low-q2/config.yaml)
 use external auxiliary fit paths recorded explicitly in their configs. Their
-regeneration requires those exact outputs. They are separate from the nine
-comparison configurations used for the paper figures and Table 2 above.
+regeneration requires those exact outputs. They are separate from the eight
+comparison configurations used for the paper figures above.
 Existing derived files alone do not establish input availability.

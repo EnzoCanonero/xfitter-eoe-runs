@@ -18,7 +18,6 @@ the inputs and calculation; directory names organize the work.
 | Vary error-calculation settings | `scan_type: pumplin-stability` | [Pumplin stability](scans/pumplin-stability/README.md) |
 | Compare parton distributions | `type: pdf-comparison` | [PDF comparisons](comparisons/pdf/README.md) |
 | Overlay selected DIS cross sections | `type: xsec-comparison` | [Cross-section comparisons](comparisons/xsec/README.md) |
-| Compare data χ² in Q²–x bins | `type: xsec-region-table` | [Regional tables](comparisons/regions/README.md) |
 
 The scan commands require a workspace under `runs/scans/`; comparison commands
 require one under `runs/comparisons/`. Further nesting is allowed. For example:
@@ -36,8 +35,7 @@ runs/
 │   └── plots/                      # generated figures
 └── comparisons/<family>/<study>/
     ├── config.yaml
-    ├── results/                    # generated tables, where applicable
-    └── plots/                      # generated figures, where applicable
+    └── plots/                      # generated figures
 ```
 
 ## Inputs and execution

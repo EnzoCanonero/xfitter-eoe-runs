@@ -14,8 +14,7 @@ definitions select the curves, scales, kinematic ranges and presentation.
 - Study source selection, the size of errors on errors, likelihood profiles,
   and the stability of uncertainty calculations.
 - Compare PDF central values and bands at a chosen Q² and x range.
-- Select DIS datasets and Q² slices for cross-section overlays, or compare
-  data χ² in configurable Q²–x regions.
+- Select DIS datasets and Q² slices for cross-section overlays.
 
 The repository includes the tools and a configured
 [HERA application](docs/hera-study.md). Its parametrisations, source selections
@@ -56,7 +55,6 @@ environment. Preview, file generation, and job submission are separate steps.
 | How stable are Pumplin uncertainty calculations? | [Pumplin stability](runs/scans/pumplin-stability/README.md) |
 | How do PDF central values and bands change? | [PDF comparisons](runs/comparisons/pdf/README.md) |
 | How do different fits describe selected DIS cross sections? | [Cross-section comparisons](runs/comparisons/xsec/README.md) |
-| Where in x and Q² does the fit improve? | [Regional χ² tables](runs/comparisons/regions/README.md) |
 
 Each guide explains the supported configuration, input format, commands and
 output files. The [workspace index](runs/README.md) describes where new studies

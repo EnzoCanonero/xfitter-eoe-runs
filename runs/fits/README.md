@@ -150,7 +150,6 @@ freedom, and valid Bartlett diagnostics when used. Match the result to its
 submitted configuration and build before comparing it with another fit.
 
 For PDF comparisons, verify grids at the requested Q² and complete error-member
-pairs. Cross-section and region comparisons require `fittedresults.txt`. See
-the [PDF](../comparisons/pdf/README.md),
-[cross-section](../comparisons/xsec/README.md), and
-[region-table](../comparisons/regions/README.md) guides for their input checks.
+pairs. Cross-section comparisons require `fittedresults.txt`. See
+the [PDF](../comparisons/pdf/README.md) and
+[cross-section](../comparisons/xsec/README.md) guides for their input checks.

@@ -10,10 +10,10 @@ restrictions on PDF-comparison scales or DIS cross-section panel selection.
 
 Detailed examples: [HERA fits](hera-fits.md), [HERA scans](hera-scans.md),
 [HERA comparisons](hera-comparisons.md). The [reproduction guide](reproducing-paper.md)
-maps these products to the manuscript figures and main tables.
+maps these products to the manuscript figures and selected main tables.
 
 The bundled HERA application contains **13 fit workspaces, 30 scan configurations,
-and 11 comparisons**. Paths identify the physical setup and study. This catalog
+and 10 comparisons**. Paths identify the physical setup and study. This catalog
 describes configured studies, not job completion.
 
 Paper workspaces use the inputs of the 20260929 campaign. Auxiliary studies
@@ -34,7 +34,6 @@ to inspect an individual study.
 | Uncertainty-calculation stability | [Pumplin stability](../runs/scans/pumplin-stability/README.md) |
 | PDF central values and bands | [PDF comparisons](../runs/comparisons/pdf/README.md) |
 | Reduced cross sections | [Cross-section comparisons](../runs/comparisons/xsec/README.md) |
-| Data χ² by region | [Regional tables](../runs/comparisons/regions/README.md) |
 
 | Setup slug | Physical setup |
 | --- | --- |
@@ -115,7 +114,7 @@ reference fit's `output/minuit.out.txt`.
 
 ## Comparisons
 
-There are **9 paper configurations and 2 auxiliary configurations**. These
+There are **8 paper configurations and 2 auxiliary configurations**. These
 consume existing fitted results. The [HERA comparison notes](hera-comparisons.md)
 document the campaign's labels, fonts and native figure files; the
 [PDF comparison guide](../runs/comparisons/pdf/README.md) describes the general interface.
@@ -126,6 +125,5 @@ document the campaign's labels, fonts and native figure files; the
 | Paper | Numerical vs iterative HERAPDF2.0 profiling (Figure 7) | [2 iterations](../runs/comparisons/pdf/herapdf20-nnlo-rtopt/numerical-vs-iter02/config.yaml), [4 iterations](../runs/comparisons/pdf/herapdf20-nnlo-rtopt/numerical-vs-iter04/config.yaml), [8 iterations](../runs/comparisons/pdf/herapdf20-nnlo-rtopt/numerical-vs-iter08/config.yaml) |
 | Paper | Three informed PDF setups (Figure 6) | [Informed comparison](../runs/comparisons/pdf/cross-setups/eoe-informed/config.yaml) |
 | Paper | HERAPDF2.0 NC e⁺p cross sections at Q² = 3.5 and 4.5 GeV² (Figure 3) | [Low-Q² comparison](../runs/comparisons/xsec/herapdf20-nnlo-rtopt/gaussian-vs-eoe-selected-low-q2/config.yaml) |
-| Paper | HERAPDF2.0 change in data χ² by x and Q² region (Table 2) | [Region table](../runs/comparisons/regions/herapdf20-nnlo-rtopt/gaussian-vs-eoe-selected/config.yaml) |
 | Auxiliary | Selected EoE PDFs: HERAPDF-BG RTOPT vs resummed | [Cross-setup comparison](../runs/comparisons/pdf/cross-setups/eoe-selected-bg-vs-resummed/config.yaml) |
 | Auxiliary | HERAPDF-BG Gaussian/EoE low-Q² cross sections | [Low-Q² comparison](../runs/comparisons/xsec/herapdf-bg-nnlo-rtopt/gaussian-vs-eoe-selected-low-q2/config.yaml) |

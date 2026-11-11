@@ -56,9 +56,8 @@ There are two selection modes:
 | `dataset` and `q2bins` | A dataset-label substring and a list of Q² values; omitted or empty values select all matching datasets or all Q² values |
 
 For example, `dataset: "Sample A"` and `q2bins: [25, 100, 1000]` selects those
-three slices wherever present. Here `q2bins` means **slice values**, unlike the
-edge arrays in a [region table](../regions/README.md). Matching uses a Q²
-absolute tolerance of 10⁻⁶. Dataset substrings can match multiple blocks.
+three slices wherever present. Here `q2bins` means **slice values**. Matching
+uses a Q² absolute tolerance of 10⁻⁶. Dataset substrings can match multiple blocks.
 An empty selection fails. Output order follows the source dataset/plot order;
 `panels` selects slices rather than defining an arbitrary page ordering.
 

@@ -4,12 +4,12 @@
 [HERA application and catalog](hera-study.md)
 
 The current paper campaign comprises **13 fixed-fit workspaces, 24 scan
-configurations and 9 comparison configurations**. This guide maps those inputs
-to Figures 1–7 and the main-text Tables 1–6. Configuration counts describe the
+configurations and 8 comparison configurations**. This guide maps those inputs
+to Figures 1–7 and selected main-text tables. Configuration counts describe the
 available studies; they do not certify that a local checkout contains completed
 results.
 
-The repository produces native figure pages, scan CSVs and a region table.
+The repository produces native figure pages and scan CSVs.
 Final multi-panel manuscript assembly and a complete automated check of every
 numerical statement are separate steps; there is no repository command that
 builds the entire paper.
@@ -122,7 +122,6 @@ output details.
 | Table | Inputs | What to check |
 | --- | --- | --- |
 | 1 | HERAPDF2.0 [forward-selection rounds 01–08](../runs/scans/forward-selection/herapdf20-nnlo-rtopt/epsilon-0p6/) | Winning source, corrected minimum and marginal reduction; seven retained sources and stopping round |
-| 2 | [HERAPDF2.0 region comparison](../runs/comparisons/regions/herapdf20-nnlo-rtopt/gaussian-vs-eoe-selected/config.yaml) | Change in pointwise data χ² and point counts by x and Q² region |
 | 3 | BG RTOPT [rounds 01–09](../runs/scans/forward-selection/herapdf-bg-nnlo-rtopt/epsilon-0p6/) | Eight retained sources and stopping round |
 | 4 | BG resummed [rounds 01–06](../runs/scans/forward-selection/herapdf-bg-nnlo-nllx-fonll-c/epsilon-0p6/) | Five retained sources and stopping round |
 | 5 | `gaussian` and `eoe-selected` fixed fits for the three selected setups, plus Tables 1/3/4 | Gaussian minima, final corrected minima and selected-source counts |
@@ -154,19 +153,6 @@ Check that its winner extends the next round's `base_systematics` list.
 The stored configurations contain the paper's prefixes and seeds explicitly;
 the runner does not derive later rounds from earlier results or choose a new
 selection automatically.
-
-### Region table
-
-```bash
-scripts/plot-xsec runs/comparisons/regions/herapdf20-nnlo-rtopt/gaussian-vs-eoe-selected
-```
-
-This writes `results/region_table.csv` and `results/region_table.tex`.
-The sign convention is selected minus Gaussian, so a negative value is an
-improvement. The table sums squared pointwise pulls from `fittedresults.txt`.
-It excludes nuisance constraints, the prediction-dependent logarithmic term
-and the global Bartlett correction; its total is not the change in corrected
-fit χ². See the [region-table guide](../runs/comparisons/regions/README.md).
 
 ### Fit summaries and nuisance parameters
 

@@ -69,7 +69,6 @@ inputs and scientific installation must be accessible on worker nodes.
 | Extract and plot scans | Completed scan outputs; Python plotting dependencies |
 | Compare PDFs | Completed fit grids or PDF sets; Python LHAPDF bindings |
 | Plot cross sections | Fit `fittedresults.txt` files, `xfitter-draw`, ROOT, Ghostscript, pdfLaTeX |
-| Regional χ² tables through `scripts/plot-xsec` | Fit `fittedresults.txt` files and a working xFitter setup |
 
 ### Choose an installation and worktree
 

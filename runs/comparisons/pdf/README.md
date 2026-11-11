@@ -140,6 +140,5 @@ The optional `presentation` mapping changes display settings:
 | `legend_fontsize` | Override the legend size in all three output variants |
 
 The [HERA presentation conventions](../../../docs/hera-comparisons.md#typography-and-presentation)
-record the supplied study's labels and typography. Related tools:
-[cross-section comparisons](../xsec/README.md) and
-[regional χ² tables](../regions/README.md).
+record the supplied study's labels and typography. See also
+[cross-section comparisons](../xsec/README.md).

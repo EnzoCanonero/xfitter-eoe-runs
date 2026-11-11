@@ -96,7 +96,7 @@ handling and runtime selection for new studies.
 Apply the [fit-output checks](../runs/fits/README.md#expected-outputs-and-validation)
 before interpreting a result. For the paper PDF comparisons, verify the
 central grid at Q² = 4 GeV² and complete Pumplin plus/minus member pairs.
-Cross-section and region comparisons use `output/fittedresults.txt`.
+Cross-section comparisons use `output/fittedresults.txt`.
 
 The [paper reproduction guide](reproducing-paper.md) maps these fixed fits to
 the native figures and main numerical tables. Replotting existing results
