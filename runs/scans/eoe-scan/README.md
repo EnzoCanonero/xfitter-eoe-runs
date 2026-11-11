@@ -18,12 +18,14 @@ Create a workspace under `runs/scans/` with a `config.yaml` containing:
 | --- | --- |
 | `scan_type` | `lambda-scan` |
 | `template` | Directory name under root `templates/` |
+| `dataset_root` | Dataset directory, relative to the directory containing `config.yaml`; absolute and `~` paths also work |
 | `datafiles` | Dataset filenames copied into generated fits |
 | `lambda` | Mapping with `min`, `max`, `step` for the scan grid |
 | `systematics` | Source entries: `name`, `type`, optional `range`, `epsilon`, `init`, `scale_with_lambda` |
 | `epsilon` | Default source strength when not specified per entry |
 | `n_iterations`, `enable_bartlett`, `q2_cut` | Options passed to the steering template |
 | `doErrors` | Optional error method; Pumplin accepts `errdef` and `iterate` |
+| `parameter_comparison` | Optional ordered list of `{name, label}` entries for the λ = 0/1 comparison; `label` defaults to `name` |
 | `xfitter_tree`, `xfitter_commit` | Worker build directory and optional exact revision |
 | `request_memory` | Condor memory request |
 
@@ -38,10 +40,22 @@ use `lambda_<value>` formatted to one decimal. The generator passes the configur
 sources to the selected steering template and uses its parameter, constants
 and weight files. It does not require a reference-fit output.
 
-The current CLI resolves `datafiles` in a fixed HERA dataset directory. YAML
-cannot select another dataset root, and there is no CLI override. The library
-`run_scan` accepts a separate `dataset_root`; see
-[installation](../../../docs/installation.md) for the adapter/runtime boundary.
+`scripts/run-scan` copies `datafiles` from the configured `dataset_root`.
+The library `run_scan` uses that root when its `dataset_root` argument is
+`None`; an explicit path overrides it. For example, these configuration fields
+select data and two parameters from your study:
+
+```yaml
+dataset_root: ../sample-data
+datafiles: [sample-a.dat, sample-b.dat]
+parameter_comparison:
+  - {name: shape_a, label: '$a$'}
+  - {name: shape_b}
+```
+
+Use parameter names present in your fit outputs. Omit `parameter_comparison`
+or set it to `[]` to disable the optional comparison plot. Other scan fields
+are still required as described above.
 
 ## Commands
 
@@ -93,12 +107,14 @@ The standard plots beneath `plots/` are:
 - `3_parameter_central_values.pdf` and `4_parameter_errors.pdf`: parameter
   changes relative to the λ = 0 fit.
 - `5_parameter_profiles.pdf` and `6_parameter_pulls.pdf`: parameter diagnostics.
-- `7_parameter_comparison.pdf`: an optional specialised comparison requiring
-  the standard HERAPDF parameter names at both λ = 0 and λ = 1.
+- `7_parameter_comparison.pdf`: an optional comparison of the configured
+  `parameter_comparison` entries, in their listed order, at λ = 0 and λ = 1.
 
 The generic parameter diagnostics use a λ = 0 reference, so include it for
-those plots. The specialised seventh plot is skipped if its required inputs
-are absent. `plot_style` and `plot_font_size_offset` affect presentation;
+those plots. The seventh plot requires both λ = 0 and λ = 1 with every selected
+parameter and is skipped when any are absent. It scales the λ = 1 intervals
+by that fit's Bartlett confidence-interval factor, using 1 when unavailable.
+`plot_style` and `plot_font_size_offset` affect presentation;
 `paper-common-epsilon` assumes the scan coordinate is physical common ε.
 The [HERA guide](../../../docs/hera-scans.md#eoe-strength-scans) explains that
 specific configuration.

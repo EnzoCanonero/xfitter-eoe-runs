@@ -15,6 +15,14 @@ with Q² ≥ 3.5 GeV², `enable_bartlett: true` and `n_iterations: 2`.
 The last setting is the nuisance-profiling steering option, separate from
 Pumplin's uncertainty-calculation `ITERATE` setting.
 
+Each configuration explicitly sets `dataset_root` to the bundled
+`datasets/hera/h1zeusCombined/inclusiveDis/1506.06042` directory, using a path
+relative to its own `config.yaml`. For example, the common-ε workspace uses:
+
+```yaml
+dataset_root: ../../../../../datasets/hera/h1zeusCombined/inclusiveDis/1506.06042
+```
+
 ## Forward selection
 
 Tool documentation: [systematic-source ranking](../runs/scans/forward-selection/README.md).
@@ -80,6 +88,12 @@ the forward-selection table above. Build selections and some seeds differ
 between the paper and auxiliary scans, so equal ε alone does not make their
 fit points interchangeable.
 
+Their `parameter_comparison` lists preserve the HERA plotting order and
+notation: `Bg`, `Cg`, `Agp`, `Bgp`, `Buv`, `Cuv`, `Euv`, `Bdv`, `Cdv`, `CUbar`,
+`DUbar`, `ADbar`, `BDbar`, `CDbar`. These names and labels are study settings
+in each YAML file. If a selected name is absent from either endpoint, the
+optional comparison is skipped.
+
 For the Figure 1 study, use:
 
 ```bash
@@ -89,7 +103,7 @@ workspace=runs/scans/eoe-scan/herapdf20-nnlo-rtopt/common-epsilon
 Its `plot_style: paper-common-epsilon` displays physical ε on the horizontal
 axis. The native Figure 1 file is `plots/1_chi2_vs_lambda.pdf`; directory names
 and CSV columns retain `lambda`. The other plots are diagnostics. The optional
-`7_parameter_comparison.pdf` requires standard HERAPDF parameters at both
+`7_parameter_comparison.pdf` requires all configured parameters at both
 λ = 0 and 1, so it is skipped for this 0–0.7 grid.
 
 ## Likelihood profiles
@@ -142,6 +156,28 @@ There are **3 × 2 × 2 = 12 requested fits**. The Gaussian group has no EoE sou
 declarations; the others retain the seven sources and refit their shifts.
 No reference-fit output is needed. This is an uncertainty-calculation test,
 separate from the paper's 2/4/8 nuisance-profiling-iteration comparison.
+
+The configuration selects the PDF diagnostics explicitly:
+
+```yaml
+plot_parameters:
+  - ADbar
+  - Agp
+  - BDbar
+  - Bdv
+  - Bg
+  - Bgp
+  - Buv
+  - CDbar
+  - CUbar
+  - Cdv
+  - Cg
+  - Cuv
+  - DUbar
+  - Euv
+```
+
+The seven configured E-type nuisance parameters are appended automatically.
 
 Use:
 

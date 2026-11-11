@@ -44,7 +44,10 @@ runs/
 
 Fit configurations specify the physics calculation and data inputs. Scan
 configurations select a template from `templates/`, source settings and scan
-coordinates. Comparison configurations select existing fitted outputs or PDF
+coordinates. Each scan's `dataset_root` selects its input directory, resolved
+relative to `config.yaml` unless absolute; `~` paths are supported. Its
+`datafiles` list names the files to copy from that directory.
+Comparison configurations select existing fitted outputs or PDF
 sets and the quantities to display. Comparison fit paths are relative to their
 workspace; outputs are written beneath that same workspace.
 

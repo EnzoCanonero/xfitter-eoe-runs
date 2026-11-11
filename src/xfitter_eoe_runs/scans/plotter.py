@@ -17,35 +17,9 @@ from .config import load_study_config
 from .extract import (extract_scan_results, extract_pumplin_widths,
                       _resolve_ordered_minuit_definitions)
 
-# PDF parameters shown in pumplin-stability plots (free HERAPDF params, sorted).
-_PUMPLIN_PDF_PARAMS = [
-    "ADbar", "Agp", "BDbar", "Bdv", "Bg", "Bgp", "Buv",
-    "CDbar", "CUbar", "Cdv", "Cg", "Cuv", "DUbar", "Euv",
-]
-
-# Standard HERAPDF parameter order and paper notation.  The order follows the
-# PDF sectors introduced in the fit setup rather than the size of the fitted
-# displacement.
-_HERAPDF_PARAMETER_LABELS = [
-    ("Bg", r"$B_g$"),
-    ("Cg", r"$C_g$"),
-    ("Agp", r"$A'_g$"),
-    ("Bgp", r"$B'_g$"),
-    ("Buv", r"$B_{u_v}$"),
-    ("Cuv", r"$C_{u_v}$"),
-    ("Euv", r"$E_{u_v}$"),
-    ("Bdv", r"$B_{d_v}$"),
-    ("Cdv", r"$C_{d_v}$"),
-    ("CUbar", r"$C_{\bar U}$"),
-    ("DUbar", r"$D_{\bar U}$"),
-    ("ADbar", r"$A_{\bar D}$"),
-    ("BDbar", r"$B_{\bar D}$"),
-    ("CDbar", r"$C_{\bar D}$"),
-]
-
 
 def _pumplin_plot_params(config) -> list:
-    params = list(_PUMPLIN_PDF_PARAMS)
+    params = list(config.plot_parameters)
     for syst in getattr(config, 'systematics', []):
         if syst.get('type') == 'E' and syst.get('name') not in params:
             params.append(syst['name'])
@@ -165,6 +139,7 @@ def plot_scan(run_dir: Path, template_root: Path):
         _plot_lambda_scan(results, plots_dir, error_label=error_label,
                           systematics=config.systematics,
                           plot_style=config.get('plot_style'),
+                          parameter_comparison=config.parameter_comparison,
                           font_size_offset=config.get('plot_font_size_offset', 0))
     elif config.scan_type == 'systematic-ranking':
         config_order = [s['name'] for s in config.systematics]
@@ -240,24 +215,26 @@ def _save_wide_parameters(results: dict, params_file: Path):
     wide_df.to_csv(params_file, index=False)
 
 
-def _plot_herapdf_parameter_comparison(poi_df: pd.DataFrame,
-                                       chi2_df: pd.DataFrame,
-                                       plots_dir: Path, font_size_offset: float = 0):
-    """Paper-style comparison of the nominal EoE and Gaussian PDF parameters.
+def _plot_parameter_comparison(poi_df: pd.DataFrame,
+                               chi2_df: pd.DataFrame,
+                               plots_dir: Path, parameter_labels: list,
+                               font_size_offset: float = 0):
+    """Compare configured PDF parameters in the nominal EoE and Gaussian fits.
 
     The lambda scan is used only as the source of the Gaussian (lambda=0) and
-    nominal seven-source (lambda=1) fits.  Lambda is deliberately absent from
-    the output notation, which compares the two physical fit configurations.
+    nominal EoE (lambda=1) fits. Parameter order and labels come from the study.
     """
+    if not parameter_labels:
+        return
     reference = poi_df[np.isclose(poi_df['lambda'], 0.0)].set_index('parameter')
     eoe = poi_df[np.isclose(poi_df['lambda'], 1.0)].set_index('parameter')
-    required = [name for name, _ in _HERAPDF_PARAMETER_LABELS]
+    required = [name for name, _ in parameter_labels]
 
     missing = [name for name in required
                if name not in reference.index or name not in eoe.index]
     if missing:
         print("  ! Skipping 7_parameter_comparison.pdf: "
-              f"missing standard HERAPDF parameters {missing}")
+              f"configured parameters missing at lambda=0 or lambda=1: {missing}")
         return
 
     # Pumplin supplies the interval half-widths.  The EoE intervals are then
@@ -273,7 +250,7 @@ def _plot_herapdf_parameter_comparison(poi_df: pd.DataFrame,
     intervals = np.array([
         eoe.loc[name, 'norm_error'] * ci_bartlett for name in required
     ])
-    labels = [label for _, label in _HERAPDF_PARAMETER_LABELS]
+    labels = [label for _, label in parameter_labels]
     y_pos = np.arange(len(required))
 
     extent = max(1.0, float(np.max(np.abs(pulls) + intervals)))
@@ -374,8 +351,9 @@ def _plot_paper_common_epsilon(chi2_df: pd.DataFrame, output: Path,
 
 def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
                       systematics: list = None, plot_style: str = None,
-                      font_size_offset: float = 0):
-    """Generate 5 standard plots for lambda-scan"""
+                      font_size_offset: float = 0,
+                      parameter_comparison: list = None):
+    """Generate lambda-scan diagnostics and an optional parameter comparison."""
 
     chi2_df = results['chi2']
     params_df = results['parameters']
@@ -594,10 +572,10 @@ def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
             n_pages += 1
     print(f"  ✓ 6_parameter_pulls.pdf  ({n_pages} pages)")
 
-    # Additional single-page figure for the nominal seven-source comparison.
-    # The existing lambda diagnostics above are retained unchanged.
-    _plot_herapdf_parameter_comparison(poi_df, chi2_df, plots_dir,
-                                       font_size_offset=font_size_offset)
+    # Optional single-page comparison using the study's parameter selection.
+    _plot_parameter_comparison(poi_df, chi2_df, plots_dir,
+                               parameter_labels=parameter_comparison,
+                               font_size_offset=font_size_offset)
 
 
 def _plot_systematic_ranking(results: dict, plots_dir: Path, results_dir: Path,

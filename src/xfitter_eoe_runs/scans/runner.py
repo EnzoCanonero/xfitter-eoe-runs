@@ -15,12 +15,6 @@ from .config import (load_study_config, LambdaScanConfig, LikelihoodScanConfig,
 from .templates import (TemplateManager, create_fit_structure,
                          generate_batch_submit)
 
-# Free PDF parameters that appear in parameters.yaml.j2 (excludes DEPENDENT: Ag, Auv, Adv).
-_PDF_PARAMS = {
-    'Bg', 'Cg', 'Agp', 'Bgp', 'Buv', 'Cuv', 'Euv',
-    'Bdv', 'Cdv', 'CUbar', 'DUbar', 'ADbar', 'BDbar', 'CDbar',
-}
-
 
 def _patch_parameters(params_file: Path,
                       pdf_params: Dict[str, Dict],
@@ -225,7 +219,7 @@ def _order_systematics_by_e_reference(systematics: Sequence[Dict],
     return [next(ordered_iter) if s.get('type') == 'E' else s for s in systematics]
 
 
-def run_scan(run_dir: Path, template_root: Path, dataset_root: Path,
+def run_scan(run_dir: Path, template_root: Path, dataset_root: Optional[Path],
              setup_env: Path, dry_run: bool = False, submit: bool = True):
     """
     Generate fits for a scan workspace and optionally submit to Condor
@@ -233,7 +227,7 @@ def run_scan(run_dir: Path, template_root: Path, dataset_root: Path,
     Args:
         run_dir: Path to the workspace containing config.yaml and runtime output
         template_root: Path containing the named scan templates
-        dataset_root: Path containing the configured dataset files
+        dataset_root: Explicit dataset directory override; None uses config.yaml
         setup_env: Environment setup script to source in generated jobs
         dry_run: If True, only print what would be done without creating files
         submit: If True, automatically submit jobs to Condor after generating fits
@@ -241,9 +235,14 @@ def run_scan(run_dir: Path, template_root: Path, dataset_root: Path,
     # Load configuration
     run_dir = Path(run_dir)
     config = load_study_config(run_dir, template_root)
+    dataset_root = (config.dataset_root if dataset_root is None
+                    else Path(dataset_root).expanduser().resolve())
+    if not dataset_root.is_dir():
+        raise FileNotFoundError(f"dataset_root directory not found: {dataset_root}")
 
     print(f"Scan type: {config.scan_type}")
     print(f"Run workspace: {run_dir}")
+    print(f"Dataset root: {dataset_root}")
 
     if config.do_errors:
         print(f"doErrors: {config.do_errors['method']}")
@@ -689,8 +688,7 @@ def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
 
     # Build initial MINUIT starting values from reference fit (override with config).
     # PDF params are every fitted (variable) parameter in the reference fit that is
-    # not an E-type systematic — read dynamically so this works for any
-    # parametrisation (HERAPDF, giuli, ...), not just the hardcoded HERAPDF set.
+    # not an E-type systematic — read dynamically from the reference fit.
     initial_params: Dict[str, Dict] = {}
     for name, pdata in ref_params.items():
         if name in e_type_names:

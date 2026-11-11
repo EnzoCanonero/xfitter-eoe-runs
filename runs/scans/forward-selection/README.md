@@ -19,6 +19,7 @@ your study; the `scan_type` field selects this implementation.
 | --- | --- |
 | `scan_type` | `systematic-ranking` |
 | `template` | Directory name under root `templates/` |
+| `dataset_root` | Dataset directory, relative to the directory containing `config.yaml`; absolute and `~` paths also work |
 | `datafiles` | Dataset filenames copied into each generated fit |
 | `systematics` | Candidate source entries: `name`, `type`, optional `range`, `epsilon`, `init` |
 | `base_systematics` | Optional sources active in every fit; same entry format |
@@ -34,12 +35,12 @@ selected dataset and xFitter setup. Ranges expand numbered names; candidates
 already present in `base_systematics` are excluded. `init` supplies starting
 values for E-type nuisances, not fixed shifts.
 
-The current `scripts/run-scan` adapter resolves `datafiles` inside its fixed
-HERA dataset directory; there is no CLI option or YAML field that changes that
-root. The library's `run_scan` accepts an explicit `dataset_root`. See
-[installation](../../../docs/installation.md) for this adapter boundary and the
-scientific runtime. Generation requires templates and data, but does not read
-a preceding round's fit output.
+`scripts/run-scan` copies `datafiles` from the configured `dataset_root`.
+The library's `run_scan` uses that root when its `dataset_root` argument is
+`None`; an explicit path overrides it. See
+[installation](../../../docs/installation.md#datasets-and-custom-studies) for
+a path example and the scientific runtime. Generation requires templates and
+data, but does not read a preceding round's fit output.
 
 ## Commands
 

@@ -23,6 +23,7 @@ base_systematics:
   - {name: proc_tb21, type: E, init: -3.7783}
   - {name: sysHZComb1064, type: E, init: 7.1276}
 
+dataset_root: ../../../../../../datasets/hera/h1zeusCombined/inclusiveDis/1506.06042
 datafiles:
   - HERA1+2_NCep_920-thexp.dat
   - HERA1+2_NCep_820-thexp.dat

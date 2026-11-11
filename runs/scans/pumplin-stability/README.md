@@ -19,11 +19,13 @@ Create a `config.yaml` in a workspace under `runs/scans/`.
 | --- | --- |
 | `scan_type` | `pumplin-stability` |
 | `template`, `datafiles` | Named root template and dataset filenames |
+| `dataset_root` | Dataset directory, relative to the directory containing `config.yaml`; absolute and `~` paths also work |
 | `eps` | Default source strength before multiplying by λ |
 | `systematics` | Source entries with `name`, `type`, optional `epsilon`, `init` and numbered `range` |
 | `lambda` | List of EoE scaling factors |
 | `errdef`, `iterate` | Lists of Pumplin settings forming the grid |
 | `errdef_ref` | Reference setting for the plotted `ERRDEF` ratios |
+| `plot_parameters` | Required nonempty ordered list of PDF parameter names to plot |
 | `n_iterations`, `enable_bartlett`, `q2_cut` | Steering-template options |
 | `xfitter_tree`, `xfitter_commit`, `request_memory` | Worker build selection and Condor memory |
 
@@ -35,10 +37,21 @@ resolved ε multiplied by λ; `init` values are starting values, not fixed shift
 The runner sets the Pumplin error block from the grid.
 
 Template inputs comprise steering and parameter templates, constants and
-weights. No reference-fit output is required. The CLI resolves `datafiles`
-inside a fixed HERA dataset directory; another root cannot be selected in YAML
-or by a CLI option. The library `run_scan` accepts `dataset_root`; see
-[installation](../../../docs/installation.md) for the adapter/runtime boundary.
+weights. No reference-fit output is required. `scripts/run-scan` copies
+`datafiles` from the configured `dataset_root`. The library `run_scan` uses
+that root when its `dataset_root` argument is `None`; an explicit path
+overrides it. For example, these fields select data and PDF parameters from
+your study:
+
+```yaml
+dataset_root: ../sample-data
+datafiles: [sample-a.dat, sample-b.dat]
+plot_parameters: [shape_a, shape_b]
+```
+
+Replace the names with those in your fit outputs and supply the other scan
+fields above. The plotter preserves the `plot_parameters` order and appends
+E-type nuisances from `systematics` automatically, without duplicate names.
 
 ## Commands
 
@@ -92,11 +105,9 @@ supplies interval and covariance information.
 | `plots/pumplin_eigenmode_contributions/<parameter>.pdf` | Aligned contributions by parameter |
 | `plots/pumplin_eigenmode_contributions_by_mode/mode_<NN>.pdf` | Aligned contributions by mode |
 
-The current plotter selects a fixed list of standard HERAPDF PDF parameters
-plus configured E-type nuisances. It does not discover arbitrary template
-parameters automatically; another parametrisation may require a plotter
-change. This is an implementation limit, not a restriction imposed by the grid
-schema.
+The diagnostic parameter selection comes from `plot_parameters` and the
+configured E-type nuisances. Check that the selected names occur in the
+interval and covariance records used by the plots.
 
 Compare the generated inventory with the available interval logs. Extraction
 requires both `XRANGE: find allowed displacements` and

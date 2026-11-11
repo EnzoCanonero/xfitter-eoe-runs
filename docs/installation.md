@@ -179,13 +179,28 @@ It copies only its supported configuration and data files; see
 [fit creation](../runs/fits/README.md#create-a-workspace-from-your-inputs) for
 handling additional inputs and the current default template.
 
-The scan command has a narrower interface: `scripts/run-scan` currently fixes
-its dataset root to `datasets/hera/h1zeusCombined/inclusiveDis/1506.06042` and
-has no dataset-root option. The Python
-[`run_scan` API](../src/xfitter_eoe_runs/scans/runner.py) accepts an explicit
-`dataset_root`. Using it for other data requires compatible templates and a
-review of the selected scan type's assumptions; changing that argument alone
-does not generalize every parametrisation or likelihood-profile setting.
+For scans, set `dataset_root` in each workspace's `config.yaml` and list the
+files to copy under `datafiles`. For example, this configuration fragment uses
+a dataset directory beside the scan workspace:
+
+```yaml
+dataset_root: ../sample-data
+datafiles:
+  - sample-a.dat
+  - sample-b.dat
+```
+
+`scripts/run-scan` resolves a relative `dataset_root` from the directory
+containing `config.yaml`, regardless of the command's working directory.
+Absolute paths and home-directory paths such as `~/data/sample-study` also
+work. The Python [`run_scan` API](../src/xfitter_eoe_runs/scans/runner.py) uses
+the configured root when its `dataset_root` argument is `None`; an explicit
+path argument overrides the configuration.
+
+Choose templates compatible with your data and xFitter setup. Pumplin scans
+require a `plot_parameters` list; λ scans can select an optional
+`parameter_comparison` list. The workflow guides describe these settings and
+their input-format requirements, including likelihood-template compatibility.
 
 Continue with the [study catalog](../runs/README.md) for the workflow families
 or the [HERA study](hera-study.md) for the supplied application. For software

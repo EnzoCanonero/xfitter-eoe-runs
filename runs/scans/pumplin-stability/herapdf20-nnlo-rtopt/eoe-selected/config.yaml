@@ -13,6 +13,7 @@ n_iterations: 2
 enable_bartlett: true
 q2_cut: 3.5
 
+dataset_root: ../../../../../datasets/hera/h1zeusCombined/inclusiveDis/1506.06042
 datafiles:
   - HERA1+2_NCep_920-thexp.dat
   - HERA1+2_NCep_820-thexp.dat
@@ -31,3 +32,20 @@ systematics:
   - {name: sysHZComb1144, type: E, init: 4.0798}
   - {name: sysHZComb1111, type: E, init: -2.5331}
   - {name: sysHZComb1113, type: E, init: 3.8119}
+
+# PDF parameters shown in stability diagnostics; E nuisances are appended.
+plot_parameters:
+  - ADbar
+  - Agp
+  - BDbar
+  - Bdv
+  - Bg
+  - Bgp
+  - Buv
+  - CDbar
+  - CUbar
+  - Cdv
+  - Cg
+  - Cuv
+  - DUbar
+  - Euv

@@ -34,6 +34,20 @@ class StudyConfig:
         return self.data.get('datafiles', [])
 
     @property
+    def dataset_root(self) -> Path:
+        """Dataset directory, absolute or relative to this workspace's config."""
+        value = self.data.get('dataset_root')
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(
+                "config.yaml must specify 'dataset_root' as a non-empty path "
+                "(absolute or relative to the workspace)"
+            )
+        path = Path(value).expanduser()
+        if not path.is_absolute():
+            path = self.workspace_dir / path
+        return path.resolve()
+
+    @property
     def template_dir(self) -> Path:
         """Template folder for this scan, selected by name under template_root.
 
@@ -205,6 +219,29 @@ class LambdaScanConfig(StudyConfig):
         """Get expanded systematics with resolved epsilon and scaling mode."""
         return self._expand_systematics(self.data['systematics'])
 
+    @property
+    def parameter_comparison(self) -> List[tuple]:
+        """Ordered (name, label) pairs for the optional lambda=0/1 comparison."""
+        entries = self.data.get('parameter_comparison', [])
+        if not isinstance(entries, list):
+            raise ValueError("parameter_comparison must be a list of name/label mappings")
+        result = []
+        names = set()
+        for entry in entries:
+            if not isinstance(entry, dict):
+                raise ValueError("parameter_comparison entries must be name/label mappings")
+            name = entry.get('name')
+            label = entry.get('label', name)
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError("parameter_comparison names must be non-empty strings")
+            if not isinstance(label, str) or not label.strip():
+                raise ValueError("parameter_comparison labels must be non-empty strings")
+            if name in names:
+                raise ValueError(f"duplicate parameter_comparison name: {name}")
+            names.add(name)
+            result.append((name, label))
+        return result
+
 
 class SystematicRankingConfig(StudyConfig):
     """Configuration for systematic-ranking workspaces."""
@@ -296,6 +333,17 @@ class PumplinStabilityConfig(StudyConfig):
     def errdef_ref(self) -> float:
         """Reference ERRDEF for the errdef-invariance plot normalization."""
         return float(self.data.get('errdef_ref', 0.5))
+
+    @property
+    def plot_parameters(self) -> List[str]:
+        """Ordered PDF parameter selection for Pumplin diagnostics."""
+        names = self.data.get('plot_parameters')
+        if (not isinstance(names, list) or not names
+                or any(not isinstance(name, str) or not name.strip() for name in names)):
+            raise ValueError("plot_parameters must be a non-empty list of parameter names")
+        if len(set(names)) != len(names):
+            raise ValueError("plot_parameters must not contain duplicate names")
+        return list(names)
 
     @property
     def systematics(self) -> List[Dict]:

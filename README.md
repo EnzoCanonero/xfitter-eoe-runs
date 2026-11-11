@@ -100,10 +100,10 @@ python -m pip install -e .
 python -m unittest discover -s tests -v
 ```
 
-The existing scan command selects the bundled dataset directory; the scan
-library accepts an explicit dataset directory. Some diagnostic plots also
-assume particular parameter names. The [installation](docs/installation.md) and
-workflow guides distinguish these implementation limits from example settings.
+Scan configurations select their dataset directory and the parameters shown
+in optional λ comparisons and Pumplin diagnostics. The
+[installation](docs/installation.md) and workflow guides describe these fields
+and the input formats required by each workflow.
 
 These tests check the software and workspace conventions. Validate fit quality
 and input compatibility for each scientific application. Commit source code,
@@ -113,3 +113,9 @@ configurations, and documentation; keep generated results outside Git.
 
 The project's code and documentation are available under the [MIT License](LICENSE).
 External scientific software and datasets retain their respective terms.
+
+I designed these tools for general use, but have applied them only to HERA so
+far. Applications to other datasets may require adaptations. If you are
+interested, please open an issue or discussion. I am happy to collaborate and
+help adapt the tools, and to welcome active contributors as project
+collaborators.

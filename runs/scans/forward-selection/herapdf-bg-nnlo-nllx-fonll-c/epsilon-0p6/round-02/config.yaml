@@ -13,6 +13,7 @@ request_memory: 4GB
 base_systematics:
   - {name: sysHZComb1053, type: E, init: -14.264694}
 
+dataset_root: ../../../../../../datasets/hera/h1zeusCombined/inclusiveDis/1506.06042
 datafiles:
   - HERA1+2_NCep_920-thexp.dat
   - HERA1+2_NCep_820-thexp.dat

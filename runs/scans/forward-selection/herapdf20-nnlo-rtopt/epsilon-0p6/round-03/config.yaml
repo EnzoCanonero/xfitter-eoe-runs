@@ -19,6 +19,7 @@ base_systematics:
   - {name: proc_tb21,     type: E, init: -4.5779}
 
 # HERA datafiles (all 7 files)
+dataset_root: ../../../../../../datasets/hera/h1zeusCombined/inclusiveDis/1506.06042
 datafiles:
   - HERA1+2_NCep_920-thexp.dat
   - HERA1+2_NCep_820-thexp.dat

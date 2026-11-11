@@ -11,6 +11,7 @@ request_memory: 4GB
 # First forward-selection round: rank all 169 correlated HERA sources against
 # the Gaussian NNLO+NLLx APFEL/FONLL-C minimum. Retain each round winner only
 # when its Bartlett-corrected improvement dchi2_B > 1.
+dataset_root: ../../../../../../datasets/hera/h1zeusCombined/inclusiveDis/1506.06042
 datafiles:
   - HERA1+2_NCep_920-thexp.dat
   - HERA1+2_NCep_820-thexp.dat

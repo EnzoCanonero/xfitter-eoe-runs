@@ -18,6 +18,7 @@ Create a `config.yaml` in a workspace under `runs/scans/`.
 | --- | --- |
 | `scan_type` | `likelihood-scan` |
 | `template`, `datafiles` | Named root template and dataset filenames for generated fits |
+| `dataset_root` | Dataset directory, relative to the directory containing `config.yaml`; absolute and `~` paths also work |
 | `reference_fit` | Reference fit root, resolved relative to the scan workspace |
 | `systematics`, `epsilon` | Source declarations and default EoE strength; entries can supply their own strength and initial value |
 | `scan_defaults` | 1D defaults `n_sigma`, `npoints`; 2D defaults `n_sigma_2d`, `npoints_2d` |
@@ -40,10 +41,14 @@ names, so the generator uses parameter indices and that declaration order to
 identify nuisances. The configured E-source set must agree with the reference.
 Changing the reference changes the study and its grid.
 
-The template supplies steering, parameters, constants and weights. The current
-CLI copies `datafiles` from a fixed HERA dataset directory; it has no dataset-root
-option. The library `run_scan` accepts an explicit `dataset_root`. See
-[installation](../../../docs/installation.md) for the adapter/runtime boundary.
+The template supplies steering, parameters, constants and weights.
+`scripts/run-scan` copies `datafiles` from the configured `dataset_root`.
+The library `run_scan` uses that root when its `dataset_root` argument is
+`None`; an explicit path overrides it. See
+[installation](../../../docs/installation.md#datasets-and-custom-studies) for
+a path example. Parameter updates expect inline `[value, step]` entries,
+with a special case for the bundled `CDbar` mapping; arbitrary mapping-style
+parameter definitions may need an adapter change.
 
 ## Commands
 

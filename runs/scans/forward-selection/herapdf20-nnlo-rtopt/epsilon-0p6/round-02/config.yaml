@@ -17,6 +17,7 @@ base_systematics:
   - {name: sysHZComb1053, type: E, init: -17.3848}
 
 # HERA datafiles (all 7 files)
+dataset_root: ../../../../../../datasets/hera/h1zeusCombined/inclusiveDis/1506.06042
 datafiles:
   - HERA1+2_NCep_920-thexp.dat
   - HERA1+2_NCep_820-thexp.dat

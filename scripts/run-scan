@@ -16,8 +16,6 @@ from xfitter_eoe_runs.scans.runner import run_scan
 
 RUN_ROOT = REPO_ROOT / "runs" / "scans"
 TEMPLATE_ROOT = REPO_ROOT / "templates"
-DATASET_ROOT = (REPO_ROOT / "datasets" / "hera" / "h1zeusCombined" /
-                "inclusiveDis" / "1506.06042")
 SETUP_ENV = REPO_ROOT / "scripts" / "setup-env.sh"
 
 
@@ -58,7 +56,7 @@ def main():
         run_scan(
             run_dir,
             template_root=TEMPLATE_ROOT,
-            dataset_root=DATASET_ROOT,
+            dataset_root=None,
             setup_env=SETUP_ENV,
             dry_run=args.dry_run,
             submit=not args.no_submit,

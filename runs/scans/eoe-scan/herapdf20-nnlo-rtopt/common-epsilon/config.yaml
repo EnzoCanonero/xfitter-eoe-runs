@@ -20,6 +20,7 @@ doErrors:
   errdef: 0.5
   iterate: 10
 
+dataset_root: ../../../../../datasets/hera/h1zeusCombined/inclusiveDis/1506.06042
 datafiles:
   - HERA1+2_NCep_920-thexp.dat
   - HERA1+2_NCep_820-thexp.dat
@@ -43,3 +44,34 @@ systematics:
 # Original manuscript Figure 1 format; the scan coordinate equals common epsilon.
 plot_style: paper-common-epsilon
 plot_font_size_offset: 2
+
+# Parameter order and notation for the optional Gaussian/EoE comparison.
+parameter_comparison:
+  - name: Bg
+    label: "$B_g$"
+  - name: Cg
+    label: "$C_g$"
+  - name: Agp
+    label: "$A'_g$"
+  - name: Bgp
+    label: "$B'_g$"
+  - name: Buv
+    label: "$B_{u_v}$"
+  - name: Cuv
+    label: "$C_{u_v}$"
+  - name: Euv
+    label: "$E_{u_v}$"
+  - name: Bdv
+    label: "$B_{d_v}$"
+  - name: Cdv
+    label: "$C_{d_v}$"
+  - name: CUbar
+    label: "$C_{\\bar U}$"
+  - name: DUbar
+    label: "$D_{\\bar U}$"
+  - name: ADbar
+    label: "$A_{\\bar D}$"
+  - name: BDbar
+    label: "$B_{\\bar D}$"
+  - name: CDbar
+    label: "$C_{\\bar D}$"
