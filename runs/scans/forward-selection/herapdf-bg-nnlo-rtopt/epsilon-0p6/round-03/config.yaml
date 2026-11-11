@@ -11,7 +11,7 @@ epsilon: 0.6
 # Third-order forward-selection scan with the Giuli parametrization (Q2cut = 3.5).
 # sysHZComb1053 + sysHZComb1062 are held ON in every fit (eps 0.6), warm-started at
 # their JOINT converged values from the 2nd-order {1053,1062} fit
-# (legacy/cleanup-20261111/runs/scans/syst-ranking/giuli-param/2nd-1053/runs/sysHZComb1062). Every candidate is ranked by its marginal
+# (../xfitter-eoe-runs-archive/legacy/cleanup-20261111/runs/scans/syst-ranking/giuli-param/2nd-1053/runs/sysHZComb1062). Every candidate is ranked by its marginal
 # impact on top of {1053, 1062}. The nominal fit is the {1053, 1062}-only fit. Both base
 # sources are auto-excluded from the candidate list.
 # Note: the Giuli parametrization has 23 PDF parameters, so 1053 = MINUIT #24, 1062 = #25

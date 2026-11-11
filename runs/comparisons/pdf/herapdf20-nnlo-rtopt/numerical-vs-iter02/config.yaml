@@ -1,5 +1,4 @@
 # Paper reproduction configuration prepared 2026-09-29.
-# Source template: legacy/cleanup-20261111/runs/comparisons/baseline-2E5N-iter2-vs-7sources/config.yaml
 type: pdf-comparison
 Q2: 4.0
 error_type: symmetric

@@ -1,5 +1,4 @@
 # Paper reproduction configuration prepared 2026-09-29.
-# Source template: legacy/cleanup-20261111/runs/comparisons/xsec-nc-cc-nominal-vs-7sources-pumplin/config.yaml
 # Expected xFitter commit: 67398b15571dff1e9ddce0bc88923554552c9c84.
 type: xsec-comparison
 panels:

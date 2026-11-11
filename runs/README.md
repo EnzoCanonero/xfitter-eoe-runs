@@ -1,21 +1,13 @@
 # Run catalog
 
 The current tree contains **13 fit workspaces, 30 scan configurations, and
-11 comparisons**. Paths identify the physical setup and study; their original
-campaign identities and relocation history are recorded in the
-[migration manifest](migration-20261111.json) and
-[archive inventory](../legacy-artifacts.yaml). This catalog describes configured
-studies, not job completion.
+11 comparisons**. Paths identify the physical setup and study. This catalog
+describes configured studies, not job completion.
 
-Paper workspaces retain the inputs of the 20260929 campaign. Auxiliary studies
-retain their own inputs and build pins, including references to archived fits.
-Moving a workspace does not replace its fitted results with a newer campaign.
-Superseded workspaces and their products are retained locally under
-`legacy/cleanup-20261111/`; that ignored archive is absent from fresh clones.
-Nested `output_OLD/` backups and historical plot folders are archived there too;
-their exact destinations are recorded in the archive's `artifact-moves.json`.
-Plotting and scan commands accept workspaces under `runs/`; an archived study
-must be restored there with its recorded inputs before those commands can run it.
+Paper workspaces use the inputs of the 20260929 campaign. Auxiliary studies
+retain their own inputs and build pins; their configured historical fit inputs
+must be available in `../xfitter-eoe-runs-archive/` (relative to the repository
+root) before generating or plotting them.
 
 | Setup slug | Physical setup |
 | --- | --- |
@@ -62,9 +54,8 @@ sources and seeds remain explicit in each configuration.
 | Auxiliary | Pumplin stability under λ, ERRDEF and ITERATE variations | [Selected EoE](scans/pumplin-stability/herapdf20-nnlo-rtopt/eoe-selected/config.yaml) |
 
 The common-ε and λ scans hold their source lists fixed; they are distinct from
-repeating forward selection at each ε. Auxiliary likelihood references retain
-their original archived fit identity and require the corresponding local
-`output/minuit.out.txt`.
+repeating forward selection at each ε. Likelihood profiles require the configured
+reference fit's `output/minuit.out.txt`.
 
 ## Comparisons
 
@@ -81,7 +72,3 @@ documents labels, fonts, and the combined, absolute-only and ratio-only PDFs.
 | Paper | HERAPDF2.0 change in data χ² by x and Q² region (Table 2) | [Region table](comparisons/regions/herapdf20-nnlo-rtopt/gaussian-vs-eoe-selected/config.yaml) |
 | Auxiliary | Selected EoE PDFs: HERAPDF-BG RTOPT vs resummed | [Cross-setup comparison](comparisons/pdf/cross-setups/eoe-selected-bg-vs-resummed/config.yaml) |
 | Auxiliary | HERAPDF-BG Gaussian/EoE low-Q² cross sections | [Low-Q² comparison](comparisons/xsec/herapdf-bg-nnlo-rtopt/gaussian-vs-eoe-selected-low-q2/config.yaml) |
-
-Auxiliary comparisons preserve their historical input paths and available
-products. Moving them does not supply missing archived grids or make them
-equivalent to the current paper fits.

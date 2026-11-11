@@ -12,7 +12,7 @@ epsilon: 0.6
 # The fourth round selects sysHZComb1114 (dchi2_B = 2.91 > 1).
 # sysHZComb1053 + proc_tb21 + sysHZComb1064 + sysHZComb1114 are held ON in every fit
 # (eps 0.6), warm-started at their JOINT converged values from the 4th-order
-# {1053,proc_tb21,1064,1114} fit (legacy/cleanup-20261111/runs/scans/syst-ranking/hera-baseline/4th-1053-tb21-1064/runs/sysHZComb1114). Every
+# {1053,proc_tb21,1064,1114} fit (../xfitter-eoe-runs-archive/legacy/cleanup-20261111/runs/scans/syst-ranking/hera-baseline/4th-1053-tb21-1064/runs/sysHZComb1114). Every
 # candidate is ranked by its marginal impact on top of those four. The nominal fit is the
 # {1053,proc_tb21,1064,1114}-only fit. All four base sources are auto-excluded from the
 # candidate list.

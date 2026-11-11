@@ -11,7 +11,7 @@ epsilon: 0.6
 # Sixth-order forward-selection scan (Q2cut = 3.5, baseline parametrization).
 # The fifth round selects sysHZComb1144 (dchi2_B = 2.53 > 1).
 # Base held ON in every fit (eps 0.6), warm-started at the JOINT converged values from the
-# 5th-order {1053,proc_tb21,1064,1114,1144} fit (legacy/cleanup-20261111/runs/scans/syst-ranking/hera-baseline/5th-1053-tb21-1064-1114/runs/sysHZComb1144).
+# 5th-order {1053,proc_tb21,1064,1114,1144} fit (../xfitter-eoe-runs-archive/legacy/cleanup-20261111/runs/scans/syst-ranking/hera-baseline/5th-1053-tb21-1064-1114/runs/sysHZComb1144).
 base_systematics:
   - {name: sysHZComb1053, type: E, init: -16.3636}
   - {name: proc_tb21,     type: E, init: -6.1758}

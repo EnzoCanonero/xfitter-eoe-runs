@@ -3,7 +3,7 @@ scan_type: likelihood-scan
 xfitter_tree: xfitter-master
 xfitter_commit: bd0470d93a433ebfb5d99f6c0fecda9c29141199
 template: hera-baseline
-reference_fit: "../../../../../legacy/cleanup-20261111/runs/fits/hera-baseline/nominal-bartlett2-pumplin"
+reference_fit: "../../../../../../xfitter-eoe-runs-archive/legacy/cleanup-20261111/runs/fits/hera-baseline/nominal-bartlett2-pumplin"
 n_iterations: 2
 enable_bartlett: true
 q2_cut: 3.5

@@ -12,7 +12,7 @@ epsilon: 0.6
 # The sixth round selects sysHZComb1111 (dchi2_B = 2.19 > 1).
 # Base held ON in every fit (eps 0.6), warm-started at the JOINT converged values
 # from the 6th-order
-# {1053,proc_tb21,1064,1114,1144,1111} fit (legacy/cleanup-20261111/runs/scans/syst-ranking/hera-baseline/6th-1053-tb21-1064-1114-1144/runs/sysHZComb1111).
+# {1053,proc_tb21,1064,1114,1144,1111} fit (../xfitter-eoe-runs-archive/legacy/cleanup-20261111/runs/scans/syst-ranking/hera-baseline/6th-1053-tb21-1064-1114-1144/runs/sysHZComb1111).
 base_systematics:
   - {name: sysHZComb1053, type: E, init: -16.4930}
   - {name: proc_tb21,     type: E, init: -6.2241}

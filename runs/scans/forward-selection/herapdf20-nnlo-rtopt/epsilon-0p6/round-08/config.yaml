@@ -12,7 +12,7 @@ epsilon: 0.6
 # (next source proc_nrl had dchi2_B = 0.81, so selection stops). Base held ON in every fit
 # (eps 0.6), warm-started at the
 # JOINT converged values from the 7th-order {1053,proc_tb21,1064,1114,1144,1111,1113} fit
-# (legacy/cleanup-20261111/runs/scans/syst-ranking/hera-baseline/7th-1053-tb21-1064-1114-1144-1111/runs/sysHZComb1113).
+# (../xfitter-eoe-runs-archive/legacy/cleanup-20261111/runs/scans/syst-ranking/hera-baseline/7th-1053-tb21-1064-1114-1144-1111/runs/sysHZComb1113).
 base_systematics:
   - {name: sysHZComb1053, type: E, init: -16.4095}
   - {name: proc_tb21,     type: E, init: -6.3118}

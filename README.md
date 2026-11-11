@@ -5,8 +5,8 @@
 Workspace for the xFitter errors-on-errors studies. The repository keeps
 reusable code, commands, templates, datasets, and execution workspaces in
 separate top-level directories. Each scan or comparison configuration lives
-with its generated products under `runs/`; generated results and local
-historical artifacts are not tracked by Git.
+with its generated products under `runs/`; generated results are not tracked
+by Git.
 
 ## Layout
 
@@ -25,9 +25,7 @@ xfitter-eoe-runs/
 │   ├── scans/<type>/<setup>/    # study configs and generated scan products
 │   └── comparisons/<type>/<setup>/ # study configs, tables, and plots
 ├── datasets/                    # canonical input data
-├── tests/
-├── legacy-artifacts.yaml        # provenance for local historical material
-└── legacy/                      # ignored local archive; absent in fresh clones
+└── tests/
 ```
 
 Generated directories under `runs/` may be absent in a fresh clone; commands
@@ -133,16 +131,13 @@ to `XFITTER_ROOT` (or an absolute path), rather than a Git branch.
 Changing `.env` does not migrate existing studies: their configurations and
 generated launchers retain their own tree and commit selections. For a new run
 on the current build, create a separate workspace with the desired tree and
-commit and generate its launchers. Retained configurations using the old
-`xfitter-master` path and `bd0470d...` pin need a build of that revision to be
-reproduced; the relocated current build has a different commit. Preserve those
-historical configurations and results when creating a new study.
+commit and generate its launchers. Existing studies require the build revision
+recorded in their configurations and launchers.
 
 The FONLL-C and resummed fits require the APFEL 3.0.6/HELL 3 dependencies.
 All 13 current paper fit launchers select `merge-master/xfitter-master` at
 `67398b15571dff1e9ddce0bc88923554552c9c84`, including the small-x fits. Auxiliary
-and archived studies retain their own build selections, which may use the older
-`xfitter-bartlett-apfel306-hell3` tree. Launchers and descriptors contain
+studies retain their own build selections. Launchers and descriptors contain
 site-specific absolute paths that must be adapted for a different checkout or
 installation; see the [fit catalog](runs/README.md#fits).
 
@@ -252,8 +247,8 @@ Cross-section plots require `xfitter-draw` and ROOT. These external components
 are expected from the configured xFitter/LCG environment and are not installed
 by this Python package. Fresh comparisons default to `merge-master/xfitter-master`; set
 `xfitter_tree` in the comparison configuration or export `XFITTER_TREE` to use
-another compatible built tree. Retained historical and small-x studies should
-continue to select the build with which they were produced.
+another compatible built tree. Existing studies should continue to select the
+build with which they were produced.
 
 For the current paper workspaces:
 
@@ -285,8 +280,7 @@ fits:
     source: xfitter-grid
 ```
 
-Local comparisons require a populated `<fit>/output/`. Historical directories
-such as `output_legacy_*` or `output_retained_*` are not promoted automatically.
+Local comparisons require a populated `<fit>/output/`.
 PDF comparisons write combined, ratio-only, and absolute-only PDFs beneath the
 workspace's `plots/` directory.
 
@@ -338,22 +332,16 @@ and layout.
 
 Assemble paper layouts separately from the repository. The native files retain
 their filenames, dimensions and page order; generated plots remain ignored by
-Git. Superseded workspaces are retained under `legacy/cleanup-20261111/`.
-The canonical configurations above retain the paper campaign's original inputs.
-Auxiliary studies keep their own input identities, including references to
-archived fits; renaming a study does not substitute newer fitted results.
+Git. The configurations above retain the paper campaign's original inputs.
 
-## Datasets and historical material
+## Datasets
 
 Canonical xFitter tables live under `datasets/`; see `datasets/README` for the
 upstream data repository. Runtime copies belong under `runs/` and are ignored.
 
-Inactive fits, studies, and other historical material are retained locally
-under the ignored `legacy/` tree. `legacy-artifacts.yaml` records their original
-locations and provenance, including the 2026-11-11 run-tree cleanup. Historical
-manifest sections intentionally retain the paths that were current when each
-snapshot was classified. The ignored archive is local material, so an auxiliary
-study referring to it requires those inputs to be available on the checkout.
+Auxiliary studies require the historical fit inputs named in their configurations
+under the sibling directory `../xfitter-eoe-runs-archive/`. These inputs must be
+available before generating or plotting those studies.
 
 ## Validation
 
@@ -369,4 +357,4 @@ python3 -m unittest discover -s tests -v
 - Keep study rationale in its workspace `config.yaml` comments or a local
   `README.md`.
 - Commit configurations, templates, source, commands, tests, and documentation.
-- Do not commit outputs, Condor logs, copied data tables, or `legacy/` payloads.
+- Do not commit outputs, Condor logs, or copied data tables.

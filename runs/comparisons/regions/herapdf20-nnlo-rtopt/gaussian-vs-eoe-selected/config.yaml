@@ -1,5 +1,4 @@
 # Paper reproduction configuration prepared 2026-09-29.
-# Source template: legacy/cleanup-20261111/runs/comparisons/xsec-region-nominal-vs-7sources/config.yaml
 type: xsec-region-table
 q2bins:
 - 0

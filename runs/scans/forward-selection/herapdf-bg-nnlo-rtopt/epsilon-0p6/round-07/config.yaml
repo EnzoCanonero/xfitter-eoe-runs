@@ -12,7 +12,7 @@ epsilon: 0.6
 # The corrected 6th-round scan selects proc_tb21 (dchi2_B = 1.17), so the base
 # {1053,1062,1111,1114,1144,proc_tb21} is held ON in every fit (eps 0.6),
 # warm-started at the JOINT converged values from
-# legacy/cleanup-20261111/runs/scans/syst-ranking/giuli-param/6th-1053-1062-1111-1114-1144/runs/proc_tb21.
+# ../xfitter-eoe-runs-archive/legacy/cleanup-20261111/runs/scans/syst-ranking/giuli-param/6th-1053-1062-1111-1114-1144/runs/proc_tb21.
 # Giuli has 23 PDF parameters, so the six EoE sources are MINUIT #24--#29.
 base_systematics:
   - {name: sysHZComb1053, type: E, init: -15.8343}
