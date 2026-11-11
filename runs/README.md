@@ -1,74 +1,70 @@
-# Run catalog
+# Workspaces and workflow guides
 
-The current tree contains **13 fit workspaces, 30 scan configurations, and
-11 comparisons**. Paths identify the physical setup and study. This catalog
-describes configured studies, not job completion.
+[Project overview](../README.md) · [Installation](../docs/installation.md) ·
+[HERA application and catalog](../docs/hera-study.md)
 
-Paper workspaces use the inputs of the 20260929 campaign. Auxiliary studies
-retain their own inputs and build pins; their configured historical fit inputs
-must be available in `../xfitter-eoe-runs-archive/` (relative to the repository
-root) before generating or plotting them.
+`runs/` contains study definitions alongside their generated results. A workspace
+identifies one fit, scan or comparison. The scientific configuration determines
+the inputs and calculation; directory names organize the work.
 
-| Setup slug | Physical setup |
-| --- | --- |
-| `herapdf20-nnlo-rtopt` | HERAPDF2.0, NNLO, RTOPT |
-| `herapdf-bg-nnlo-rtopt` | HERAPDF-BG, NNLO, RTOPT |
-| `herapdf-bg-nnlo-fonll-c` | HERAPDF-BG, NNLO, FONLL-C |
-| `herapdf-bg-nnlo-nllx-fonll-c` | HERAPDF-BG, NNLO+NLLₓ, FONLL-C |
+## Choose a workflow
 
-## Fits
-
-All 13 fits support the paper. Each workspace retains its `config/`, launchers,
-and local outputs. `eoe-selected` denotes the final forward-selection fit;
-`eoe-informed` denotes the separate informed assignment. The HERAPDF2.0
-`iter02/04/08` fits profile five selected sources while fitting two numerically.
-
-| Setup | Fit configurations |
-| --- | --- |
-| HERAPDF2.0 NNLO RTOPT (6) | [Gaussian](fits/herapdf20-nnlo-rtopt/gaussian/config/parameters.yaml), [selected EoE](fits/herapdf20-nnlo-rtopt/eoe-selected/config/parameters.yaml), [informed EoE](fits/herapdf20-nnlo-rtopt/eoe-informed/config/parameters.yaml), iterative [2](fits/herapdf20-nnlo-rtopt/eoe-selected-iter02/config/parameters.yaml), [4](fits/herapdf20-nnlo-rtopt/eoe-selected-iter04/config/parameters.yaml), [8](fits/herapdf20-nnlo-rtopt/eoe-selected-iter08/config/parameters.yaml) |
-| HERAPDF-BG NNLO RTOPT (3) | [Gaussian](fits/herapdf-bg-nnlo-rtopt/gaussian/config/parameters.yaml), [selected EoE](fits/herapdf-bg-nnlo-rtopt/eoe-selected/config/parameters.yaml), [informed EoE](fits/herapdf-bg-nnlo-rtopt/eoe-informed/config/parameters.yaml) |
-| HERAPDF-BG NNLO FONLL-C (1) | [Gaussian matched fixed-order reference](fits/herapdf-bg-nnlo-fonll-c/gaussian/config/parameters.yaml) |
-| HERAPDF-BG NNLO+NLLₓ FONLL-C (3) | [Gaussian](fits/herapdf-bg-nnlo-nllx-fonll-c/gaussian/config/parameters.yaml), [selected EoE](fits/herapdf-bg-nnlo-nllx-fonll-c/eoe-selected/config/parameters.yaml), [informed EoE](fits/herapdf-bg-nnlo-nllx-fonll-c/eoe-informed/config/parameters.yaml) |
-
-All 13 fit launchers pin `merge-master/xfitter-master` at
-`67398b15571dff1e9ddce0bc88923554552c9c84`. The FONLL-C fits require its
-APFEL 3.0.6/HELL 3 dependencies; the fixed-order reference and resummed Gaussian
-fit use matched settings. See the root [environment instructions](../README.md#setup).
-`scripts/new-fit` defaults to `fits/herapdf20-nnlo-rtopt/gaussian/config`.
-
-## Scans
-
-There are **24 paper configurations and 6 auxiliary configurations**. The
-forward-selection chains use ε = 0.6 and a Q² cut of 3.5 GeV². Round 01 starts
-with no sources selected; the final round tests the stopping criterion. The selected
-sources and seeds remain explicit in each configuration.
-
-| Role | Study | Configuration links |
+| Task | Definition | Guide |
 | --- | --- | --- |
-| Paper | HERAPDF2.0 forward selection: 7 retained sources + stopping round | [01](scans/forward-selection/herapdf20-nnlo-rtopt/epsilon-0p6/round-01/config.yaml), [02](scans/forward-selection/herapdf20-nnlo-rtopt/epsilon-0p6/round-02/config.yaml), [03](scans/forward-selection/herapdf20-nnlo-rtopt/epsilon-0p6/round-03/config.yaml), [04](scans/forward-selection/herapdf20-nnlo-rtopt/epsilon-0p6/round-04/config.yaml), [05](scans/forward-selection/herapdf20-nnlo-rtopt/epsilon-0p6/round-05/config.yaml), [06](scans/forward-selection/herapdf20-nnlo-rtopt/epsilon-0p6/round-06/config.yaml), [07](scans/forward-selection/herapdf20-nnlo-rtopt/epsilon-0p6/round-07/config.yaml), [08](scans/forward-selection/herapdf20-nnlo-rtopt/epsilon-0p6/round-08/config.yaml) |
-| Paper | HERAPDF-BG NNLO RTOPT forward selection: 8 retained sources + stopping round | [01](scans/forward-selection/herapdf-bg-nnlo-rtopt/epsilon-0p6/round-01/config.yaml), [02](scans/forward-selection/herapdf-bg-nnlo-rtopt/epsilon-0p6/round-02/config.yaml), [03](scans/forward-selection/herapdf-bg-nnlo-rtopt/epsilon-0p6/round-03/config.yaml), [04](scans/forward-selection/herapdf-bg-nnlo-rtopt/epsilon-0p6/round-04/config.yaml), [05](scans/forward-selection/herapdf-bg-nnlo-rtopt/epsilon-0p6/round-05/config.yaml), [06](scans/forward-selection/herapdf-bg-nnlo-rtopt/epsilon-0p6/round-06/config.yaml), [07](scans/forward-selection/herapdf-bg-nnlo-rtopt/epsilon-0p6/round-07/config.yaml), [08](scans/forward-selection/herapdf-bg-nnlo-rtopt/epsilon-0p6/round-08/config.yaml), [09](scans/forward-selection/herapdf-bg-nnlo-rtopt/epsilon-0p6/round-09/config.yaml) |
-| Paper | HERAPDF-BG NNLO+NLLₓ FONLL-C forward selection: 5 retained sources + stopping round | [01](scans/forward-selection/herapdf-bg-nnlo-nllx-fonll-c/epsilon-0p6/round-01/config.yaml), [02](scans/forward-selection/herapdf-bg-nnlo-nllx-fonll-c/epsilon-0p6/round-02/config.yaml), [03](scans/forward-selection/herapdf-bg-nnlo-nllx-fonll-c/epsilon-0p6/round-03/config.yaml), [04](scans/forward-selection/herapdf-bg-nnlo-nllx-fonll-c/epsilon-0p6/round-04/config.yaml), [05](scans/forward-selection/herapdf-bg-nnlo-nllx-fonll-c/epsilon-0p6/round-05/config.yaml), [06](scans/forward-selection/herapdf-bg-nnlo-nllx-fonll-c/epsilon-0p6/round-06/config.yaml) |
-| Paper | HERAPDF2.0 common ε, 0–0.7, with the seven selected sources fixed (Figure 1) | [Common epsilon](scans/eoe-scan/herapdf20-nnlo-rtopt/common-epsilon/config.yaml) |
-| Auxiliary | Fixed-selection λ scaling, ε = 0.6λ | [HERAPDF2.0](scans/eoe-scan/herapdf20-nnlo-rtopt/lambda-scaling/config.yaml), [HERAPDF-BG RTOPT](scans/eoe-scan/herapdf-bg-nnlo-rtopt/lambda-scaling/config.yaml), [HERAPDF-BG resummed](scans/eoe-scan/herapdf-bg-nnlo-nllx-fonll-c/lambda-scaling/config.yaml) |
-| Auxiliary | HERAPDF2.0 likelihood profiles: 14 PDF parameters; selected EoE also profiles 7 NPs | [Gaussian](scans/likelihood/herapdf20-nnlo-rtopt/gaussian/config.yaml), [selected EoE](scans/likelihood/herapdf20-nnlo-rtopt/eoe-selected/config.yaml) |
-| Auxiliary | Pumplin stability under λ, ERRDEF and ITERATE variations | [Selected EoE](scans/pumplin-stability/herapdf20-nnlo-rtopt/eoe-selected/config.yaml) |
+| Standalone fit | xFitter files in `config/`, launcher in `condor/` | [Fit workspaces](fits/README.md) |
+| Rank candidate EoE sources | `scan_type: systematic-ranking` | [Forward selection](scans/forward-selection/README.md) |
+| Scale errors on errors | `scan_type: lambda-scan` | [EoE scans](scans/eoe-scan/README.md) |
+| Profile fitted parameters | `scan_type: likelihood-scan` | [Likelihood profiles](scans/likelihood/README.md) |
+| Vary error-calculation settings | `scan_type: pumplin-stability` | [Pumplin stability](scans/pumplin-stability/README.md) |
+| Compare parton distributions | `type: pdf-comparison` | [PDF comparisons](comparisons/pdf/README.md) |
+| Overlay selected DIS cross sections | `type: xsec-comparison` | [Cross-section comparisons](comparisons/xsec/README.md) |
+| Compare data χ² in Q²–x bins | `type: xsec-region-table` | [Regional tables](comparisons/regions/README.md) |
 
-The common-ε and λ scans hold their source lists fixed; they are distinct from
-repeating forward selection at each ε. Likelihood profiles require the configured
-reference fit's `output/minuit.out.txt`.
+The scan commands require a workspace under `runs/scans/`; comparison commands
+require one under `runs/comparisons/`. Further nesting is allowed. For example:
 
-## Comparisons
+```text
+runs/
+├── fits/<study>/
+│   ├── config/
+│   ├── condor/submit.sh
+│   └── output/                     # generated
+├── scans/<family>/<study>/
+│   ├── config.yaml
+│   ├── runs/                       # generated fit jobs and batch files
+│   ├── results/                    # extracted numerical results
+│   └── plots/                      # generated figures
+└── comparisons/<family>/<study>/
+    ├── config.yaml
+    ├── results/                    # generated tables, where applicable
+    └── plots/                      # generated figures, where applicable
+```
 
-There are **9 paper configurations and 2 auxiliary configurations**. These
-consume existing fitted results. The [paper presentation guide](../README.md#current-paper-plots-and-individual-panels)
-documents labels, fonts, and the combined, absolute-only and ratio-only PDFs.
+## Inputs and execution
 
-| Role | Study | Configuration links |
-| --- | --- | --- |
-| Paper | Gaussian vs selected EoE PDFs (Figures 2, 4, 5) | [HERAPDF2.0](comparisons/pdf/herapdf20-nnlo-rtopt/gaussian-vs-eoe-selected/config.yaml), [HERAPDF-BG RTOPT](comparisons/pdf/herapdf-bg-nnlo-rtopt/gaussian-vs-eoe-selected/config.yaml), [HERAPDF-BG resummed](comparisons/pdf/herapdf-bg-nnlo-nllx-fonll-c/gaussian-vs-eoe-selected/config.yaml) |
-| Paper | Numerical vs iterative HERAPDF2.0 profiling (Figure 7) | [2 iterations](comparisons/pdf/herapdf20-nnlo-rtopt/numerical-vs-iter02/config.yaml), [4 iterations](comparisons/pdf/herapdf20-nnlo-rtopt/numerical-vs-iter04/config.yaml), [8 iterations](comparisons/pdf/herapdf20-nnlo-rtopt/numerical-vs-iter08/config.yaml) |
-| Paper | Three informed PDF setups (Figure 6) | [Informed comparison](comparisons/pdf/cross-setups/eoe-informed/config.yaml) |
-| Paper | HERAPDF2.0 NC e⁺p cross sections at Q² = 3.5 and 4.5 GeV² (Figure 3) | [Low-Q² comparison](comparisons/xsec/herapdf20-nnlo-rtopt/gaussian-vs-eoe-selected-low-q2/config.yaml) |
-| Paper | HERAPDF2.0 change in data χ² by x and Q² region (Table 2) | [Region table](comparisons/regions/herapdf20-nnlo-rtopt/gaussian-vs-eoe-selected/config.yaml) |
-| Auxiliary | Selected EoE PDFs: HERAPDF-BG RTOPT vs resummed | [Cross-setup comparison](comparisons/pdf/cross-setups/eoe-selected-bg-vs-resummed/config.yaml) |
-| Auxiliary | HERAPDF-BG Gaussian/EoE low-Q² cross sections | [Low-Q² comparison](comparisons/xsec/herapdf-bg-nnlo-rtopt/gaussian-vs-eoe-selected-low-q2/config.yaml) |
+Fit configurations specify the physics calculation and data inputs. Scan
+configurations select a template from `templates/`, source settings and scan
+coordinates. Comparison configurations select existing fitted outputs or PDF
+sets and the quantities to display. Comparison fit paths are relative to their
+workspace; outputs are written beneath that same workspace.
+
+Preview a configured scan with `python scripts/run-scan --dry-run WORKSPACE`.
+Use `--no-submit` to generate files without sending jobs. Omitting both flags
+generates and submits; a fit's `condor/submit.sh` also submits immediately.
+The guides explain the prerequisites and products for each command.
+
+For changed scientific inputs, use a separate workspace to preserve previous
+results. Replotting completed results only requires the relevant plotting
+command. Generation and plotting can replace existing files at their configured
+destinations.
+
+## Supplied application
+
+The [HERA catalog](../docs/hera-study.md) links all bundled configurations and
+defines their setup and treatment notation. Its fit settings, comparison scales
+and kinematic selections are examples of the workflows above. Consult the
+individual guides for input-format requirements and current implementation
+limits when preparing another application.
+
+Commit study definitions and launchers. Generated fit outputs, scan jobs,
+extracted results, figures and runtime logs are excluded from Git.
