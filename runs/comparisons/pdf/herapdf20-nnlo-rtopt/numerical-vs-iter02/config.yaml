@@ -1,0 +1,24 @@
+# Paper reproduction configuration prepared 2026-09-29.
+# Source template: legacy/cleanup-20261111/runs/comparisons/baseline-2E5N-iter2-vs-7sources/config.yaml
+type: pdf-comparison
+Q2: 4.0
+error_type: symmetric
+observables:
+- uv
+- dv
+- gluon
+- sea
+ratio_reference: 0
+presentation:
+  title: HERAPDF2.0, NNLO, RTOPT
+fits:
+- label: Numerical
+  setup: HERAPDF2.0, NNLO, RTOPT
+  treatment: EoE
+  path: "../../../../fits/herapdf20-nnlo-rtopt/eoe-selected"
+  source: xfitter-grid
+- label: Iterative
+  setup: HERAPDF2.0, NNLO, RTOPT
+  treatment: EoE
+  path: "../../../../fits/herapdf20-nnlo-rtopt/eoe-selected-iter02"
+  source: xfitter-grid

@@ -526,3 +526,25 @@ comparisons:
       - "fits/compare/studies/direction-test-eoe-vs-q2cut"
       - "fits/compare/studies/pdf-bandmethod-nominal-hesse-vs-pumplin"
       - "fits/compare/studies/xsec-lowq2-giuli-gaussian-vs-5sources-pumplin"
+
+workspace_cleanup_20261111:
+  source_repository_commit: "3453e6c6a558a25c272ae1fda0a645e63f57fa94"
+  migration_manifest: "runs/migration-20261111.json"
+  archive_root: "legacy/cleanup-20261111"
+  archive_payload_tracked: false
+  scientific_settings_modified: false
+  jobs_submitted: false
+  fits_rerun: false
+  original_execution_records_preserved: true
+  current_workspaces: {fits: 13, scans: 30, comparisons: 11}
+  archived_workspaces: {fits: 10, scans: 24, comparisons: 9}
+  notes:
+    - "Current paper workspaces retain the numerical results of the 20260929 campaign."
+    - "Auxiliary comparisons and likelihood scans retain their original input identities, including incomplete historical inputs."
+    - "Shared historical small-x launchers and the local validation campaign are archived with their provenance."
+    - "Workspace names identify setup and study; original campaign dates remain in the migration manifest."
+    - "The new-fit default now selects the canonical HERAPDF2.0 NNLO RTOPT Gaussian configuration."
+  residual_backup_directories_archived: 3844
+  residual_backup_files_preserved: 7687
+  residual_backup_bytes_preserved: 12877302445
+  residual_artifact_inventory: "legacy/cleanup-20261111/artifact-moves.json"

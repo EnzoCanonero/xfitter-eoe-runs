@@ -18,7 +18,7 @@ Theory error bands (--therr) come from the therr+/- columns, which are filled
 (and Bartlett-scaled) by current xFitter builds containing the Bartlett fixes;
 older outputs have zeros there and simply show no band.
 
-Config keys (runs/comparisons/<workspace>/config.yaml)
+Config keys (runs/comparisons/<type>/<setup>/<study>/config.yaml)
 ------------------------------------------------
 type: xsec-comparison
 dataset: "HERA1+2 NCep 920"        # substring match on the dataset label
@@ -29,8 +29,8 @@ panels:
   - {dataset: "HERA1+2 NCep 920", q2: 3.5}
   - {dataset: "HERA1+2 NCep 575", q2: 8.5}
 fits:                               # 2+ entries; first = reference/data holder
-  - {label: "nominal",  path: ../../fits/hera-baseline/nominal-bartlett2-hesse}
-  - {label: "EoE-7src", path: ../../fits/hera-baseline/baseline-7-sources-bartlett2-hesse}
+  - {label: "nominal",  path: ../../../../fits/herapdf20-nnlo-rtopt/gaussian}
+  - {label: "EoE-7src", path: ../../../../fits/herapdf20-nnlo-rtopt/eoe-selected}
 # Optional setup/treatment metadata separates a common heading from curve labels:
 #   setup: HERAPDF2.0, NNLO, RTOPT
 #   treatment: Gaussian             # or EoE (FS), EoE (INF), etc.
@@ -52,7 +52,7 @@ filledbands: false         # filled instead of hatched bands (--filledbands)
 transparentbands: false    #                                 (--transparentbands)
 extra_options: []          # raw passthrough, e.g. ["--thicklines", "--bw"]
 
-xfitter_tree: xfitter-master   # binary tree under $XFITTER_ROOT
+xfitter_tree: merge-master/xfitter-master   # binary tree under $XFITTER_ROOT
 """
 
 import os

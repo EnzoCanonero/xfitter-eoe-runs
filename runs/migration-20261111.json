@@ -1,0 +1,692 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-11",
+  "repository": "/nfs/scratch2/ecanoner/xfitter-eoe-runs",
+  "source_commit": "3453e6c6a558a25c272ae1fda0a645e63f57fa94",
+  "archive_root": "legacy/cleanup-20261111",
+  "moves": [
+    {
+      "old": "runs/fits/hera-baseline/baseline-2E5N-bartlett2-pumplin",
+      "new": "legacy/cleanup-20261111/runs/fits/hera-baseline/baseline-2E5N-bartlett2-pumplin",
+      "kind": "fit",
+      "role": "archive"
+    },
+    {
+      "old": "runs/fits/hera-baseline/baseline-2E5N-niter2-bartlett2-pumplin-20260929",
+      "new": "runs/fits/herapdf20-nnlo-rtopt/eoe-selected-iter02",
+      "kind": "fit",
+      "role": "paper"
+    },
+    {
+      "old": "runs/fits/hera-baseline/baseline-2E5N-niter4-bartlett2-pumplin-20260929",
+      "new": "runs/fits/herapdf20-nnlo-rtopt/eoe-selected-iter04",
+      "kind": "fit",
+      "role": "paper"
+    },
+    {
+      "old": "runs/fits/hera-baseline/baseline-2E5N-niter4-bartlett2-pumplin",
+      "new": "legacy/cleanup-20261111/runs/fits/hera-baseline/baseline-2E5N-niter4-bartlett2-pumplin",
+      "kind": "fit",
+      "role": "archive"
+    },
+    {
+      "old": "runs/fits/hera-baseline/baseline-2E5N-niter8-bartlett2-pumplin-20260929",
+      "new": "runs/fits/herapdf20-nnlo-rtopt/eoe-selected-iter08",
+      "kind": "fit",
+      "role": "paper"
+    },
+    {
+      "old": "runs/fits/hera-baseline/baseline-2E5N-niter8-bartlett2-pumplin",
+      "new": "legacy/cleanup-20261111/runs/fits/hera-baseline/baseline-2E5N-niter8-bartlett2-pumplin",
+      "kind": "fit",
+      "role": "archive"
+    },
+    {
+      "old": "runs/fits/hera-baseline/baseline-7-sources-bartlett2-pumplin-20260929",
+      "new": "runs/fits/herapdf20-nnlo-rtopt/eoe-selected",
+      "kind": "fit",
+      "role": "paper"
+    },
+    {
+      "old": "runs/fits/hera-baseline/baseline-7-sources-bartlett2-pumplin",
+      "new": "legacy/cleanup-20261111/runs/fits/hera-baseline/baseline-7-sources-bartlett2-pumplin",
+      "kind": "fit",
+      "role": "archive"
+    },
+    {
+      "old": "runs/fits/hera-baseline/informed-bartlett2-pumplin-20260929",
+      "new": "runs/fits/herapdf20-nnlo-rtopt/eoe-informed",
+      "kind": "fit",
+      "role": "paper"
+    },
+    {
+      "old": "runs/fits/hera-baseline/nominal-bartlett2-pumplin-20260929",
+      "new": "runs/fits/herapdf20-nnlo-rtopt/gaussian",
+      "kind": "fit",
+      "role": "paper"
+    },
+    {
+      "old": "runs/fits/hera-baseline/nominal-bartlett2-pumplin",
+      "new": "legacy/cleanup-20261111/runs/fits/hera-baseline/nominal-bartlett2-pumplin",
+      "kind": "fit",
+      "role": "archive"
+    },
+    {
+      "old": "runs/fits/hera-giuli-param/gaussian-bartlett2-pumplin-20260929",
+      "new": "runs/fits/herapdf-bg-nnlo-rtopt/gaussian",
+      "kind": "fit",
+      "role": "paper"
+    },
+    {
+      "old": "runs/fits/hera-giuli-param/gaussian-bartlett2-pumplin",
+      "new": "legacy/cleanup-20261111/runs/fits/hera-giuli-param/gaussian-bartlett2-pumplin",
+      "kind": "fit",
+      "role": "archive"
+    },
+    {
+      "old": "runs/fits/hera-giuli-param/giuli-8-sources-bartlett2-pumplin-20260929",
+      "new": "runs/fits/herapdf-bg-nnlo-rtopt/eoe-selected",
+      "kind": "fit",
+      "role": "paper"
+    },
+    {
+      "old": "runs/fits/hera-giuli-param/giuli-8-sources-bartlett2-pumplin",
+      "new": "legacy/cleanup-20261111/runs/fits/hera-giuli-param/giuli-8-sources-bartlett2-pumplin",
+      "kind": "fit",
+      "role": "archive"
+    },
+    {
+      "old": "runs/fits/hera-giuli-param/informed-bartlett2-pumplin-20260929",
+      "new": "runs/fits/herapdf-bg-nnlo-rtopt/eoe-informed",
+      "kind": "fit",
+      "role": "paper"
+    },
+    {
+      "old": "runs/fits/smallx-resummation/eoe/bg-param-nnlo-nllx-fonll-greedy-top5-20260929",
+      "new": "runs/fits/herapdf-bg-nnlo-nllx-fonll-c/eoe-selected",
+      "kind": "fit",
+      "role": "paper"
+    },
+    {
+      "old": "runs/fits/smallx-resummation/eoe/bg-param-nnlo-nllx-fonll-greedy-top5",
+      "new": "legacy/cleanup-20261111/runs/fits/smallx-resummation/eoe/bg-param-nnlo-nllx-fonll-greedy-top5",
+      "kind": "fit",
+      "role": "archive"
+    },
+    {
+      "old": "runs/fits/smallx-resummation/eoe/bg-param-nnlo-nllx-fonll-informed-20260929",
+      "new": "runs/fits/herapdf-bg-nnlo-nllx-fonll-c/eoe-informed",
+      "kind": "fit",
+      "role": "paper"
+    },
+    {
+      "old": "runs/fits/smallx-resummation/gaussian/bg-param-nnlo-fonll-20260929",
+      "new": "runs/fits/herapdf-bg-nnlo-fonll-c/gaussian",
+      "kind": "fit",
+      "role": "paper"
+    },
+    {
+      "old": "runs/fits/smallx-resummation/gaussian/bg-param-nnlo-fonll",
+      "new": "legacy/cleanup-20261111/runs/fits/smallx-resummation/gaussian/bg-param-nnlo-fonll",
+      "kind": "fit",
+      "role": "archive"
+    },
+    {
+      "old": "runs/fits/smallx-resummation/gaussian/bg-param-nnlo-nllx-fonll-20260929",
+      "new": "runs/fits/herapdf-bg-nnlo-nllx-fonll-c/gaussian",
+      "kind": "fit",
+      "role": "paper"
+    },
+    {
+      "old": "runs/fits/smallx-resummation/gaussian/bg-param-nnlo-nllx-fonll",
+      "new": "legacy/cleanup-20261111/runs/fits/smallx-resummation/gaussian/bg-param-nnlo-nllx-fonll",
+      "kind": "fit",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/lambda/bg-param-nnlo-nllx-fonll/greedy-selection",
+      "new": "runs/scans/eoe-scan/herapdf-bg-nnlo-nllx-fonll-c/lambda-scaling",
+      "kind": "scan",
+      "role": "auxiliary"
+    },
+    {
+      "old": "runs/scans/lambda/giuli-param/greedy-selection",
+      "new": "runs/scans/eoe-scan/herapdf-bg-nnlo-rtopt/lambda-scaling",
+      "kind": "scan",
+      "role": "auxiliary"
+    },
+    {
+      "old": "runs/scans/lambda/hera-baseline/final-selection-common-epsilon-20260918",
+      "new": "legacy/cleanup-20261111/runs/scans/lambda/hera-baseline/final-selection-common-epsilon-20260918",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/lambda/hera-baseline/final-selection-common-epsilon-20260929",
+      "new": "runs/scans/eoe-scan/herapdf20-nnlo-rtopt/common-epsilon",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/lambda/hera-baseline/greedy-selection",
+      "new": "runs/scans/eoe-scan/herapdf20-nnlo-rtopt/lambda-scaling",
+      "kind": "scan",
+      "role": "auxiliary"
+    },
+    {
+      "old": "runs/scans/likelihood/hera-baseline/baseline",
+      "new": "runs/scans/likelihood/herapdf20-nnlo-rtopt/gaussian",
+      "kind": "scan",
+      "role": "auxiliary"
+    },
+    {
+      "old": "runs/scans/likelihood/hera-baseline/greedy-selection",
+      "new": "runs/scans/likelihood/herapdf20-nnlo-rtopt/eoe-selected",
+      "kind": "scan",
+      "role": "auxiliary"
+    },
+    {
+      "old": "runs/scans/pumplin-stability/hera-baseline/greedy-selection",
+      "new": "runs/scans/pumplin-stability/herapdf20-nnlo-rtopt/eoe-selected",
+      "kind": "scan",
+      "role": "auxiliary"
+    },
+    {
+      "old": "runs/scans/syst-ranking/bg-param-nnlo-nllx-fonll-eps0.6/2nd-1053",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/bg-param-nnlo-nllx-fonll-eps0.6/2nd-1053",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/bg-param-nnlo-nllx-fonll-eps0.6/3rd-1053-1062",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/bg-param-nnlo-nllx-fonll-eps0.6/3rd-1053-1062",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/bg-param-nnlo-nllx-fonll-eps0.6/4th-1053-1062-1111",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/bg-param-nnlo-nllx-fonll-eps0.6/4th-1053-1062-1111",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/bg-param-nnlo-nllx-fonll-eps0.6/5th-1053-1062-1111-1114",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/bg-param-nnlo-nllx-fonll-eps0.6/5th-1053-1062-1111-1114",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/bg-param-nnlo-nllx-fonll-eps0.6/6th-1053-1062-1111-1114-1144",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/bg-param-nnlo-nllx-fonll-eps0.6/6th-1053-1062-1111-1114-1144",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/bg-param-nnlo-nllx-fonll-eps0.6/baseline",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/bg-param-nnlo-nllx-fonll-eps0.6/baseline",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/bg-param-nnlo-nllx-fonll-eps0.6/paper-20260929/2nd-1053",
+      "new": "runs/scans/forward-selection/herapdf-bg-nnlo-nllx-fonll-c/epsilon-0p6/round-02",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/bg-param-nnlo-nllx-fonll-eps0.6/paper-20260929/3rd-1053-1062",
+      "new": "runs/scans/forward-selection/herapdf-bg-nnlo-nllx-fonll-c/epsilon-0p6/round-03",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/bg-param-nnlo-nllx-fonll-eps0.6/paper-20260929/4th-1053-1062-1111",
+      "new": "runs/scans/forward-selection/herapdf-bg-nnlo-nllx-fonll-c/epsilon-0p6/round-04",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/bg-param-nnlo-nllx-fonll-eps0.6/paper-20260929/5th-1053-1062-1111-1114",
+      "new": "runs/scans/forward-selection/herapdf-bg-nnlo-nllx-fonll-c/epsilon-0p6/round-05",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/bg-param-nnlo-nllx-fonll-eps0.6/paper-20260929/6th-1053-1062-1111-1114-1144",
+      "new": "runs/scans/forward-selection/herapdf-bg-nnlo-nllx-fonll-c/epsilon-0p6/round-06",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/bg-param-nnlo-nllx-fonll-eps0.6/paper-20260929/baseline",
+      "new": "runs/scans/forward-selection/herapdf-bg-nnlo-nllx-fonll-c/epsilon-0p6/round-01",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/giuli-param/2nd-1053",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/giuli-param/2nd-1053",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/giuli-param/3rd-1053-1062",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/giuli-param/3rd-1053-1062",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/giuli-param/4th-1053-1062-1111",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/giuli-param/4th-1053-1062-1111",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/giuli-param/5th-1053-1062-1111-1114",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/giuli-param/5th-1053-1062-1111-1114",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/giuli-param/6th-1053-1062-1111-1114-1144",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/giuli-param/6th-1053-1062-1111-1114-1144",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/giuli-param/7th-1053-1062-1111-1114-1144-tb21",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/giuli-param/7th-1053-1062-1111-1114-1144-tb21",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/giuli-param/8th-1053-1062-1111-1114-1144-tb21-1064",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/giuli-param/8th-1053-1062-1111-1114-1144-tb21-1064",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/giuli-param/9th-1053-1062-1111-1114-1144-tb21-1064-1113",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/giuli-param/9th-1053-1062-1111-1114-1144-tb21-1064-1113",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/giuli-param/baseline",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/giuli-param/baseline",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/giuli-param/paper-20260929/2nd-1053",
+      "new": "runs/scans/forward-selection/herapdf-bg-nnlo-rtopt/epsilon-0p6/round-02",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/giuli-param/paper-20260929/3rd-1053-1062",
+      "new": "runs/scans/forward-selection/herapdf-bg-nnlo-rtopt/epsilon-0p6/round-03",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/giuli-param/paper-20260929/4th-1053-1062-1111",
+      "new": "runs/scans/forward-selection/herapdf-bg-nnlo-rtopt/epsilon-0p6/round-04",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/giuli-param/paper-20260929/5th-1053-1062-1111-1114",
+      "new": "runs/scans/forward-selection/herapdf-bg-nnlo-rtopt/epsilon-0p6/round-05",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/giuli-param/paper-20260929/6th-1053-1062-1111-1114-1144",
+      "new": "runs/scans/forward-selection/herapdf-bg-nnlo-rtopt/epsilon-0p6/round-06",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/giuli-param/paper-20260929/7th-1053-1062-1111-1114-1144-tb21",
+      "new": "runs/scans/forward-selection/herapdf-bg-nnlo-rtopt/epsilon-0p6/round-07",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/giuli-param/paper-20260929/8th-1053-1062-1111-1114-1144-tb21-1064",
+      "new": "runs/scans/forward-selection/herapdf-bg-nnlo-rtopt/epsilon-0p6/round-08",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/giuli-param/paper-20260929/9th-1053-1062-1111-1114-1144-tb21-1064-1113",
+      "new": "runs/scans/forward-selection/herapdf-bg-nnlo-rtopt/epsilon-0p6/round-09",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/giuli-param/paper-20260929/baseline",
+      "new": "runs/scans/forward-selection/herapdf-bg-nnlo-rtopt/epsilon-0p6/round-01",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/hera-baseline/2nd-1053",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/hera-baseline/2nd-1053",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/hera-baseline/3rd-1053-tb21",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/hera-baseline/3rd-1053-tb21",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/hera-baseline/4th-1053-tb21-1064",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/hera-baseline/4th-1053-tb21-1064",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/hera-baseline/5th-1053-tb21-1064-1114",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/hera-baseline/5th-1053-tb21-1064-1114",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/hera-baseline/6th-1053-tb21-1064-1114-1144",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/hera-baseline/6th-1053-tb21-1064-1114-1144",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/hera-baseline/7th-1053-tb21-1064-1114-1144-1111",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/hera-baseline/7th-1053-tb21-1064-1114-1144-1111",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/hera-baseline/8th-1053-tb21-1064-1114-1144-1111-1113",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/hera-baseline/8th-1053-tb21-1064-1114-1144-1111-1113",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/hera-baseline/baseline",
+      "new": "legacy/cleanup-20261111/runs/scans/syst-ranking/hera-baseline/baseline",
+      "kind": "scan",
+      "role": "archive"
+    },
+    {
+      "old": "runs/scans/syst-ranking/hera-baseline/paper-20260929/2nd-1053",
+      "new": "runs/scans/forward-selection/herapdf20-nnlo-rtopt/epsilon-0p6/round-02",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/hera-baseline/paper-20260929/3rd-1053-tb21",
+      "new": "runs/scans/forward-selection/herapdf20-nnlo-rtopt/epsilon-0p6/round-03",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/hera-baseline/paper-20260929/4th-1053-tb21-1064",
+      "new": "runs/scans/forward-selection/herapdf20-nnlo-rtopt/epsilon-0p6/round-04",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/hera-baseline/paper-20260929/5th-1053-tb21-1064-1114",
+      "new": "runs/scans/forward-selection/herapdf20-nnlo-rtopt/epsilon-0p6/round-05",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/hera-baseline/paper-20260929/6th-1053-tb21-1064-1114-1144",
+      "new": "runs/scans/forward-selection/herapdf20-nnlo-rtopt/epsilon-0p6/round-06",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/hera-baseline/paper-20260929/7th-1053-tb21-1064-1114-1144-1111",
+      "new": "runs/scans/forward-selection/herapdf20-nnlo-rtopt/epsilon-0p6/round-07",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/hera-baseline/paper-20260929/8th-1053-tb21-1064-1114-1144-1111-1113",
+      "new": "runs/scans/forward-selection/herapdf20-nnlo-rtopt/epsilon-0p6/round-08",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/scans/syst-ranking/hera-baseline/paper-20260929/baseline",
+      "new": "runs/scans/forward-selection/herapdf20-nnlo-rtopt/epsilon-0p6/round-01",
+      "kind": "scan",
+      "role": "paper"
+    },
+    {
+      "old": "runs/comparisons/baseline-2E5N-iter2-vs-7sources-20260929",
+      "new": "runs/comparisons/pdf/herapdf20-nnlo-rtopt/numerical-vs-iter02",
+      "kind": "comparison",
+      "role": "paper"
+    },
+    {
+      "old": "runs/comparisons/baseline-2E5N-iter2-vs-7sources",
+      "new": "legacy/cleanup-20261111/runs/comparisons/baseline-2E5N-iter2-vs-7sources",
+      "kind": "comparison",
+      "role": "archive"
+    },
+    {
+      "old": "runs/comparisons/baseline-2E5N-iter4-vs-7sources-20260929",
+      "new": "runs/comparisons/pdf/herapdf20-nnlo-rtopt/numerical-vs-iter04",
+      "kind": "comparison",
+      "role": "paper"
+    },
+    {
+      "old": "runs/comparisons/baseline-2E5N-iter4-vs-7sources",
+      "new": "legacy/cleanup-20261111/runs/comparisons/baseline-2E5N-iter4-vs-7sources",
+      "kind": "comparison",
+      "role": "archive"
+    },
+    {
+      "old": "runs/comparisons/baseline-2E5N-iter8-vs-7sources-20260929",
+      "new": "runs/comparisons/pdf/herapdf20-nnlo-rtopt/numerical-vs-iter08",
+      "kind": "comparison",
+      "role": "paper"
+    },
+    {
+      "old": "runs/comparisons/baseline-2E5N-iter8-vs-7sources",
+      "new": "legacy/cleanup-20261111/runs/comparisons/baseline-2E5N-iter8-vs-7sources",
+      "kind": "comparison",
+      "role": "archive"
+    },
+    {
+      "old": "runs/comparisons/baseline-nominal-vs-7sources-20260929",
+      "new": "runs/comparisons/pdf/herapdf20-nnlo-rtopt/gaussian-vs-eoe-selected",
+      "kind": "comparison",
+      "role": "paper"
+    },
+    {
+      "old": "runs/comparisons/baseline-nominal-vs-7sources",
+      "new": "legacy/cleanup-20261111/runs/comparisons/baseline-nominal-vs-7sources",
+      "kind": "comparison",
+      "role": "archive"
+    },
+    {
+      "old": "runs/comparisons/giuli-eoe8-vs-smallx-eoe5-pumplin",
+      "new": "runs/comparisons/pdf/cross-setups/eoe-selected-bg-vs-resummed",
+      "kind": "comparison",
+      "role": "auxiliary"
+    },
+    {
+      "old": "runs/comparisons/giuli-gaussian-vs-8sources-pumplin-20260929",
+      "new": "runs/comparisons/pdf/herapdf-bg-nnlo-rtopt/gaussian-vs-eoe-selected",
+      "kind": "comparison",
+      "role": "paper"
+    },
+    {
+      "old": "runs/comparisons/giuli-gaussian-vs-8sources-pumplin",
+      "new": "legacy/cleanup-20261111/runs/comparisons/giuli-gaussian-vs-8sources-pumplin",
+      "kind": "comparison",
+      "role": "archive"
+    },
+    {
+      "old": "runs/comparisons/informed-three-set-20260818",
+      "new": "legacy/cleanup-20261111/runs/comparisons/informed-three-set-20260818",
+      "kind": "comparison",
+      "role": "archive"
+    },
+    {
+      "old": "runs/comparisons/informed-three-set-20260929",
+      "new": "runs/comparisons/pdf/cross-setups/eoe-informed",
+      "kind": "comparison",
+      "role": "paper"
+    },
+    {
+      "old": "runs/comparisons/smallx-gaussian-vs-5sources-pumplin-20260818",
+      "new": "legacy/cleanup-20261111/runs/comparisons/smallx-gaussian-vs-5sources-pumplin-20260818",
+      "kind": "comparison",
+      "role": "archive"
+    },
+    {
+      "old": "runs/comparisons/smallx-gaussian-vs-5sources-pumplin-20260929",
+      "new": "runs/comparisons/pdf/herapdf-bg-nnlo-nllx-fonll-c/gaussian-vs-eoe-selected",
+      "kind": "comparison",
+      "role": "paper"
+    },
+    {
+      "old": "runs/comparisons/xsec-lowq2-giuli-gaussian-vs-8sources-pumplin",
+      "new": "runs/comparisons/xsec/herapdf-bg-nnlo-rtopt/gaussian-vs-eoe-selected-low-q2",
+      "kind": "comparison",
+      "role": "auxiliary"
+    },
+    {
+      "old": "runs/comparisons/xsec-nc-cc-nominal-vs-7sources-pumplin-20260929",
+      "new": "runs/comparisons/xsec/herapdf20-nnlo-rtopt/gaussian-vs-eoe-selected-low-q2",
+      "kind": "comparison",
+      "role": "paper"
+    },
+    {
+      "old": "runs/comparisons/xsec-nc-cc-nominal-vs-7sources-pumplin",
+      "new": "legacy/cleanup-20261111/runs/comparisons/xsec-nc-cc-nominal-vs-7sources-pumplin",
+      "kind": "comparison",
+      "role": "archive"
+    },
+    {
+      "old": "runs/comparisons/xsec-region-nominal-vs-7sources-20260929",
+      "new": "runs/comparisons/regions/herapdf20-nnlo-rtopt/gaussian-vs-eoe-selected",
+      "kind": "comparison",
+      "role": "paper"
+    },
+    {
+      "old": "runs/comparisons/xsec-region-nominal-vs-7sources",
+      "new": "legacy/cleanup-20261111/runs/comparisons/xsec-region-nominal-vs-7sources",
+      "kind": "comparison",
+      "role": "archive"
+    }
+  ],
+  "support_moves": [
+    {
+      "old": "runs/fits/validation",
+      "new": "legacy/cleanup-20261111/runs/fits/validation",
+      "kind": "support",
+      "role": "archive"
+    },
+    {
+      "old": "runs/fits/smallx-resummation/README.md",
+      "new": "legacy/cleanup-20261111/runs/fits/smallx-resummation/README.md",
+      "kind": "support",
+      "role": "archive"
+    },
+    {
+      "old": "runs/fits/smallx-resummation/gaussian/batch",
+      "new": "legacy/cleanup-20261111/runs/fits/smallx-resummation/gaussian/batch",
+      "kind": "support",
+      "role": "archive"
+    },
+    {
+      "old": "runs/fits/smallx-resummation/gaussian/submit.sh",
+      "new": "legacy/cleanup-20261111/runs/fits/smallx-resummation/gaussian/submit.sh",
+      "kind": "support",
+      "role": "archive"
+    },
+    {
+      "old": "runs/fits/smallx-resummation/eoe/batch",
+      "new": "legacy/cleanup-20261111/runs/fits/smallx-resummation/eoe/batch",
+      "kind": "support",
+      "role": "archive"
+    },
+    {
+      "old": "runs/fits/smallx-resummation/eoe/submit.sh",
+      "new": "legacy/cleanup-20261111/runs/fits/smallx-resummation/eoe/submit.sh",
+      "kind": "support",
+      "role": "archive"
+    }
+  ],
+  "purpose": "Relocate current paper workspaces and retain historical results without refitting.",
+  "status": "complete",
+  "results_tracked": false,
+  "current_workspace_counts": {
+    "fits": 13,
+    "scans": 30,
+    "comparisons": 11
+  },
+  "archived_workspace_counts": {
+    "fits": 10,
+    "scans": 24,
+    "comparisons": 9
+  },
+  "provenance_policy": "Original execution logs, result files, historical reports and input-provenance manifests retain their original contents. Operational path changes are recorded separately.",
+  "audit_directory": "/nfs/scratch2/ecanoner/xfitter-run-cleanup-20261111",
+  "artifact_archive": {
+    "directories_archived": 3844,
+    "files_preserved": 7687,
+    "bytes_preserved": 12877302445,
+    "unexpected_changes": [],
+    "inventory": "legacy/cleanup-20261111/artifact-moves.json",
+    "inventory_sha256": "96569e67b5f23f9a6007a6870407dcf1bdb0aa8c32a1970fc4f98ba2b2cc5fd7",
+    "directory_patterns": [
+      "output_OLD",
+      "output_bkp*",
+      "bkpref",
+      "output_legacy_*",
+      "output_retained_*",
+      "plots_*",
+      "results_*",
+      "runs_*",
+      "fits_*"
+    ],
+    "file_patterns": [
+      "runs_output_bkp*.tar.gz",
+      "output_bkp*.tar.gz",
+      "output_legacy_*.tar.gz",
+      "output_retained_*.tar.gz"
+    ],
+    "destination_rule": "archive_root / original_workspace / relative_artifact_path",
+    "new_empty_directories_removed": 0,
+    "original_plan_sha256": "1fa98ccfb075010b0357de517a7d86ee4f98e5adba58999fe406eb48f706be43",
+    "precedence": "The artifact inventory overrides parent workspace mappings for its listed descendants."
+  },
+  "verification": {
+    "original_files_and_symlinks_checked": 314635,
+    "original_bytes": 96345933122,
+    "operational_files_updated": 4002,
+    "new_operational_files": 1,
+    "protected_result_files_unchanged": 202540,
+    "protected_result_bytes_unchanged": 70813861059,
+    "unexpected_file_changes": 0,
+    "scientific_configs_checked": 166,
+    "workspace_configs_loaded": 74,
+    "input_reference_identities_preserved": 98,
+    "existing_tests_passed": 34,
+    "before_manifest_sha256": "19aab48eed202eaaa916d8ab6426f3620fc91339c3bdb413ce4425a8ca8e5fca",
+    "after_manifest_sha256": "7709157edaac60da771627611f8284ee4a1639d976bd2d7eb31a7d57b8ce79f1",
+    "preexisting_stale_descriptor_repaired": "runs/fits/herapdf-bg-nnlo-rtopt/eoe-selected/condor/job.sub",
+    "residual_backup_directories_archived": 3844,
+    "residual_backup_files_preserved": 7687,
+    "missing_historical_inputs": "Pre-existing availability preserved; no inputs substituted."
+  }
+}

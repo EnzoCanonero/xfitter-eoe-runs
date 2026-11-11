@@ -1,0 +1,16 @@
+# Comparison of the two final EoE endpoints used in the small-x discussion.
+type: pdf-comparison
+Q2: 4.0
+error_type: asymmetric
+observables: [uv, dv, gluon]
+x_min: 1.0e-4
+x_max: 0.1
+ratio_reference: 0
+ratio_ylim: null
+fits:
+  - label: "BG + EoE"
+    path: "../../../../../legacy/cleanup-20261111/runs/fits/hera-giuli-param/giuli-8-sources-bartlett2-pumplin"
+    source: xfitter-grid
+  - label: "BG + FONLL-C + NLLx + EoE"
+    path: "../../../../../legacy/cleanup-20261111/runs/fits/smallx-resummation/eoe/bg-param-nnlo-nllx-fonll-greedy-top5"
+    source: xfitter-grid

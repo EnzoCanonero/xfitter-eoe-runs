@@ -20,9 +20,10 @@ xfitter-eoe-runs/
 ├── scripts/                     # user-facing commands and environment setup
 ├── templates/                   # named xFitter scan templates
 ├── runs/                        # tracked configurations and local artifacts
-│   ├── fits/                    # manual fit configs, launchers, and outputs
-│   ├── scans/<study>/           # config.yaml, generated fits, results, plots
-│   └── comparisons/<study>/     # config.yaml, generated results and plots
+│   ├── README.md                # catalog of paper and auxiliary studies
+│   ├── fits/<setup>/<fit>/       # manual fit configs, launchers, and outputs
+│   ├── scans/<type>/<setup>/    # study configs and generated scan products
+│   └── comparisons/<type>/<setup>/ # study configs, tables, and plots
 ├── datasets/                    # canonical input data
 ├── tests/
 ├── legacy-artifacts.yaml        # provenance for local historical material
@@ -31,7 +32,8 @@ xfitter-eoe-runs/
 
 Generated directories under `runs/` may be absent in a fresh clone; commands
 create them when needed. The enclosing workspaces and their `config.yaml` files
-are tracked.
+are tracked. The [run catalog](runs/README.md) lists the 13 fit workspaces,
+30 scan configurations, and 11 comparisons retained in the current tree.
 
 ## Boundaries
 
@@ -136,11 +138,13 @@ commit and generate its launchers. Retained configurations using the old
 reproduced; the relocated current build has a different commit. Preserve those
 historical configurations and results when creating a new study.
 
-In particular, the small-x runs require the dedicated
-`xfitter-bartlett-apfel306-hell3` build and its APFEL 3.0.6/HELL 3 dependencies.
-Their retained batch launchers and descriptors contain site-specific absolute
-paths that must be adapted for a different checkout or installation; see the
-[small-x notes](runs/fits/smallx-resummation/README.md).
+The FONLL-C and resummed fits require the APFEL 3.0.6/HELL 3 dependencies.
+All 13 current paper fit launchers select `merge-master/xfitter-master` at
+`67398b15571dff1e9ddce0bc88923554552c9c84`, including the small-x fits. Auxiliary
+and archived studies retain their own build selections, which may use the older
+`xfitter-bartlett-apfel306-hell3` tree. Launchers and descriptors contain
+site-specific absolute paths that must be adapted for a different checkout or
+installation; see the [fit catalog](runs/README.md#fits).
 
 ## Commands
 
@@ -159,24 +163,24 @@ Fits created by `scripts/new-fit` and the retained HERA workspaces have this
 shape:
 
 ```text
-runs/fits/<group>/<fit>/
+runs/fits/<setup>/<fit>/
 ├── config/                      # xFitter inputs
 ├── condor/submit.sh             # tracked launcher
 └── output/                      # generated and ignored
 ```
 
-Create a fit from the retained HERA baseline configuration:
+Create a fit from the current HERAPDF2.0 Gaussian configuration (the default):
 
 ```bash
-scripts/new-fit hera-baseline/my-study/variant-a
+scripts/new-fit herapdf20-nnlo-rtopt/my-study/variant-a
 ```
 
 Or use another fit configuration as the template:
 
 ```bash
 scripts/new-fit \
-  hera-baseline/my-study/variant-b \
-  hera-baseline/baseline-7-sources-bartlett2-pumplin/config
+  herapdf20-nnlo-rtopt/my-study/variant-b \
+  herapdf20-nnlo-rtopt/eoe-selected/config
 ```
 
 `scripts/new-fit` copies the configuration and required files from `datasets/`.
@@ -184,11 +188,13 @@ The generated `submit.sh` creates the ignored Condor files, sets the absolute
 output path, and submits the job:
 
 ```bash
-runs/fits/hera-baseline/my-study/variant-a/condor/submit.sh
+runs/fits/herapdf20-nnlo-rtopt/my-study/variant-a/condor/submit.sh
 ```
 
-The retained small-x studies keep their existing grouped batch launchers under
-`runs/fits/smallx-resummation/`.
+Small-x workspaces use the `herapdf-bg-nnlo-fonll-c` and
+`herapdf-bg-nnlo-nllx-fonll-c` setup directories. Their existing launchers remain
+with the fit workspace; the fixed-order Gaussian fit is the matched reference
+used in the paper, not an auxiliary study.
 
 ## Scan workspaces
 
@@ -196,7 +202,7 @@ Each scan workspace contains its tracked definition and local generated
 products:
 
 ```text
-runs/scans/<study>/
+runs/scans/<type>/<setup>/<study>/
 ├── config.yaml                  # tracked definition
 ├── runs/                        # generated xFitter jobs
 ├── results/                     # generated extracted results
@@ -207,7 +213,7 @@ Each `config.yaml` selects a named template from root `templates/`. Pass the
 workspace directory directly to the commands:
 
 ```bash
-workspace=runs/scans/lambda/hera-baseline/greedy-selection
+workspace=runs/scans/eoe-scan/herapdf20-nnlo-rtopt/common-epsilon
 
 scripts/run-scan --dry-run "$workspace"   # preview only
 scripts/run-scan "$workspace"             # generate and submit
@@ -233,7 +239,7 @@ reference output must exist locally before running the workspace.
 ## Comparison workspaces
 
 Each comparison workspace keeps its tracked `config.yaml` beside its ignored
-plots or tables under `runs/comparisons/<study>/`.
+plots or tables under `runs/comparisons/<type>/<setup>/<study>/`.
 
 The supported definition types and commands are:
 
@@ -244,7 +250,7 @@ The supported definition types and commands are:
 PDF comparisons require the LHAPDF Python bindings (`import lhapdf`).
 Cross-section plots require `xfitter-draw` and ROOT. These external components
 are expected from the configured xFitter/LCG environment and are not installed
-by this Python package. Fresh comparisons default to `xfitter-master`; set
+by this Python package. Fresh comparisons default to `merge-master/xfitter-master`; set
 `xfitter_tree` in the comparison configuration or export `XFITTER_TREE` to use
 another compatible built tree. Retained historical and small-x studies should
 continue to select the build with which they were produced.
@@ -253,13 +259,13 @@ For the current paper workspaces:
 
 ```bash
 scripts/plot-pdf-comparison \
-  runs/comparisons/baseline-nominal-vs-7sources-20260929
+  runs/comparisons/pdf/herapdf20-nnlo-rtopt/gaussian-vs-eoe-selected
 
 scripts/plot-xsec \
-  runs/comparisons/xsec-nc-cc-nominal-vs-7sources-pumplin-20260929
+  runs/comparisons/xsec/herapdf20-nnlo-rtopt/gaussian-vs-eoe-selected-low-q2
 
 scripts/plot-scan \
-  runs/scans/lambda/hera-baseline/final-selection-common-epsilon-20260929
+  runs/scans/eoe-scan/herapdf20-nnlo-rtopt/common-epsilon
 ```
 
 Local fit paths in a comparison config are resolved relative to its workspace.
@@ -270,12 +276,12 @@ fits:
   - label: Gaussian
     setup: HERAPDF2.0, NNLO, RTOPT
     treatment: Gaussian
-    path: ../../fits/hera-baseline/nominal-bartlett2-pumplin-20260929
+    path: ../../../../fits/herapdf20-nnlo-rtopt/gaussian
     source: xfitter-grid
   - label: EoE
     setup: HERAPDF2.0, NNLO, RTOPT
     treatment: EoE
-    path: ../../fits/hera-baseline/baseline-7-sources-bartlett2-pumplin-20260929
+    path: ../../../../fits/herapdf20-nnlo-rtopt/eoe-selected
     source: xfitter-grid
 ```
 
@@ -292,13 +298,13 @@ same labels and typography as the assembled paper figures.
 
 | Figure | Workspace configuration | Presentation |
 | --- | --- | --- |
-| 1 | [Common epsilon scan](runs/scans/lambda/hera-baseline/final-selection-common-epsilon-20260929/config.yaml) | Original titleless format; axis labels 20 pt, ticks 15 pt |
-| 2 | [HERAPDF2.0 comparison](runs/comparisons/baseline-nominal-vs-7sources-20260929/config.yaml) | HERAPDF2.0, NNLO, RTOPT; Gaussian/EoE |
-| 3 | [Cross sections](runs/comparisons/xsec-nc-cc-nominal-vs-7sources-pumplin-20260929/config.yaml) | Gaussian/EoE; no setup heading; Q² labels include GeV²; original text sizes |
-| 4 | [HERAPDF-BG comparison](runs/comparisons/giuli-gaussian-vs-8sources-pumplin-20260929/config.yaml) | HERAPDF-BG, NNLO, RTOPT; Gaussian/EoE |
-| 5 | [Resummed comparison](runs/comparisons/smallx-gaussian-vs-5sources-pumplin-20260929/config.yaml) | HERAPDF-BG, NNLO+NLLₓ, FONLL-C; Gaussian/EoE |
-| 6 | [Three informed setups](runs/comparisons/informed-three-set-20260929/config.yaml) | No heading; HERAPDF2.0 / HERAPDF-BG / HERAPDF-BG NNLO+NLL; 13 pt legend; Ratio to HERAPDF2.0 |
-| 7 | [2 iterations](runs/comparisons/baseline-2E5N-iter2-vs-7sources-20260929/config.yaml), [4 iterations](runs/comparisons/baseline-2E5N-iter4-vs-7sources-20260929/config.yaml), [8 iterations](runs/comparisons/baseline-2E5N-iter8-vs-7sources-20260929/config.yaml) | HERAPDF2.0, NNLO, RTOPT; Numerical/Iterative; Ratio to Numerical |
+| 1 | [Common epsilon scan](runs/scans/eoe-scan/herapdf20-nnlo-rtopt/common-epsilon/config.yaml) | Original titleless format; axis labels 20 pt, ticks 15 pt |
+| 2 | [HERAPDF2.0 comparison](runs/comparisons/pdf/herapdf20-nnlo-rtopt/gaussian-vs-eoe-selected/config.yaml) | HERAPDF2.0, NNLO, RTOPT; Gaussian/EoE |
+| 3 | [Cross sections](runs/comparisons/xsec/herapdf20-nnlo-rtopt/gaussian-vs-eoe-selected-low-q2/config.yaml) | Gaussian/EoE; no setup heading; Q² labels include GeV²; original text sizes |
+| 4 | [HERAPDF-BG comparison](runs/comparisons/pdf/herapdf-bg-nnlo-rtopt/gaussian-vs-eoe-selected/config.yaml) | HERAPDF-BG, NNLO, RTOPT; Gaussian/EoE |
+| 5 | [Resummed comparison](runs/comparisons/pdf/herapdf-bg-nnlo-nllx-fonll-c/gaussian-vs-eoe-selected/config.yaml) | HERAPDF-BG, NNLO+NLLₓ, FONLL-C; Gaussian/EoE |
+| 6 | [Three informed setups](runs/comparisons/pdf/cross-setups/eoe-informed/config.yaml) | No heading; HERAPDF2.0 / HERAPDF-BG / HERAPDF-BG NNLO+NLL; 13 pt legend; Ratio to HERAPDF2.0 |
+| 7 | [2 iterations](runs/comparisons/pdf/herapdf20-nnlo-rtopt/numerical-vs-iter02/config.yaml), [4 iterations](runs/comparisons/pdf/herapdf20-nnlo-rtopt/numerical-vs-iter04/config.yaml), [8 iterations](runs/comparisons/pdf/herapdf20-nnlo-rtopt/numerical-vs-iter08/config.yaml) | HERAPDF2.0, NNLO, RTOPT; Numerical/Iterative; Ratio to Numerical |
 
 Every PDF-comparison workspace writes three files with the same observable page
 order from its `observables` configuration:
@@ -332,9 +338,10 @@ and layout.
 
 Assemble paper layouts separately from the repository. The native files retain
 their filenames, dimensions and page order; generated plots remain ignored by
-Git. Older workspace names retain historical configurations and outputs and
-may reference unavailable archived inputs. Use the dated configurations above
-for the current paper rather than substituting current fits into old studies.
+Git. Superseded workspaces are retained under `legacy/cleanup-20261111/`.
+The canonical configurations above retain the paper campaign's original inputs.
+Auxiliary studies keep their own input identities, including references to
+archived fits; renaming a study does not substitute newer fitted results.
 
 ## Datasets and historical material
 
@@ -343,8 +350,10 @@ upstream data repository. Runtime copies belong under `runs/` and are ignored.
 
 Inactive fits, studies, and other historical material are retained locally
 under the ignored `legacy/` tree. `legacy-artifacts.yaml` records their original
-locations and provenance. Historical manifest sections intentionally retain
-the paths that were current when each snapshot was classified.
+locations and provenance, including the 2026-11-11 run-tree cleanup. Historical
+manifest sections intentionally retain the paths that were current when each
+snapshot was classified. The ignored archive is local material, so an auxiliary
+study referring to it requires those inputs to be available on the checkout.
 
 ## Validation
 

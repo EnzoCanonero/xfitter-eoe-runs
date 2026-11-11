@@ -1,0 +1,24 @@
+# Paper reproduction configuration prepared 2026-09-29.
+# Source template: legacy/cleanup-20261111/runs/comparisons/giuli-gaussian-vs-8sources-pumplin/config.yaml
+type: pdf-comparison
+Q2: 4.0
+error_type: symmetric
+observables:
+- uv
+- dv
+- gluon
+ratio_reference: 0
+ratio_ylim:
+- 0.6
+- 1.6
+fits:
+- label: Gaussian
+  setup: HERAPDF-BG, NNLO, RTOPT
+  treatment: Gaussian
+  path: "../../../../fits/herapdf-bg-nnlo-rtopt/gaussian"
+  source: xfitter-grid
+- label: EoE
+  setup: HERAPDF-BG, NNLO, RTOPT
+  treatment: EoE
+  path: "../../../../fits/herapdf-bg-nnlo-rtopt/eoe-selected"
+  source: xfitter-grid

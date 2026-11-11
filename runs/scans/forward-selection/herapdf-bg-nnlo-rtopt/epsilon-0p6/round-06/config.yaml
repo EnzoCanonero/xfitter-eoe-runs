@@ -1,0 +1,38 @@
+xfitter_commit: 67398b15571dff1e9ddce0bc88923554552c9c84
+request_memory: 2GB
+n_iterations: 2
+enable_bartlett: true
+q2_cut: 3.5
+scan_type: systematic-ranking
+xfitter_tree: merge-master/xfitter-master
+template: giuli-param
+epsilon: 0.6
+
+# Sixth-order forward-selection scan with the Giuli parametrization (Q2cut = 3.5).
+# The corrected 5th-round scan selects 1144 (dchi2_B = 2.62), so the base
+# {1053,1062,1111,1114,1144} is held ON in every fit (eps 0.6), warm-started at
+# the JOINT converged values from
+# legacy/cleanup-20261111/runs/scans/syst-ranking/giuli-param/5th-1053-1062-1111-1114/runs/sysHZComb1144.
+# Giuli has 23 PDF parameters, so the five EoE sources are MINUIT #24--#28.
+base_systematics:
+  - {name: sysHZComb1053, type: E, init: -16.1352}
+  - {name: sysHZComb1062, type: E, init: -5.3977}
+  - {name: sysHZComb1111, type: E, init: -2.5279}
+  - {name: sysHZComb1114, type: E, init: 4.3649}
+  - {name: sysHZComb1144, type: E, init: 4.4307}
+
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+
+systematics:
+  - {name: sysHZComb, range: "1001-1162", type: E}
+  - {name: proc_nrl, type: E}
+  - {name: proc_tb, range: "21-24", type: E}
+  - {name: proc_gp, type: E}
+  - {name: proc_had, type: E}

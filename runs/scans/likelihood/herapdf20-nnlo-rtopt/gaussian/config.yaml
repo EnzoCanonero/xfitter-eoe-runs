@@ -1,0 +1,38 @@
+# Profile-likelihood scans for the 14 free HERA PDF parameters without EoE.
+scan_type: likelihood-scan
+xfitter_tree: xfitter-master
+xfitter_commit: bd0470d93a433ebfb5d99f6c0fecda9c29141199
+template: hera-baseline
+reference_fit: "../../../../../legacy/cleanup-20261111/runs/fits/hera-baseline/nominal-bartlett2-pumplin"
+n_iterations: 2
+enable_bartlett: true
+q2_cut: 3.5
+
+scan_defaults: {n_sigma: 3, npoints: 31}
+
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+
+systematics: []
+
+scan_params_1d:
+  - {name: ADbar}
+  - {name: Agp}
+  - {name: BDbar}
+  - {name: Bdv}
+  - {name: Bg}
+  - {name: Bgp}
+  - {name: Buv}
+  - {name: CDbar}
+  - {name: CUbar}
+  - {name: Cdv}
+  - {name: Cg}
+  - {name: Cuv}
+  - {name: DUbar}
+  - {name: Euv}

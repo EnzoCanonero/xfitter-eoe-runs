@@ -24,15 +24,15 @@ giving a net change of -50.5.
 The pull column is theory-with-shifts based (theo_mod), i.e. the description the
 fit actually achieves, which is what the chi2 minimises.
 
-Config keys (runs/comparisons/<workspace>/config.yaml)
+Config keys (runs/comparisons/<type>/<setup>/<study>/config.yaml)
 ------------------------------------------------
 type: xsec-region-table
 q2bins: [0, 10, 30, 100, 1000, 1.0e9]     # bin EDGES, ascending
 xbins:  [0, 1.0e-3, 1.0e-2, 1.0e-1, 1.0]  # bin EDGES, ascending
 dataset: ""                                # optional substring filter; "" = all
 fits:                                      # exactly 2; first = reference
-  - {label: "nominal",  path: ../../fits/hera-baseline/nominal-bartlett2-pumplin}
-  - {label: "EoE-7src", path: ../../fits/hera-baseline/baseline-7-sources-bartlett2-pumplin}
+  - {label: "nominal",  path: ../../../../fits/herapdf20-nnlo-rtopt/gaussian}
+  - {label: "EoE-7src", path: ../../../../fits/herapdf20-nnlo-rtopt/eoe-selected}
 """
 
 import math
