@@ -18,7 +18,7 @@ describes configured studies, not job completion.
 
 Paper workspaces use the inputs of the 20260929 campaign. Auxiliary studies
 retain their own inputs and build pins. The auxiliary PDF/cross-section
-comparisons and likelihood profiles refer to external fit inputs under
+comparisons refer to external fit inputs under
 `../xfitter-eoe-runs-archive/` (relative to the repository root); those inputs
 are not included in a clone. The ε/λ and Pumplin scans generate their own fits.
 
@@ -109,8 +109,7 @@ sources and seeds remain explicit in each configuration.
 | Auxiliary | Pumplin stability under λ, ERRDEF and ITERATE variations | [Selected EoE](../runs/scans/pumplin-stability/herapdf20-nnlo-rtopt/eoe-selected/config.yaml) |
 
 The common-ε and λ scans hold their source lists fixed; they are distinct from
-repeating forward selection at each ε. Likelihood profiles require the configured
-reference fit's `output/minuit.out.txt`.
+repeating forward selection at each ε. Likelihood profiles generate their own nominal fit and use explicit manual ranges.
 
 ## Comparisons
 

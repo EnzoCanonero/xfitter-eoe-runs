@@ -48,8 +48,8 @@ python scripts/run-scan --help
 Invoke scans as `python scripts/run-scan`: executing `scripts/run-scan` directly
 selects `/usr/bin/python3`, which may differ from the activated environment.
 For an existing scan configuration, `--dry-run` previews generation without
-writing files. Some scan types, including likelihood profiles, need reference
-fit outputs even for a preview. The [HERA study](hera-study.md) provides a
+writing files. Likelihood scans also prepare their own nominal fit and need
+no previous fit outputs. The [HERA study](hera-study.md) provides a
 concrete eight-fit preview using the bundled inputs.
 
 ## Scientific runtime

@@ -112,30 +112,28 @@ Tool documentation: [profile-likelihood scans](../runs/scans/likelihood/README.m
 
 | Reference | Configuration | Requested grid |
 | --- | --- | --- |
-| Gaussian HERAPDF2.0 | [Gaussian profiles](../runs/scans/likelihood/herapdf20-nnlo-rtopt/gaussian/config.yaml) | 14 PDF parameters × 31 points = **434 fits** |
-| Seven-source HERAPDF2.0 EoE, ε = 0.6 | [PDF and nuisance profiles](../runs/scans/likelihood/herapdf20-nnlo-rtopt/eoe-selected/config.yaml) | 14 PDF + 7 nuisance parameters × 21 points = **441 fits** |
+| Gaussian HERAPDF2.0 | [Gaussian profiles](../runs/scans/likelihood/herapdf20-nnlo-rtopt/gaussian/config.yaml) | 14 PDF parameters × 31 points = **434 points + 1 nominal fit** |
+| Seven-source HERAPDF2.0 EoE, ε = 0.6 | [PDF and nuisance profiles](../runs/scans/likelihood/herapdf20-nnlo-rtopt/eoe-selected/config.yaml) | 14 PDF + 7 nuisance parameters × 21 points = **441 points + 1 nominal fit** |
 
-Both configurations request one-dimensional profiles over the reference value
-±3 reference errors using `hera-baseline`. They are auxiliary diagnostics,
-not a separately configured paper figure. Parameters absent from the reference
-can be skipped; verify the generated manifest against the requested counts.
+Both configurations define explicit manual intervals in `config.yaml` and
+use `hera-baseline` starting values, with configured E-source starts for EoE.
+These example ranges are study choices, not intervals inferred from a previous
+fit. Adjust them to cover the profiles of interest. They are auxiliary
+diagnostics, not a separately configured paper figure.
 
-The `reference_fit` entries name inputs in the sibling
-`xfitter-eoe-runs-archive/` directory. Provide the exact configured reference's
-`output/minuit.out.txt` and retain `config/steering.txt` for the nuisance-source
-order. A dry run also needs these inputs. The scans do not create the reference
-fit and should not be silently redirected to newer fixed-fit outputs.
-
-After making the reference available, use, for example:
+Each workspace generates its own unconstrained nominal alongside the scan
+points: 435 jobs for Gaussian and 442 for EoE. No archive input is needed.
+For example:
 
 ```bash
 workspace=runs/scans/likelihood/herapdf20-nnlo-rtopt/gaussian
+python scripts/run-scan --dry-run "$workspace"
 ```
 
-The derived outputs are `results/profiles_1d.csv` and `plots/profiles_1d.pdf`.
-Δχ² is based on the raw minimized statistic, not the Bartlett-corrected
-goodness-of-fit value used for source rankings. The general guide describes
-normalization and missing-point handling.
+The outputs include `results/profiles_1d.csv` and `plots/profiles_1d.pdf`.
+Every Δχ² subtracts the raw minimum from `runs/nominal/`, never the lowest scan
+point. The nominal must converge; negative differences are retained and
+reported. Regenerate old workspaces using the current manual-grid format.
 
 ## Pumplin stability
 
@@ -208,7 +206,7 @@ provenance; changing `.env` does not replace a configuration's build selection.
 
 Run from the repository root after installation. First execute **one** of the
 concrete `workspace=...` assignments above, or choose a workspace from its
-configuration table. For likelihood scans, prepare the reference inputs first.
+configuration table. Likelihood previews use only their configuration and templates.
 
 Preview without creating files or submitting jobs:
 

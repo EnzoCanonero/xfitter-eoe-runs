@@ -352,63 +352,32 @@ class PumplinStabilityConfig(StudyConfig):
 
 
 class LikelihoodScanConfig(StudyConfig):
-    """Configuration for likelihood-scan workspaces.
-
-    The scan_type field in config.yaml must be 'likelihood-scan'.
-    Use scan_params_1d to list parameters to scan one at a time.
-    A future scan_params_2d key will enable 2D contour scans.
-    """
+    """Manual likelihood grids with an internal nominal fit."""
 
     def __init__(self, config_file: Path, template_root: Path):
         super().__init__(config_file, template_root)
-
-        if self.scan_type != 'likelihood-scan':
-            raise ValueError(f"Expected scan_type='likelihood-scan', got '{self.scan_type}'")
-
-        if 'reference_fit' not in self.data:
-            raise ValueError("likelihood-scan config missing required field: 'reference_fit'")
-        if not any(k in self.data for k in
+        removed = {'reference_fit', 'scan_defaults'} & self.data.keys()
+        if removed:
+            raise ValueError(f"unsupported likelihood settings: {sorted(removed)}; "
+                             "specify explicit ranges and npoints")
+        if not any(self.data.get(key) for key in
                    ('scan_params_1d', 'scan_systematics_1d', 'scan_params_2d')):
-            raise ValueError(
-                "likelihood-scan config must have at least one of "
-                "'scan_params_1d', 'scan_systematics_1d', 'scan_params_2d'"
-            )
-
-    @property
-    def reference_fit(self) -> Path:
-        """Absolute reference fit path, resolved relative to the workspace."""
-        return (self.workspace_dir / self.data['reference_fit']).resolve()
-
-    @property
-    def scan_defaults(self) -> dict:
-        return self.data.get('scan_defaults', {'n_sigma': 3, 'npoints': 31})
+            raise ValueError("likelihood-scan needs at least one scan")
+        for entry in self.scan_params_1d + self.scan_systematics_1d + self.scan_params_2d:
+            if 'n_sigma' in entry:
+                raise ValueError("n_sigma is unsupported; specify explicit ranges")
 
     @property
     def scan_params_1d(self) -> List[Dict]:
-        """PDF parameters to scan: [{name, n_sigma?, npoints?, min?, max?}].
-        Fixed via step=0 in the Parameters block."""
         return self.data.get('scan_params_1d', [])
 
     @property
     def scan_systematics_1d(self) -> List[Dict]:
-        """E-type systematics to scan: [{name, n_sigma?, npoints?, min?, max?}].
-        Fixed via MINUIT SET PAR / FIX commands (xFitter registers them from &Systematics)."""
         return self.data.get('scan_systematics_1d', [])
 
     @property
     def scan_params_2d(self) -> List[Dict]:
-        """Parameter pairs for 2D contour scans:
-        [{pair: [xName, yName], npoints?, n_sigma?, x_range?, y_range?}].
-
-        Each axis name may be a PDF parameter or an E-type systematic; the type is
-        inferred from the systematics block. Both axes are fixed at each grid point
-        (PDF via step=0, E-type via MINUIT SET PAR / FIX) while the rest are profiled."""
         return self.data.get('scan_params_2d', [])
-
-    @property
-    def sigma_levels(self) -> List[float]:
-        """Sigma levels at which to draw 2D joint contours (default [1, 2, 3])."""
-        return [float(s) for s in self.data.get('sigma_levels', [1, 2, 3])]
 
     @property
     def systematics(self) -> List[Dict]:
@@ -416,13 +385,7 @@ class LikelihoodScanConfig(StudyConfig):
 
     @property
     def parameter_overrides(self) -> Dict:
-        """Optional per-parameter overrides: {name: {value?, step?}}.
-
-        Takes precedence over values read from the reference fit.
-        Example in config.yaml:
-            parameter_overrides:
-              DUbar: {value: 1.9, step: 2.5}
-        """
+        """PDF value/step overrides applied to the template in every fit."""
         return self.data.get('parameter_overrides', {})
 
 

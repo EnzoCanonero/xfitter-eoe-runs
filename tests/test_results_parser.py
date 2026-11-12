@@ -104,6 +104,7 @@ class ResultsParserTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             fits_dir = Path(tmp)
             contents = {
+                "nominal": "After minimisation 101.0 80 1.25\n",
                 "legacy": "After minimisation 1.0e+02 80 1.25\n",
                 "eoe": "cHi2 AFTER minimisation +1.025D+02 80 1.28\n",
             }
@@ -111,15 +112,15 @@ class ResultsParserTests(unittest.TestCase):
                 output = fits_dir / name / "output"
                 output.mkdir(parents=True)
                 (output / "Results.txt").write_text(content)
+                (output / "minuit.out.txt").write_text("MIGRAD MINIMIZATION HAS CONVERGED\n")
 
             (fits_dir / "missing" / "output").mkdir(parents=True)
             manifest = {
+                "nominal": "nominal",
                 "scan_1d": {
                     "ADbar": {
                         "scan_values": [0.2, 0.3, 0.4],
                         "fit_dirs": ["legacy", "eoe", "missing"],
-                        "value_at_minimum": 0.2,
-                        "error": 0.1,
                     },
                 },
                 "scan_2d": {
@@ -129,8 +130,6 @@ class ResultsParserTests(unittest.TestCase):
                         "x_values": [0.2, 0.3, 0.4],
                         "y_values": [0.0],
                         "fit_grid": [["legacy"], ["eoe"], ["missing"]],
-                        "x_ref": 0.2,
-                        "y_ref": 0.0,
                     },
                 },
             }
@@ -147,6 +146,24 @@ class ResultsParserTests(unittest.TestCase):
             self.assertEqual(scan_2d[0, 0], 100.0)
             self.assertEqual(scan_2d[1, 0], 102.5)
             self.assertTrue(math.isnan(scan_2d[2, 0]))
+            self.assertEqual(results["nominal_chi2"], 101.0)
+            self.assertEqual(results["scan_1d"]["ADbar"]["delta_chi2"][:2].tolist(), [-1, 1.5])
+            self.assertEqual(results["scan_2d"]["ADbar__Bg"]["delta_chi2"][:2, 0].tolist(), [-1, 1.5])
+
+            nominal_output = fits_dir / "nominal" / "output"
+            for result_text, minuit_text in [
+                ("After minimisation 101 80", "FCN=101 FROM MIGRAD STATUS=FAILED"),
+                ("No result", "MIGRAD MINIMIZATION HAS CONVERGED"),
+            ]:
+                with self.subTest(nominal=result_text, status=minuit_text):
+                    (nominal_output / "Results.txt").write_text(result_text)
+                    (nominal_output / "minuit.out.txt").write_text(minuit_text)
+                    with self.assertRaisesRegex(ValueError, "nominal fit"):
+                        _extract_likelihood_scan_results(fits_dir)
+            (nominal_output / "Results.txt").unlink()
+            with self.assertRaisesRegex(ValueError, "nominal fit"):
+                _extract_likelihood_scan_results(fits_dir)
+
 
 
 if __name__ == "__main__":

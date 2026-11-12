@@ -5,63 +5,32 @@ Generates fits and submits to Condor based on a workspace config
 
 import json
 import re
-import warnings
-from collections import Counter
+from copy import deepcopy
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional
 import numpy as np
+import yaml
 from .config import (load_study_config, LambdaScanConfig, LikelihoodScanConfig,
                      SystematicRankingConfig, PumplinStabilityConfig)
 from .templates import (TemplateManager, create_fit_structure,
                          generate_batch_submit)
 
 
-def _patch_parameters(params_file: Path,
-                      pdf_params: Dict[str, Dict],
-                      scan_fixed_params: Dict[str, float],
-                      fix_commands: Optional[Dict[str, Tuple[int, float]]] = None) -> None:
-    """
-    Patch a rendered parameters.yaml in-place for a likelihood scan fit.
-
-    - pdf_params: {name: {value, step}} — warm-start values from the reference fit
-    - scan_fixed_params: {name: value} — PDF parameter to fix at this scan point (step → 0)
-    - fix_commands: {name: (minuit_index, value)} — E-type parameters to fix via
-      MINUIT 'SET PAR N V' + 'FIX N' commands injected into the Commands block.
-      E-type params are never added to the Parameters block; xFitter registers them
-      automatically from the &Systematics steering block.
-    """
-    content = params_file.read_text()
-
-    # Patch PDF parameter values and steps
-    for name, pdata in pdf_params.items():
-        val = scan_fixed_params.get(name, pdata['value'])
-        step = 0.0 if name in scan_fixed_params else pdata['step']
-
-        if name == 'CDbar':
-            content = re.sub(
-                r'  CDbar:.*\n(?:    [^\n]*\n)*',
-                f'  CDbar: [ {val:.8g}, {step:.4g} ]\n',
-                content,
-            )
+def _set_pdf_parameter(parameters: Dict, name: str, values: Dict) -> None:
+    """Update a numeric parameter without dropping its bounds."""
+    entry = parameters.get(name)
+    if not values or set(values) - {'value', 'step'}:
+        raise ValueError(f"{name}: expected value and/or step")
+    for key, value in values.items():
+        value = float(value)
+        if not np.isfinite(value) or (key == 'step' and value < 0):
+            raise ValueError(f"{name}: invalid {key}")
+        if isinstance(entry, list) and len(entry) >= 2:
+            entry[0 if key == 'value' else 1] = value
+        elif isinstance(entry, dict) and 'value' in entry and 'step' in entry:
+            entry[key] = value
         else:
-            content = re.sub(
-                rf'^([ \t]+{re.escape(name)}[ \t]*:)[ \t]*\[.*?\]',
-                rf'\1 [ {val:.8g}, {step:.4g} ]',
-                content,
-                flags=re.MULTILINE,
-            )
-
-    # Inject MINUIT FIX commands for E-type parameters that must be held fixed.
-    # These are prepended to the Commands block so MIGRAD never varies them.
-    if fix_commands:
-        lines = []
-        for name, (idx, val) in fix_commands.items():
-            lines.append(f'    SET PAR {idx} {val:.8g}')
-            lines.append(f'    FIX {idx}')
-        fix_block = '\n'.join(lines) + '\n'
-        content = content.replace('    call fcn 1\n', fix_block + '    call fcn 1\n', 1)
-
-    params_file.write_text(content)
+            raise ValueError(f"{name}: expected a numeric parameter with value and step")
 
 
 def _eoe_param_indices(parameters_yaml_text: str,
@@ -94,7 +63,7 @@ def _inject_init_commands(params_file: Path, init_by_index: Dict[int, float]) ->
     """Warm-start E-type EoE nuisances via MINUIT `set par <idx> <val>` commands.
 
     Lines are inserted before the `    call fcn 1\n` anchor in the Commands block
-    (same mechanism as _patch_parameters, but without FIX). Zero/None values are
+    without fixing the parameter. Zero/None values are
     skipped, so an unset/explicit-0 init is a no-op (xfitter's default).
     """
     cmds = {idx: val for idx, val in init_by_index.items() if val}
@@ -109,10 +78,7 @@ def _inject_init_commands(params_file: Path, init_by_index: Dict[int, float]) ->
 def _apply_source_inits(fit_dir: Path, sources: List[Dict]) -> None:
     """Inject init `set par` commands for a fit's E-type sources that carry an init.
 
-    `sources` are expanded systematics dicts ({name, type, epsilon, init}). No-op
-    when none have a non-zero init. Used by the from-scratch generators (systematic
-    -ranking, lambda-scan, pumplin-stability), which have no reference fit to read
-    MINUIT indices from.
+    Source indices follow the parameter and source declarations.
     """
     e_sources = [s['name'] for s in sources if s.get('type') == 'E']
     e_init = {s['name']: s['init'] for s in sources
@@ -124,99 +90,6 @@ def _apply_source_inits(fit_dir: Path, sources: List[Dict]) -> None:
     # depend on the full set), then we set par only for the init-bearing ones.
     idx = _eoe_param_indices(params_file.read_text(), e_sources)
     _inject_init_commands(params_file, {idx[n]: e_init[n] for n in e_init})
-
-
-def _parse_e_source_order(steering_text: str) -> List[str]:
-    """Return E-type source names in ``ListOfSources`` declaration order.
-
-    Only the ``&Systematics`` namelist is inspected. Quoted source strings use
-    xFitter's ``name:type@...`` format; non-E sources are intentionally omitted
-    because they do not become MINUIT nuisance parameters.
-    """
-    block_match = re.search(
-        r'&Systematics\b(.*?)(?=^\s*(?:&End|/)\s*$)',
-        steering_text,
-        re.IGNORECASE | re.MULTILINE | re.DOTALL,
-    )
-    if block_match is None:
-        return []
-
-    list_match = re.search(
-        r'\bListOfSources\s*=\s*(.*?)(?=^\s*[A-Za-z_]\w*\s*=|\Z)',
-        block_match.group(1),
-        re.IGNORECASE | re.MULTILINE | re.DOTALL,
-    )
-    if list_match is None:
-        return []
-
-    order = []
-    for quoted in re.finditer(r"'([^']*)'|\"([^\"]*)\"", list_match.group(1)):
-        source_spec = quoted.group(1) if quoted.group(1) is not None else quoted.group(2)
-        parsed = re.match(r'^\s*([^:\s,]+)\s*:\s*([^@\s,]+)', source_spec)
-        if parsed is not None and parsed.group(2).upper() == 'E':
-            order.append(parsed.group(1))
-    return order
-
-
-def _reference_e_source_order(ref_fit_dir: Path,
-                              configured_order: Sequence[str]) -> List[str]:
-    """Get and validate the reference fit's ordered E-source declaration.
-
-    A reference steering file is the authoritative source for MINUIT parameter
-    ordering. Falling back to the configured order is safe only when that file
-    is unavailable; an available steering file whose E-source multiset differs
-    from the likelihood configuration is an error rather than a guess.
-    """
-    configured = list(configured_order)
-    steering_file = ref_fit_dir / 'config' / 'steering.txt'
-    if not steering_file.is_file():
-        if configured:
-            warnings.warn(
-                f"reference steering unavailable at {steering_file}; "
-                "falling back to likelihood configuration E-source order",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-        return configured
-
-    reference = _parse_e_source_order(steering_file.read_text())
-    configured_counts = Counter(configured)
-    reference_counts = Counter(reference)
-    if reference_counts != configured_counts:
-        missing = list((configured_counts - reference_counts).elements())
-        unexpected = list((reference_counts - configured_counts).elements())
-        raise ValueError(
-            "likelihood/reference E-source mismatch: "
-            f"missing from reference={missing}, unexpected in reference={unexpected}; "
-            f"configured={configured}, reference={reference}"
-        )
-    return reference
-
-
-def _order_systematics_by_e_reference(systematics: Sequence[Dict],
-                                      e_source_order: Sequence[str]) -> List[Dict]:
-    """Reorder E entries to match the reference while retaining non-E slots."""
-    configured_e = [s['name'] for s in systematics if s.get('type') == 'E']
-    if Counter(configured_e) != Counter(e_source_order):
-        raise ValueError(
-            "cannot apply reference E-source order to configured systematics: "
-            f"configured={configured_e}, reference={list(e_source_order)}"
-        )
-
-    by_name: Dict[str, List[Dict]] = {}
-    for systematic in systematics:
-        if systematic.get('type') == 'E':
-            by_name.setdefault(systematic['name'], []).append(systematic)
-
-    ordered_e = []
-    for name in e_source_order:
-        entries = by_name.get(name, [])
-        if not entries:
-            raise ValueError(f"E-source '{name}' has no matching systematic entry")
-        ordered_e.append(entries.pop(0))
-
-    ordered_iter = iter(ordered_e)
-    return [next(ordered_iter) if s.get('type') == 'E' else s for s in systematics]
 
 
 def run_scan(run_dir: Path, template_root: Path, dataset_root: Optional[Path],
@@ -555,420 +428,137 @@ def _generate_systematic_ranking_fits(config: SystematicRankingConfig,
     )
 
 
-def _build_reference_params(ref_fit_dir: Path,
-                             e_type_systematics: Sequence[str],
-                             e_source_order: Optional[Sequence[str]] = None
-                             ) -> Dict[str, Dict]:
-    """
-    Read fitted parameter values and errors from a reference fit's MINUIT output.
-
-    MINUIT truncates parameter names to 10 characters. E-type systematics with
-    longer names (e.g. sysHZComb1053) collide when truncated. Repeated prefixes
-    are resolved by parameter-definition index and the reference fit's
-    ``ListOfSources`` declaration order.
-
-    Args:
-        ref_fit_dir: Path to the reference fit directory (contains output/)
-        e_type_systematics: Full names of all E-type systematics in the scan config.
-        e_source_order: Already-validated reference declaration order. When
-            omitted, it is read and validated from ``config/steering.txt``.
-
-    Returns:
-        dict {full_name: {'value': float, 'error': float}}
-    """
-    configured_order = list(e_type_systematics)
-    if e_source_order is None:
-        resolved_e_order = _reference_e_source_order(ref_fit_dir, configured_order)
-    else:
-        resolved_e_order = list(e_source_order)
-        if Counter(resolved_e_order) != Counter(configured_order):
-            raise ValueError(
-                "provided reference E-source order does not match configured sources: "
-                f"configured={configured_order}, reference={resolved_e_order}"
-            )
-
-    minuit_file = ref_fit_dir / "output" / "minuit.out.txt"
-    with open(minuit_file, 'r') as f:
-        content = f.read()
-
-    # Parse PARAMETER DEFINITIONS block: {index: truncated_name}
-    defs: Dict[int, str] = {}
-    for m in re.finditer(r"^\s*(\d+)\s+'([^']*?)\s*'", content, re.MULTILINE):
-        defs[int(m.group(1))] = m.group(2).strip()
-
-    # Build truncated_prefix → [full names in ListOfSources order].
-    trunc_groups: Dict[str, List[str]] = {}
-    for full in resolved_e_order:
-        trunc = full[:10]
-        trunc_groups.setdefault(trunc, []).append(full)
-
-    # Map each parameter index to a full name
-    trunc_counters: Dict[str, int] = {k: 0 for k in trunc_groups}
-    index_to_fullname: Dict[int, str] = {}
-    for idx in sorted(defs.keys()):
-        trunc = defs[idx]
-        if trunc in trunc_groups:
-            fullnames = trunc_groups[trunc]
-            pos = trunc_counters[trunc]
-            index_to_fullname[idx] = fullnames[pos] if pos < len(fullnames) else trunc
-            trunc_counters[trunc] += 1
-        else:
-            index_to_fullname[idx] = trunc  # no truncation for short names
-
-    # Parse all EXT PARAMETER tables (last value per index wins = final converged)
-    params: Dict[int, Tuple] = {}
-    in_section = False
-    for line in content.split('\n'):
-        if 'EXT PARAMETER' in line:
-            in_section = True
-            continue
-        if in_section:
-            if line.strip() == '':
-                in_section = False
-                continue
-            parts = line.split()
-            if len(parts) >= 4 and parts[0].isdigit():
-                try:
-                    idx = int(parts[0])
-                    val = float(parts[2])
-                    err = float(parts[3])
-                    params[idx] = (val, err)
-                except (ValueError, IndexError):
-                    continue
-
-    result = {}
-    for idx, (val, err) in params.items():
-        full_name = index_to_fullname.get(idx, defs.get(idx, str(idx)))
-        result[full_name] = {'value': val, 'error': err, 'index': idx}
-
-    return result
-
-
 def _generate_likelihood_scan_fits(config: LikelihoodScanConfig,
-                                    fits_dir: Path, dry_run: bool,
-                                    dataset_root: Path,
-                                    setup_env: Path) -> Optional[Path]:
-    """
-    Generate fits for profile likelihood scans.
-
-    Currently implements 1D: for each parameter in scan_params_1d, generates
-    npoints fits with that parameter fixed and all others free (MIGRAD).
-    Scan ranges default to [ref_value ± n_sigma * ref_error]; override
-    per-parameter with explicit min/max in the config.
-
-    After all fits are created, writes scan_manifest.json and generates a
-    single-cluster Condor batch submission (runs/batch/ + runs/submit.sh).
-
-    2D support (scan_params_2d) is reserved for a future extension.
-
-    Returns:
-        Path to runs/submit.sh (None in dry-run mode).
-    """
-    # Template folder selected by the scan config's `template:` field
-    template_dir = config.template_dir
-    templates = TemplateManager(template_dir)
+                                   fits_dir: Path, dry_run: bool,
+                                   dataset_root: Path, setup_env: Path):
+    """Generate the nominal fit and manual 1D/2D grids together."""
+    templates = TemplateManager(config.template_dir)
+    parameters_text = templates.render_parameters(fits_dir, config.do_errors_string)
+    block = re.search(r'^Parameters:[ \t]*\n.*?(?=^\S|\Z)',
+                      parameters_text, re.MULTILINE | re.DOTALL)
+    if block is None:
+        raise ValueError("template is missing its Parameters block")
+    parameters = yaml.safe_load(block.group())['Parameters']
+    for name, values in config.parameter_overrides.items():
+        _set_pdf_parameter(parameters, name, values)
 
     systematics = config.systematics
-    configured_e_type_names = [s['name'] for s in systematics if s['type'] == 'E']
-    e_type_names = _reference_e_source_order(
-        config.reference_fit, configured_e_type_names,
-    )
-    # Generated likelihood fits must register their E nuisances in the same
-    # order as the reference whose MINUIT indices are reused below.
-    systematics = _order_systematics_by_e_reference(systematics, e_type_names)
-
-    print(f"\nReference fit: {config.reference_fit}")
-    print(f"E-type systematics (free in MINUIT): {e_type_names}")
-
-    # Read fitted values and errors from reference fit
-    ref_params = _build_reference_params(
-        config.reference_fit, configured_e_type_names,
-        e_source_order=e_type_names,
+    e_names = [s['name'] for s in systematics if s['type'] == 'E']
+    if len(set(e_names)) != len(e_names) or set(e_names) & parameters.keys():
+        raise ValueError("E-source names must be unique and distinct from PDF parameters")
+    e_indices = {name: len(parameters) + i + 1 for i, name in enumerate(e_names)}
+    if e_names and '    call fcn 1\n' not in parameters_text:
+        raise ValueError("template Commands must contain 'call fcn 1'")
+    steering = templates.render_steering(
+        sources=[(s['name'], s['type'], s['epsilon']) for s in systematics],
+        datafiles=config.datafiles,
+        n_iterations=config.get('n_iterations', 2),
+        enable_bartlett=config.get('enable_bartlett', True),
+        q2_cut=config.get('q2_cut', 3.5),
     )
 
-    # Build initial MINUIT starting values from reference fit (override with config).
-    # PDF params are every fitted (variable) parameter in the reference fit that is
-    # not an E-type systematic — read dynamically from the reference fit.
-    initial_params: Dict[str, Dict] = {}
-    for name, pdata in ref_params.items():
-        if name in e_type_names:
-            continue  # E-type nuisances are fixed via MINUIT index, not the Parameters block
-        initial_params[name] = {'value': pdata['value'],
-                                'step': max(abs(pdata['error']), 1e-4)}
-    for name, override in config.parameter_overrides.items():
-        if name in initial_params:
-            initial_params[name].update(override)
+    def check_parameter(name):
+        if name in e_indices:
+            return
+        entry = parameters.get(name)
+        step = (entry.get('step', 0) if isinstance(entry, dict) else
+                entry[1] if isinstance(entry, list) and len(entry) >= 2 else 0)
+        if not np.isfinite(float(step)) or float(step) <= 0:
+            raise ValueError(f"{name}: scan parameter must be free in the nominal fit")
 
-    # E-type parameters: registered by xFitter automatically from &Systematics.
-    # We only need their MINUIT index (for fixing via SET PAR / FIX when scanned).
-    e_type_indices: Dict[str, int] = {}
-    for name in e_type_names:
-        if name in ref_params and 'index' in ref_params[name]:
-            e_type_indices[name] = ref_params[name]['index']
-        else:
-            print(f"  WARNING: MINUIT index for '{name}' not found in reference fit — "
-                  f"cannot scan this parameter")
+    def grid(bounds, npoints):
+        lo, hi = map(float, bounds)
+        if not np.isfinite([lo, hi]).all() or lo >= hi:
+            raise ValueError("scan bounds must be finite and increasing")
+        if not isinstance(npoints, int) or isinstance(npoints, bool) or npoints < 2:
+            raise ValueError("npoints must be an integer >= 2")
+        return np.linspace(lo, hi, npoints).tolist()
 
-    print(f"\nInitial PDF parameter values (from reference fit):")
-    for name, pdata in sorted(initial_params.items()):
-        print(f"  {name:8s}: value={pdata['value']:+.6f}, step={pdata['step']:.4f}")
-    if e_type_indices:
-        print(f"\nE-type parameters (managed by xFitter via &Systematics):")
-        for name, idx in e_type_indices.items():
-            ref_val = ref_params[name]['value']
-            print(f"  {name}: ref_value={ref_val:+.6f}, MINUIT index={idx}")
+    jobs = [('nominal', {})]
+    manifest = {'nominal': 'nominal', 'scan_1d': {}, 'scan_2d': {}}
+    for entries, is_systematic in ((config.scan_params_1d, False),
+                                   (config.scan_systematics_1d, True)):
+        for entry in entries:
+            name = entry['name']
+            check_parameter(name)
+            if (name in e_indices) != is_systematic:
+                raise ValueError(f"{name}: use the matching PDF or systematic scan list")
+            if name in manifest['scan_1d']:
+                raise ValueError(f"duplicate scan: {name}")
+            values = grid((entry['min'], entry['max']), entry['npoints'])
+            fit_names = []
+            for i, value in enumerate(values):
+                fit_name = f"1d_{name}_{i:03d}"
+                jobs.append((fit_name, {name: value}))
+                fit_names.append(fit_name)
+            manifest['scan_1d'][name] = {'scan_values': values, 'fit_dirs': fit_names}
+            print(f"  {name}: [{values[0]:g}, {values[-1]:g}], {len(values)} points")
 
-    defaults = config.scan_defaults
-    default_n_sigma = float(defaults.get('n_sigma', 3))
-    default_npoints = int(defaults.get('npoints', 31))
-
-    do_errors = config.do_errors_string
-
-    # Build a unified scan list with is_systematic flag
-    scan_items = [(p, False) for p in config.scan_params_1d] + \
-                 [(p, True)  for p in config.scan_systematics_1d]
-
-    n_pdf  = len(config.scan_params_1d)
-    n_syst = len(config.scan_systematics_1d)
-    print(f"\n1D scan: {n_pdf} PDF parameter(s), {n_syst} E-type systematic(s)")
-    print(f"Defaults: n_sigma={default_n_sigma}, npoints={default_npoints}")
-
-    total_fits = 0
-    manifest: Dict = {'scan_1d': {}, 'scan_2d': {}}
-    all_fit_dirs: List[Path] = []
-
-    for scan_param, is_systematic in scan_items:
-        name = scan_param['name']
-
-        if name not in ref_params:
-            print(f"  WARNING: '{name}' not found in reference fit params — skipping")
-            print(f"    Available: {sorted(ref_params.keys())}")
-            continue
-
-        if is_systematic and name not in e_type_indices:
-            print(f"  WARNING: '{name}' listed in scan_systematics_1d but has no MINUIT "
-                  f"index — is it declared as E-type in systematics:? Skipping.")
-            continue
-
-        ref_val = ref_params[name]['value']
-        ref_err = ref_params[name]['error']
-
-        n_sigma = float(scan_param.get('n_sigma', default_n_sigma))
-        npoints = int(scan_param.get('npoints', default_npoints))
-
-        if 'min' in scan_param and 'max' in scan_param:
-            lo = float(scan_param['min'])
-            hi = float(scan_param['max'])
-        else:
-            lo = ref_val - n_sigma * ref_err
-            hi = ref_val + n_sigma * ref_err
-
-        scan_values = np.linspace(lo, hi, npoints)
-
-        tag = '[syst]' if is_systematic else '[pdf] '
-        print(f"  {tag} {name}: [{lo:.4g}, {hi:.4g}] ({npoints} pts, "
-              f"ref={ref_val:.4g} ± {ref_err:.4g})")
-
-        if dry_run:
-            total_fits += npoints
-            continue
-
-        fit_names_for_param = []
-        for i, v in enumerate(scan_values):
-            fit_name = f"1d_{name}_{i:03d}"
-            fit_dir = fits_dir / fit_name
-
-            sources = [(s['name'], s['type'], s['epsilon']) for s in systematics]
-            steering = templates.render_steering(
-                sources=sources,
-                datafiles=config.datafiles,
-                n_iterations=config.get('n_iterations', 2),
-                enable_bartlett=config.get('enable_bartlett', True),
-                q2_cut=config.get('q2_cut', 3.5),
-            )
-
-            create_fit_structure(fit_dir, steering, "", config.datafiles,
-                                 template_dir=template_dir,
-                                 dataset_root=dataset_root,
-                                 setup_env=setup_env,
-                                 do_errors=do_errors,
-                                 xfitter_tree=config.xfitter_tree,
-                                 xfitter_commit=config.xfitter_commit)
-
-            if is_systematic:
-                # E-type: fixed via MINUIT SET PAR / FIX commands
-                fix_cmds = {name: (e_type_indices[name], v)}
-                pdf_fixed = {}
-            else:
-                # PDF param: fixed via step=0 in Parameters block
-                fix_cmds = {}
-                pdf_fixed = {name: v}
-
-            _patch_parameters(
-                fit_dir / "config" / "parameters.yaml",
-                pdf_params=initial_params,
-                scan_fixed_params=pdf_fixed,
-                fix_commands=fix_cmds,
-            )
-            # Warm-start E-type sources carrying an `init`, except the one being
-            # scanned (its grid value is fixed via fix_commands above, and runs after).
-            init_by_index = {
-                e_type_indices[s['name']]: s['init']
-                for s in systematics
-                if s.get('type') == 'E' and s.get('init')
-                and s['name'] in e_type_indices and s['name'] != name
-            }
-            _inject_init_commands(fit_dir / "config" / "parameters.yaml", init_by_index)
-            fit_names_for_param.append(fit_name)
-            if not (fit_dir / "output" / "Results.txt").exists():
-                all_fit_dirs.append(fit_dir.resolve())
-
-        manifest['scan_1d'][name] = {
-            'value_at_minimum': ref_val,
-            'error': ref_err,
-            'n_sigma': n_sigma,
-            'npoints': npoints,
-            'lo': lo,
-            'hi': hi,
-            'scan_values': scan_values.tolist(),
-            'fit_dirs': fit_names_for_param,
+    for entry in config.scan_params_2d:
+        xname, yname = entry['pair']
+        check_parameter(xname)
+        check_parameter(yname)
+        key = f"{xname}__{yname}"
+        if xname == yname or key in manifest['scan_2d']:
+            raise ValueError(f"duplicate scan axes or pair: {key}")
+        nx, ny = entry['npoints']
+        xs = grid(entry['x_range'], nx)
+        ys = grid(entry['y_range'], ny)
+        fit_grid = []
+        for i, xv in enumerate(xs):
+            row = []
+            for j, yv in enumerate(ys):
+                fit_name = f"2d_{xname}_{yname}_{i:03d}_{j:03d}"
+                jobs.append((fit_name, {xname: xv, yname: yv}))
+                row.append(fit_name)
+            fit_grid.append(row)
+        manifest['scan_2d'][key] = {
+            'x_name': xname, 'y_name': yname,
+            'x_values': xs, 'y_values': ys, 'fit_grid': fit_grid,
         }
-        total_fits += npoints
+        print(f"  {xname} x {yname}: {nx} x {ny} points")
 
-    # ── 2D contour scans ────────────────────────────────────────────────────
-    scan_pairs = config.scan_params_2d
-    if scan_pairs:
-        sigma_levels = config.sigma_levels
-        default_npoints_2d = int(defaults.get('npoints_2d', 21))
-        default_n_sigma_2d = float(defaults.get('n_sigma_2d',
-                                                int(np.ceil(max(sigma_levels))) + 1))
-
-        def _resolve_axis(axis_name):
-            """Return (kind, ref_value, ref_error, minuit_index) or None."""
-            if axis_name not in ref_params:
-                return None
-            rv = ref_params[axis_name]['value']
-            re_ = ref_params[axis_name]['error']
-            if axis_name in e_type_indices:
-                return ('E', rv, re_, e_type_indices[axis_name])
-            return ('pdf', rv, re_, None)
-
-        print(f"\n2D scan: {len(scan_pairs)} parameter pair(s)")
-        print(f"Defaults: n_sigma_2d={default_n_sigma_2d}, npoints_2d={default_npoints_2d}, "
-              f"sigma_levels={sigma_levels}")
-
-        for pair_cfg in scan_pairs:
-            xname, yname = pair_cfg['pair']
-            npoints = int(pair_cfg.get('npoints', default_npoints_2d))
-            n_sigma = float(pair_cfg.get('n_sigma', default_n_sigma_2d))
-
-            ax, ay = _resolve_axis(xname), _resolve_axis(yname)
-            if ax is None or ay is None:
-                missing = [n for n, a in ((xname, ax), (yname, ay)) if a is None]
-                print(f"  WARNING: pair ({xname}, {yname}) — {missing} not in reference "
-                      f"fit params; skipping")
-                continue
-            for nm, a in ((xname, ax), (yname, ay)):
-                if a[0] == 'E' and nm not in e_type_indices:
-                    print(f"  WARNING: '{nm}' is E-type but has no MINUIT index; skipping pair")
-                    a = None
-            xkind, xref, xerr, xidx = ax
-            ykind, yref, yerr, yidx = ay
-
-            if 'x_range' in pair_cfg:
-                xlo, xhi = (float(v) for v in pair_cfg['x_range'])
-            else:
-                xlo, xhi = xref - n_sigma * xerr, xref + n_sigma * xerr
-            if 'y_range' in pair_cfg:
-                ylo, yhi = (float(v) for v in pair_cfg['y_range'])
-            else:
-                ylo, yhi = yref - n_sigma * yerr, yref + n_sigma * yerr
-
-            xs = np.linspace(xlo, xhi, npoints)
-            ys = np.linspace(ylo, yhi, npoints)
-
-            print(f"  [{xkind}x{ykind}] {xname} x {yname}: "
-                  f"x[{xlo:.4g},{xhi:.4g}] y[{ylo:.4g},{yhi:.4g}] "
-                  f"({npoints}x{npoints} = {npoints * npoints} fits)")
-
-            if dry_run:
-                total_fits += npoints * npoints
-                continue
-
-            fit_grid: List[List[str]] = []
-            for i, xv in enumerate(xs):
-                row = []
-                for j, yv in enumerate(ys):
-                    fit_name = f"2d_{xname}_{yname}_{i:03d}_{j:03d}"
-                    fit_dir = fits_dir / fit_name
-
-                    sources = [(s['name'], s['type'], s['epsilon']) for s in systematics]
-                    steering = templates.render_steering(
-                        sources=sources,
-                        datafiles=config.datafiles,
-                        n_iterations=config.get('n_iterations', 2),
-                        enable_bartlett=config.get('enable_bartlett', True),
-                        q2_cut=config.get('q2_cut', 3.5),
-                    )
-                    create_fit_structure(fit_dir, steering, "", config.datafiles,
-                                         template_dir=template_dir,
-                                         dataset_root=dataset_root,
-                                         setup_env=setup_env,
-                                         do_errors=do_errors,
-                                         xfitter_tree=config.xfitter_tree,
-                                         xfitter_commit=config.xfitter_commit)
-
-                    pdf_fixed: Dict[str, float] = {}
-                    fix_cmds: Dict[str, Tuple[int, float]] = {}
-                    if xkind == 'pdf':
-                        pdf_fixed[xname] = xv
-                    else:
-                        fix_cmds[xname] = (xidx, xv)
-                    if ykind == 'pdf':
-                        pdf_fixed[yname] = yv
-                    else:
-                        fix_cmds[yname] = (yidx, yv)
-
-                    _patch_parameters(
-                        fit_dir / "config" / "parameters.yaml",
-                        pdf_params=initial_params,
-                        scan_fixed_params=pdf_fixed,
-                        fix_commands=fix_cmds,
-                    )
-                    row.append(fit_name)
-                    if not (fit_dir / "output" / "Results.txt").exists():
-                        all_fit_dirs.append(fit_dir.resolve())
-                fit_grid.append(row)
-
-            manifest['scan_2d'][f"{xname}__{yname}"] = {
-                'x_name': xname, 'y_name': yname,
-                'x_values': xs.tolist(), 'y_values': ys.tolist(),
-                'x_ref': xref, 'y_ref': yref, 'x_err': xerr, 'y_err': yerr,
-                'n_sigma': n_sigma, 'npoints': npoints,
-                'sigma_levels': sigma_levels,
-                'fit_grid': fit_grid,
-            }
-            total_fits += npoints * npoints
-
+    print(f"\nLikelihood scan: {len(jobs)} fits including nominal")
     if dry_run:
-        print(f"\n[DRY RUN] Would generate {total_fits} fits total")
         return None
+    if fits_dir.exists() and any(fits_dir.iterdir()):
+        raise ValueError("likelihood runs/ already exists; generate in a fresh workspace")
 
-    # Write manifest for result collection
-    fits_dir.mkdir(parents=True, exist_ok=True)
-    manifest_file = fits_dir / "scan_manifest.json"
-    with open(manifest_file, 'w') as f:
-        json.dump(manifest, f, indent=2)
+    fit_dirs = []
+    for fit_name, fixed in jobs:
+        fit_dir = fits_dir / fit_name
+        create_fit_structure(
+            fit_dir, steering, "", config.datafiles,
+            template_dir=config.template_dir, dataset_root=dataset_root,
+            setup_env=setup_env, do_errors=config.do_errors_string,
+            xfitter_tree=config.xfitter_tree, xfitter_commit=config.xfitter_commit,
+        )
+        fit_parameters = deepcopy(parameters)
+        for name, value in fixed.items():
+            if name not in e_indices:
+                _set_pdf_parameter(fit_parameters, name, {'value': value, 'step': 0})
+        replacement = yaml.safe_dump({'Parameters': fit_parameters},
+                                    sort_keys=False, default_flow_style=None)
+        text = parameters_text[:block.start()] + replacement + parameters_text[block.end():]
+        commands = []
+        for source in systematics:
+            name = source['name']
+            if name not in e_indices:
+                continue
+            value = fixed.get(name, source.get('init'))
+            if value is not None:
+                commands.append(f"    set par {e_indices[name]} {value:.16g}\n")
+            if name in fixed:
+                commands.append(f"    fix {e_indices[name]}\n")
+        if commands:
+            text = text.replace('    call fcn 1\n',
+                                ''.join(commands) + '    call fcn 1\n', 1)
+        (fit_dir / 'config/parameters.yaml').write_text(text)
+        fit_dirs.append(fit_dir.resolve())
 
-    # Generate single-cluster batch submission
-    submit_script = generate_batch_submit(
-        fits_dir, all_fit_dirs, setup_env=setup_env,
-        xfitter_tree=config.xfitter_tree,
-        xfitter_commit=config.xfitter_commit,
+    (fits_dir / 'scan_manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+    return generate_batch_submit(
+        fits_dir, fit_dirs, setup_env=setup_env,
+        xfitter_tree=config.xfitter_tree, xfitter_commit=config.xfitter_commit,
         request_memory=str(config.get('request_memory', '2GB')),
     )
-
-    print(f"\nCreated {total_fits} fits in {fits_dir}")
-    print(f"Scan manifest: {manifest_file}")
-
-    return submit_script

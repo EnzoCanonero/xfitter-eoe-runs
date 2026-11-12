@@ -3,13 +3,10 @@ scan_type: likelihood-scan
 xfitter_tree: xfitter-master
 xfitter_commit: bd0470d93a433ebfb5d99f6c0fecda9c29141199
 template: hera-baseline
-reference_fit: "../../../../../../xfitter-eoe-runs-archive/legacy/cleanup-20261111/runs/fits/hera-baseline/baseline-7-sources-bartlett2-pumplin"
 epsilon: 0.6
 n_iterations: 2
 enable_bartlett: true
 q2_cut: 3.5
-
-scan_defaults: {n_sigma: 3, npoints: 21}
 
 dataset_root: ../../../../../datasets/hera/h1zeusCombined/inclusiveDis/1506.06042
 datafiles:
@@ -21,7 +18,7 @@ datafiles:
   - HERA1+2_CCep-thexp.dat
   - HERA1+2_CCem-thexp.dat
 
-# Keep this order aligned with ListOfSources in the canonical reference fit.
+# Source order also defines the MINUIT nuisance indices.
 systematics:
   - {name: sysHZComb1053, type: E, init: -16.4095}
   - {name: proc_tb21,     type: E, init: -6.3118}
@@ -31,27 +28,28 @@ systematics:
   - {name: sysHZComb1111, type: E, init: -2.5331}
   - {name: sysHZComb1113, type: E, init: 3.8119}
 
+# Manual example ranges; adjust them for the study.
 scan_params_1d:
-  - {name: Bg}
-  - {name: Cg}
-  - {name: Agp}
-  - {name: Bgp}
-  - {name: Buv}
-  - {name: Cuv}
-  - {name: Euv}
-  - {name: Bdv}
-  - {name: Cdv}
-  - {name: CUbar}
-  - {name: DUbar}
-  - {name: ADbar}
-  - {name: BDbar}
-  - {name: CDbar}
+  - {name: Bg, min: -0.4, max: 0.2, npoints: 21}
+  - {name: Cg, min: 3, max: 9, npoints: 21}
+  - {name: Agp, min: 0.01, max: 0.8, npoints: 21}
+  - {name: Bgp, min: -0.7, max: -0.1, npoints: 21}
+  - {name: Buv, min: 0.6, max: 1.0, npoints: 21}
+  - {name: Cuv, min: 3, max: 6, npoints: 21}
+  - {name: Euv, min: 3, max: 18, npoints: 21}
+  - {name: Bdv, min: 0.5, max: 1.5, npoints: 21}
+  - {name: Cdv, min: 2.5, max: 7, npoints: 21}
+  - {name: CUbar, min: 2, max: 12, npoints: 21}
+  - {name: DUbar, min: -2, max: 6, npoints: 21}
+  - {name: ADbar, min: 0.15, max: 0.45, npoints: 21}
+  - {name: BDbar, min: -0.2, max: -0.05, npoints: 21}
+  - {name: CDbar, min: 3, max: 16, npoints: 21}
 
 scan_systematics_1d:
-  - {name: sysHZComb1053}
-  - {name: proc_tb21}
-  - {name: sysHZComb1064}
-  - {name: sysHZComb1114}
-  - {name: sysHZComb1144}
-  - {name: sysHZComb1111}
-  - {name: sysHZComb1113}
+  - {name: sysHZComb1053, min: -22, max: -10, npoints: 21}
+  - {name: proc_tb21, min: -10, max: -2, npoints: 21}
+  - {name: sysHZComb1064, min: 4, max: 16, npoints: 21}
+  - {name: sysHZComb1114, min: 0, max: 8, npoints: 21}
+  - {name: sysHZComb1144, min: 0, max: 8, npoints: 21}
+  - {name: sysHZComb1111, min: -6, max: 2, npoints: 21}
+  - {name: sysHZComb1113, min: 0, max: 8, npoints: 21}

@@ -3,12 +3,9 @@ scan_type: likelihood-scan
 xfitter_tree: xfitter-master
 xfitter_commit: bd0470d93a433ebfb5d99f6c0fecda9c29141199
 template: hera-baseline
-reference_fit: "../../../../../../xfitter-eoe-runs-archive/legacy/cleanup-20261111/runs/fits/hera-baseline/nominal-bartlett2-pumplin"
 n_iterations: 2
 enable_bartlett: true
 q2_cut: 3.5
-
-scan_defaults: {n_sigma: 3, npoints: 31}
 
 dataset_root: ../../../../../datasets/hera/h1zeusCombined/inclusiveDis/1506.06042
 datafiles:
@@ -22,18 +19,19 @@ datafiles:
 
 systematics: []
 
+# Manual example ranges; adjust them for the study.
 scan_params_1d:
-  - {name: ADbar}
-  - {name: Agp}
-  - {name: BDbar}
-  - {name: Bdv}
-  - {name: Bg}
-  - {name: Bgp}
-  - {name: Buv}
-  - {name: CDbar}
-  - {name: CUbar}
-  - {name: Cdv}
-  - {name: Cg}
-  - {name: Cuv}
-  - {name: DUbar}
-  - {name: Euv}
+  - {name: ADbar, min: 0.15, max: 0.45, npoints: 31}
+  - {name: Agp, min: 0.01, max: 0.8, npoints: 31}
+  - {name: BDbar, min: -0.2, max: -0.05, npoints: 31}
+  - {name: Bdv, min: 0.5, max: 1.5, npoints: 31}
+  - {name: Bg, min: -0.4, max: 0.2, npoints: 31}
+  - {name: Bgp, min: -0.7, max: -0.1, npoints: 31}
+  - {name: Buv, min: 0.6, max: 1.0, npoints: 31}
+  - {name: CDbar, min: 3, max: 16, npoints: 31}
+  - {name: CUbar, min: 2, max: 12, npoints: 31}
+  - {name: Cdv, min: 2.5, max: 7, npoints: 31}
+  - {name: Cg, min: 3, max: 9, npoints: 31}
+  - {name: Cuv, min: 3, max: 6, npoints: 31}
+  - {name: DUbar, min: -2, max: 6, npoints: 31}
+  - {name: Euv, min: 3, max: 18, npoints: 31}

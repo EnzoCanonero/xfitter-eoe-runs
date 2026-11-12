@@ -66,17 +66,17 @@ def plot_scan(run_dir: Path, template_root: Path):
         if results.get('scan_1d'):
             scan_rows = []
             for param_name, pdata in results['scan_1d'].items():
-                for sv, chi2, dchi2, conv in zip(
+                for sv, chi2, dchi2, conv, status in zip(
                         pdata['scan_values'], pdata['chi2'],
-                        pdata['delta_chi2'], pdata['converged']):
+                        pdata['delta_chi2'], pdata['converged'], pdata['status']):
                     scan_rows.append({
                         'parameter': param_name,
                         'scan_value': float(sv),
                         'chi2': float(chi2) if not np.isnan(chi2) else None,
                         'delta_chi2': float(dchi2) if not np.isnan(dchi2) else None,
                         'converged': bool(conv),
-                        'ref_value': pdata['value_at_minimum'],
-                        'ref_error': pdata['error'],
+                        'status': status,
+                        'nominal_chi2': results['nominal_chi2'],
                     })
             profiles_file = results_dir / "profiles_1d.csv"
             pd.DataFrame(scan_rows).to_csv(profiles_file, index=False)
@@ -95,7 +95,8 @@ def plot_scan(run_dir: Path, template_root: Path):
                             'chi2': float(pdata['chi2'][i, j]) if np.isfinite(pdata['chi2'][i, j]) else None,
                             'delta_chi2': float(pdata['delta_chi2'][i, j]) if np.isfinite(pdata['delta_chi2'][i, j]) else None,
                             'converged': bool(pdata['converged'][i, j]),
-                            'status': str(pdata.get('status', np.full_like(pdata['converged'], 'unknown', dtype=object))[i, j]),
+                            'status': str(pdata['status'][i, j]),
+                            'nominal_chi2': results['nominal_chi2'],
                         })
             grids_file = results_dir / "grids_2d.csv"
             pd.DataFrame(grid_rows).to_csv(grids_file, index=False)
@@ -861,93 +862,26 @@ def _plot_chi2_lollipop(chi2_df, nominal_chi2, plots_dir, config_order):
 
 
 def _plot_likelihood_scan(results: dict, plots_dir: Path, results_dir: Path):
-    """
-    Generate profile likelihood plots for a likelihood-scan workspace.
-
-    Produces one file:
-      profiles_1d.pdf  — one page per parameter: Δχ² profile + Gaussian reference
-
-    Non-converged points are silently discarded; a terminal message lists them.
-    Δχ² is normalized to the central scan point (closest scan value to ref_val).
-    """
-    scan_1d = results['scan_1d']
-    param_names = list(scan_1d.keys())
-    print(f"\nGenerating likelihood-scan plots ({len(param_names)} parameters)...")
-
-    _BLUE = '#1f77b4'
-    _RED  = '#d62728'
-    _GREY = '#999999'
-
-    profiles_pdf = plots_dir / "profiles_1d.pdf"
-    with PdfPages(profiles_pdf) as pdf:
-        for param_name in param_names:
-            pdata = scan_1d[param_name]
-            x = pdata['scan_values']
-            dchi2 = pdata['delta_chi2']
-            conv = pdata['converged']
-            ref_val = pdata['value_at_minimum']
-            ref_err = pdata['error']
-
-            n_fail = int((~conv).sum())
-            if n_fail:
-                print(f"  {param_name}: discarding {n_fail} non-converged point(s)")
-
-            # Only converged points
-            x_ok    = x[conv]
-            dchi2_ok = dchi2[conv]
-
-            # Parabolic reference over the full scan range
-            x_dense = np.linspace(x[0], x[-1], 300)
-            gauss_ref = ((x_dense - ref_val) / ref_err) ** 2
-
+    """Plot converged profiles relative to the nominal fit."""
+    with PdfPages(plots_dir / 'profiles_1d.pdf') as pdf:
+        for name, data in results['scan_1d'].items():
+            valid = data['converged'] & np.isfinite(data['delta_chi2'])
+            y = np.where(valid, data['delta_chi2'], np.nan)
             fig, ax = plt.subplots(figsize=(8, 5))
-
-            for level, style, label in [(1.0, '--', r'$\Delta\chi^2=1$ (1$\sigma$)'),
-                                         (4.0, ':',  r'$\Delta\chi^2=4$ (2$\sigma$)'),
-                                         (9.0, '-.',  r'$\Delta\chi^2=9$ (3$\sigma$)')]:
-                ax.axhline(level, color=_GREY, linewidth=0.8, linestyle=style, label=label)
-
-            ax.plot(x_dense, gauss_ref, color=_RED, linewidth=1.2, linestyle='--',
-                    label='Parabolic reference')
-
-            if len(x_ok):
-                ax.plot(x_ok, dchi2_ok, 'o-', color=_BLUE, linewidth=1.5,
-                        markersize=5, zorder=3)
-
-            ax.axvline(ref_val, color='black', linewidth=0.8, linestyle=':',
-                       label=f'ref = {ref_val:.4g}')
-
-            # y-axis: derived from converged data; cap top at 12
-            dchi2_finite = dchi2_ok[np.isfinite(dchi2_ok)]
-            ymax = min(float(np.nanmax(dchi2_finite)) * 1.1, 12.0) if len(dchi2_finite) else 12.0
-            ymax = max(ymax, 10.0)
-            ymin_data = float(np.nanmin(dchi2_finite)) if len(dchi2_finite) else 0.0
-            ymin = min(ymin_data, 0.0) - 0.3
-            ax.set_ylim(ymin, ymax)
-
-            ax.set_xlabel(param_name, fontsize=13)
-            ax.set_ylabel(r'$\Delta\chi^2$', fontsize=13)
-            ax.set_title(param_name, fontsize=14)
-            ax.legend(fontsize=9, loc='upper center', framealpha=0.9, ncol=2)
+            ax.plot(data['scan_values'], y, 'o-', markersize=5)
+            for level in (0, 1, 4, 9):
+                ax.axhline(level, color='grey', linewidth=0.8, linestyle=':')
+            ax.set_xlabel(name)
+            ax.set_ylabel(r'$\chi^2 - \chi^2_{\mathrm{nominal}}$')
+            ax.set_title(name)
             ax.grid(True, alpha=0.25)
-            plt.tight_layout()
+            fig.tight_layout()
             pdf.savefig(fig)
             plt.close(fig)
-
-    print(f"  ✓ profiles_1d.pdf  ({len(param_names)} pages)")
-
-
-def _sigma_to_dchi2_2dof(n_sigma: float) -> float:
-    """Δχ² threshold for an n-sigma 2-parameter joint confidence region.
-
-    Coverage P = erf(n/√2); for 2 dof, Δχ² = -2·ln(1 - P)
-    → 1σ=2.30, 2σ=6.18, 3σ=11.83.
-    """
-    p = math.erf(n_sigma / math.sqrt(2.0))
-    return -2.0 * math.log(1.0 - p)
+    print("  ✓ profiles_1d.pdf")
 
 
-def _fit_quadratic_pull_surface(x, y, z):
+def _fit_quadratic_surface(x, y, z):
     """Fit z = c0 + cx*x + cy*y + cxx*x² + cxy*x*y + cyy*y²."""
     if len(z) < 6:
         return None
@@ -981,11 +915,6 @@ def _fit_quadratic_pull_surface(x, y, z):
     }
 
 
-def _eval_quadratic_pull_surface(coeff, x, y):
-    return (coeff[0] + coeff[1] * x + coeff[2] * y +
-            coeff[3] * x * x + coeff[4] * x * y + coeff[5] * y * y)
-
-
 def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
     """2D likelihood diagnostics as status maps and 1D slice profiles.
 
@@ -1001,15 +930,15 @@ def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
     profiles_pdf = plots_dir / "likelihood_2d_profiles.pdf"
     summary_lines = [
         "# 2D likelihood quadratic-fit summary",
-        "# Coordinates are normalized pulls: (parameter - reference) / sigma.",
-        "# Delta chi2 is normalized to the reference grid point, not the grid minimum.",
+        "# Coordinates are the configured parameter values.",
+        "# Delta chi2 is relative to the nominal fit.",
         "# Quadratic fits use converged finite points with Delta chi2 <= 10; if fewer",
         "# than 12 points pass that cut, all converged finite points are used.",
         "",
         (
             "pair total converged call_limit failed other fit_points "
             "rho condition flat_angle_deg residual_rms residual_max_abs "
-            "lambda_min lambda_max chi2_ref"
+            "lambda_min lambda_max nominal_chi2"
         ),
     ]
 
@@ -1020,33 +949,9 @@ def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
         ys = np.asarray(d['y_values'], dtype=float)
         dchi2 = np.asarray(d['delta_chi2'], dtype=float)
         conv = np.asarray(d['converged'], dtype=bool)
-        status = np.asarray(
-            d.get('status', np.where(conv, 'converged', 'unknown')),
-            dtype=object,
-        ).astype(str)
+        status = np.asarray(d['status']).astype(str)
 
         X, Y = np.meshgrid(xs, ys, indexing='ij')
-        x_ref = d.get('x_ref')
-        y_ref = d.get('y_ref')
-        x_err = d.get('x_err')
-        y_err = d.get('y_err')
-        normalized_axes = all(v is not None for v in (x_ref, y_ref, x_err, y_err))
-        if normalized_axes:
-            x_ref = float(x_ref)
-            y_ref = float(y_ref)
-            x_err = float(x_err)
-            y_err = float(y_err)
-            normalized_axes = x_err > 0.0 and y_err > 0.0
-
-        if normalized_axes:
-            Xfit = (X - x_ref) / x_err
-            Yfit = (Y - y_ref) / y_err
-        else:
-            Xfit, Yfit = X, Y
-            x_ref = y_ref = None
-
-        # Plot in raw parameter coordinates; keep pull coordinates only for the
-        # quadratic summary so users can read the axes directly.
         Xp, Yp = X, Y
         x_label = f"{d['x_name']} value"
         y_label = f"{d['y_name']} value"
@@ -1068,15 +973,15 @@ def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
             fit_mask = conv_mask
         fit_result = None
         if int(fit_mask.sum()) >= 6:
-            fit_result = _fit_quadratic_pull_surface(
-                Xfit[fit_mask], Yfit[fit_mask], dchi2[fit_mask],
+            fit_result = _fit_quadratic_surface(
+                X[fit_mask], Y[fit_mask], dchi2[fit_mask],
             )
 
-        chi2_ref = d.get('chi2_reference', np.nan)
+        nominal_chi2 = results['nominal_chi2']
         if fit_result is None:
             summary_lines.append(
                 f"{pair_key} {n_total} {n_conv} {n_call} {n_fail} {n_other} "
-                f"0 nan nan nan nan nan nan nan {chi2_ref:.8g}"
+                f"0 nan nan nan nan nan nan nan {nominal_chi2:.8g}"
             )
         else:
             summary_lines.append(
@@ -1085,14 +990,13 @@ def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
                 f"{fit_result['condition']:.8g} {fit_result['angle']:.8g} "
                 f"{fit_result['rms']:.8g} {fit_result['max_abs']:.8g} "
                 f"{fit_result['eigvals'][0]:.8g} {fit_result['eigvals'][-1]:.8g} "
-                f"{chi2_ref:.8g}"
+                f"{nominal_chi2:.8g}"
             )
 
         conv_values = dchi2[conv_mask]
         if conv_values.size:
-            y_low = min(0.0, float(np.nanpercentile(conv_values, 1.0)))
-            y_high = float(np.nanpercentile(conv_values, 98.0))
-            y_high = max(4.0, min(80.0, y_high))
+            y_low = min(0.0, float(np.min(conv_values)))
+            y_high = max(4.0, float(np.max(conv_values)))
             if y_high <= y_low:
                 y_high = y_low + 4.0
         else:
@@ -1104,8 +1008,6 @@ def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
             'pair_key': pair_key,
             'd': d,
             'Xp': Xp, 'Yp': Yp, 'dchi2': dchi2,
-            'x_ref': x_ref,
-            'y_ref': y_ref,
             'conv_mask': conv_mask,
             'call_mask': call_mask,
             'failed_mask': failed_mask,
@@ -1139,9 +1041,6 @@ def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
                         kwargs.update({'edgecolors': 'black', 'linewidths': 0.25,
                                        'color': color})
                     ax.scatter(p['Xp'][mask], p['Yp'][mask], **kwargs)
-            if p['x_ref'] is not None and p['y_ref'] is not None:
-                ax.plot(p['x_ref'], p['y_ref'], marker='+', color='black', ms=13, mew=1.8,
-                        label='reference')
             ax.set_xlabel(p['x_label'])
             ax.set_ylabel(p['y_label'])
             ax.set_title(
@@ -1190,11 +1089,9 @@ def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
             sm.set_array([])
             fig.colorbar(sm, ax=ax_y, fraction=0.046, pad=0.04,
                          label=f"fixed {d['x_name']} value")
-            if p['y_ref'] is not None:
-                ax_y.axvline(p['y_ref'], color='#555555', lw=0.8, ls=':')
             ax_y.axhline(0, color='#555555', lw=0.8, ls=':')
             ax_y.set_xlabel(p['y_label'])
-            ax_y.set_ylabel(r'$\Delta\chi^2$')
+            ax_y.set_ylabel(r'$\chi^2 - \chi^2_{\mathrm{nominal}}$')
             ax_y.set_ylim(*p['y_limits'])
             ax_y.set_title(f"Fixed {d['x_name']}; scan {d['y_name']}")
             ax_y.grid(True, alpha=0.22)
@@ -1218,18 +1115,16 @@ def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
             sm.set_array([])
             fig.colorbar(sm, ax=ax_x, fraction=0.046, pad=0.04,
                          label=f"fixed {d['y_name']} value")
-            if p['x_ref'] is not None:
-                ax_x.axvline(p['x_ref'], color='#555555', lw=0.8, ls=':')
             ax_x.axhline(0, color='#555555', lw=0.8, ls=':')
             ax_x.set_xlabel(p['x_label'])
-            ax_x.set_ylabel(r'$\Delta\chi^2$')
+            ax_x.set_ylabel(r'$\chi^2 - \chi^2_{\mathrm{nominal}}$')
             ax_x.set_ylim(*p['y_limits'])
             ax_x.set_title(f"Fixed {d['y_name']}; scan {d['x_name']}")
             ax_x.grid(True, alpha=0.22)
 
             fig.suptitle(
                 f"{d['x_name']} vs {d['y_name']}: converged profile slices only\n"
-                f"Reference point is treated as the minimum; y-range uses the converged 1-98% band",
+                "Delta chi2 relative to the nominal fit",
                 fontsize=12,
             )
             fig.tight_layout(rect=[0, 0, 1, 0.90])
@@ -1239,11 +1134,6 @@ def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
     summary_path = results_dir / "quadratic_fit_summary.txt"
     summary_path.write_text("\n".join(summary_lines) + "\n")
 
-    for stale_name in ("contours_2d.pdf", "likelihood_2d_3d.pdf",
-                       "likelihood_2d_diagnostics.pdf"):
-        stale = plots_dir / stale_name
-        if stale.exists():
-            stale.unlink()
     print(f"  ✓ likelihood_2d_convergence.pdf")
     print(f"  ✓ likelihood_2d_profiles.pdf")
     print(f"  ✓ {summary_path}")

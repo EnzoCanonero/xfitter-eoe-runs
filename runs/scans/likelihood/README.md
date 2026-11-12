@@ -1,111 +1,89 @@
 # Profile-likelihood scans
 
 [Repository](../../../README.md) · [Installation](../../../docs/installation.md) ·
-[HERA study](../../../docs/hera-study.md) ·
-[HERA examples](../../../docs/hera-scans.md#likelihood-profiles) ·
-[Paper reproduction](../../../docs/reproducing-paper.md)
+[HERA examples](../../../docs/hera-scans.md#likelihood-profiles)
 
-`scan_type: likelihood-scan` fixes one parameter, or a pair of parameters, on a
-grid and reoptimizes the remaining free parameters. The reference fit supplies
-starting values, errors and nuisance-parameter identities. The resulting
-profiles describe departures from a quadratic approximation.
+`scan_type: likelihood-scan` generates a nominal fit and a manual 1D or 2D
+grid. At each grid point it fixes the selected parameters and refits the rest.
+All fits use the same template, data, source settings and starting values.
+No previous fit output is needed, including for a dry run.
 
-## Configuration and reference inputs
+## Configuration
 
-Create a `config.yaml` in a workspace under `runs/scans/`.
+Create `config.yaml` under `runs/scans/`. Use the usual `template`,
+`dataset_root`, `datafiles`, `systematics`, `epsilon`, runtime and Condor settings.
+PDF starting values and steps come from the template; `parameter_overrides`
+changes them for every fit. E-type source starts use `systematics[].init`.
 
-| Field | Meaning |
-| --- | --- |
-| `scan_type` | `likelihood-scan` |
-| `template`, `datafiles` | Named root template and dataset filenames for generated fits |
-| `dataset_root` | Dataset directory, relative to the directory containing `config.yaml`; absolute and `~` paths also work |
-| `reference_fit` | Reference fit root, resolved relative to the scan workspace |
-| `systematics`, `epsilon` | Source declarations and default EoE strength; entries can supply their own strength and initial value |
-| `scan_defaults` | 1D defaults `n_sigma`, `npoints`; 2D defaults `n_sigma_2d`, `npoints_2d` |
-| `scan_params_1d` | PDF parameter entries with `name`; optional `n_sigma`, `npoints`, or explicit `min` and `max` |
-| `scan_systematics_1d` | Same grid fields for declared E-type nuisance parameters |
-| `scan_params_2d` | Entries with `pair: [xName, yName]`; optional `n_sigma`, `npoints`, `x_range`, `y_range` |
-| `parameter_overrides` | Optional PDF starting-value/step overrides by parameter name |
-| `n_iterations`, `enable_bartlett`, `q2_cut`, `doErrors` | Steering and error-calculation options |
-| `xfitter_tree`, `xfitter_commit`, `request_memory` | Worker build selection and Condor memory |
-
-At least one scan list is required. By default, each axis spans the reference
-value ± `n_sigma` times its reference error. A 2D entry generates an
-`npoints × npoints` grid, fixing both axes while profiling other parameters.
-When `n_sigma_2d` is omitted, the 2D range is derived from the optional
-`sigma_levels` list (default `[1, 2, 3]`).
-
-Even a dry run reads `reference_fit/output/minuit.out.txt`. Retain the reference
-`config/steering.txt` for the authoritative E-source order: MINUIT truncates
-names, so the generator uses parameter indices and that declaration order to
-identify nuisances. The configured E-source set must agree with the reference.
-Changing the reference changes the study and its grid.
-
-The template supplies steering, parameters, constants and weights.
-`scripts/run-scan` copies `datafiles` from the configured `dataset_root`.
-The library `run_scan` uses that root when its `dataset_root` argument is
-`None`; an explicit path overrides it. See
-[installation](../../../docs/installation.md#datasets-and-custom-studies) for
-a path example. Parameter updates expect inline `[value, step]` entries,
-with a special case for the bundled `CDbar` mapping; arbitrary mapping-style
-parameter definitions may need an adapter change.
-
-## Commands
-
-Set `workspace` to **your existing scan directory** under `runs/scans/`, with
-its reference outputs available. These are command templates; concrete
-configurations are in the [HERA examples](../../../docs/hera-scans.md#likelihood-profiles).
-Run from the repository root after installation.
-
-Preview reference parameters, ranges and fit counts:
-
-```bash
-python scripts/run-scan --dry-run "${workspace:?Set workspace to your scan directory}"
+```yaml
+scan_type: likelihood-scan
+template: hera-baseline
+dataset_root: /path/to/datasets
+datafiles: [sample.dat]
+epsilon: 0.6
+systematics:
+  - {name: calibration, type: E, init: 0.0}
+parameter_overrides:
+  Bg: {value: -0.06, step: 0.02}
+scan_params_1d:
+  - {name: Bg, min: -0.3, max: 0.2, npoints: 31}
+scan_systematics_1d:
+  - {name: calibration, min: -2, max: 2, npoints: 21}
+scan_params_2d:
+  - pair: [Bg, calibration]
+    x_range: [-0.3, 0.2]
+    y_range: [-2, 2]
+    npoints: [21, 15]
 ```
 
-Generate inputs and the manifest without submitting:
+Replace the sample data and source names with your study's inputs. Supply at
+least one scan list. Each 1D entry requires `min`, `max`, `npoints`; each 2D
+entry requires `x_range`, `y_range` and `[nx, ny]` point counts. Bounds are
+inclusive and grids are evenly spaced. PDF parameters must be free in the
+nominal configuration; E-type parameters must be declared in `systematics`.
+Their MINUIT indices follow the generated parameter and source declarations.
+
+The parameter template can use numeric lists or value/step mappings, with
+optional bounds. Dependent parameters cannot be scanned directly. E-source
+commands are inserted before `call fcn 1` in the template's MINUIT commands.
+`reference_fit`, `scan_defaults` and `n_sigma` are no longer supported.
+
+## Run
+
+From the repository root, with `workspace` set to your scan directory:
 
 ```bash
-python scripts/run-scan --no-submit "${workspace:?Set workspace to your scan directory}"
+python scripts/run-scan --dry-run "$workspace"
+python scripts/run-scan --no-submit "$workspace"
+bash "$workspace/runs/submit.sh"
+# After the fits finish:
+scripts/plot-scan "$workspace"
 ```
 
-Submit the generated batch:
+Generation creates `runs/nominal/`, the grid fits, `runs/scan_manifest.json`
+and the batch scripts. The nominal has no scan constraints and runs in the
+same batch as the grid. Total jobs are **1 + all requested grid points**.
+Generation requires an empty `runs/`; use a fresh workspace when changing a
+study. Existing completed runs only need the plotting command. Old manifests
+must be regenerated with the new configuration.
 
-```bash
-bash "${workspace:?Set workspace to your scan directory}/runs/submit.sh"
+## Results
+
+Extraction reads each fit's `output/Results.txt` and `output/minuit.out.txt`.
+The nominal must have a finite raw minimized χ² and converged MIGRAD:
+
+```text
+delta_chi2 = chi2(point) - chi2(nominal)
 ```
 
-After fitting, extract profiles and plot:
+This applies to every 1D and 2D point. There is no subtraction of a grid minimum
+or central point, and no Bartlett correction. Negative differences are kept
+and reported: check the nominal minimization if a converged point is lower.
+Missing or failed points remain visible in CSV status fields and are excluded
+from the profile curves. Axes use the configured parameter values.
 
-```bash
-scripts/plot-scan "${workspace:?Set workspace to your scan directory}"
-```
-
-Generation writes the workspace's `runs/` tree. Use a separate workspace for a
-changed reference/grid. Existing results need only the plotting command;
-omitting both generation flags generates and submits immediately.
-
-## Outputs and interpretation
-
-| Output within the workspace | Contents |
-| --- | --- |
-| `runs/scan_manifest.json` | Reference information, grid coordinates and fit names |
-| `runs/1d_<parameter>_<index>/`, `runs/2d_<x>_<y>_<i>_<j>/` | Individual fixed-parameter fits |
-| `runs/batch/fit_dirs.txt`, `runs/batch/batch.log` | Generated inventory and submitted Condor events |
-| `results/profiles_1d.csv`, `plots/profiles_1d.pdf` | 1D profiles and convergence flags, when requested |
-| `results/grids_2d.csv` | 2D point statistics and status, when requested |
-| `plots/likelihood_2d_convergence.pdf`, `plots/likelihood_2d_profiles.pdf` | 2D convergence and profile-slice diagnostics |
-| `results/quadratic_fit_summary.txt` | 2D quadratic diagnostic summary |
-
-The 1D Δχ² uses raw minimized χ², not the Bartlett-corrected goodness-of-fit
-statistic used in source rankings. It is normalized to the scan point closest
-to the reference value; if that point has no finite χ², extraction falls back
-to the lowest available finite value. The plot does not apply an additional
-confidence-interval Bartlett correction.
-
-Check the manifest against every requested parameter and grid size: missing
-reference parameters can be skipped during generation. Inspect missing χ² and
-`converged` flags in the CSVs; 1D plots omit points marked non-converged. Review
-the central point and questionable fits in raw `Results.txt` and
-`minuit.out.txt` before drawing conclusions. A smooth curve with omitted points
-does not establish grid completeness or validate interval coverage.
+Outputs are `results/profiles_1d.csv`, `plots/profiles_1d.pdf`,
+`results/grids_2d.csv`, `plots/likelihood_2d_convergence.pdf` and
+`plots/likelihood_2d_profiles.pdf`, as requested. CSVs include `nominal_chi2`.
+The 2D `results/quadratic_fit_summary.txt` uses raw parameter coordinates.
+Check grid coverage and convergence before interpreting intervals.
