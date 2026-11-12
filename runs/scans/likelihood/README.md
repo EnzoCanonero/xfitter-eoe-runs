@@ -1,25 +1,17 @@
-# Profile-likelihood scans
+# Likelihood profiles
 
-[Repository](../../../README.md) · [Installation](../../../docs/installation.md) ·
-[HERA examples](../../../docs/hera-scans.md#likelihood-profiles)
+[Workflows](../../README.md) · [Installation](../../../docs/installation.md)
 
-`scan_type: likelihood-scan` generates a nominal fit and a manual 1D or 2D
-grid. At each grid point it fixes the selected parameters and refits the rest.
-All fits use the same template, data, source settings and starting values.
-No previous fit output is needed, including for a dry run.
+Generate a nominal fit and a manual 1D or 2D grid. Each grid point fixes the
+selected parameters and refits the rest. No previous fit output is needed.
 
 ## Configuration
 
-Create `config.yaml` under `runs/scans/`. Use the usual `template`,
-`dataset_root`, `datafiles`, `systematics`, `epsilon`, runtime and Condor settings.
-PDF starting values and steps come from the template; `parameter_overrides`
-changes them for every fit. E-type source starts use `systematics[].init`.
+Create `config.yaml` under `runs/scans/likelihood/my-study/`. Add the
+[shared inputs](../../README.md#shared-scan-configuration) and these fields:
 
 ```yaml
 scan_type: likelihood-scan
-template: hera-baseline
-dataset_root: /path/to/datasets
-datafiles: [sample.dat]
 epsilon: 0.6
 systematics:
   - {name: calibration, type: E, init: 0.0}
@@ -36,54 +28,39 @@ scan_params_2d:
     npoints: [21, 15]
 ```
 
-Replace the sample data and source names with your study's inputs. Supply at
-least one scan list. Each 1D entry requires `min`, `max`, `npoints`; each 2D
-entry requires `x_range`, `y_range` and `[nx, ny]` point counts. Bounds are
-inclusive and grids are evenly spaced. PDF parameters must be free in the
-nominal configuration; E-type parameters must be declared in `systematics`.
-Their MINUIT indices follow the generated parameter and source declarations.
+Replace names and ranges for your study; keep at least one scan list.
+[Complete HERA example](herapdf20-nnlo-rtopt/eoe-selected/config.yaml).
 
-The parameter template can use numeric lists or value/step mappings, with
-optional bounds. Dependent parameters cannot be scanned directly. E-source
-commands are inserted before `call fcn 1` in the template's MINUIT commands.
-`reference_fit`, `scan_defaults` and `n_sigma` are no longer supported.
+- Grids are evenly spaced, including both bounds. PDF parameters must be free
+  in the nominal fit; E-type nuisances must be declared in `systematics`.
+- PDF starts come from the template; optional `parameter_overrides` changes
+  values and steps. Source starts use `init`. These settings apply to all fits.
 
 ## Run
 
-From the repository root, with `workspace` set to your scan directory:
+From the repository root, after creating the configuration:
 
 ```bash
-python scripts/run-scan --dry-run "$workspace"
-python scripts/run-scan --no-submit "$workspace"
-bash "$workspace/runs/submit.sh"
+workspace=runs/scans/likelihood/my-study
+python scripts/run-scan --dry-run "$workspace"    # preview
+python scripts/run-scan --no-submit "$workspace"  # generate
+bash "$workspace/runs/submit.sh"                  # submit
 # After the fits finish:
 scripts/plot-scan "$workspace"
 ```
 
-Generation creates `runs/nominal/`, the grid fits, `runs/scan_manifest.json`
-and the batch scripts. The nominal has no scan constraints and runs in the
-same batch as the grid. Total jobs are **1 + all requested grid points**.
-Generation requires an empty `runs/`; use a fresh workspace when changing a
-study. Existing completed runs only need the plotting command. Old manifests
-must be regenerated with the new configuration.
+The batch contains `runs/nominal/` plus all grid points. Generation requires
+an empty `runs/`; use a new workspace when changing the scan.
 
-## Results
+## Outputs and reference
 
-Extraction reads each fit's `output/Results.txt` and `output/minuit.out.txt`.
-The nominal must have a finite raw minimized χ² and converged MIGRAD:
+**Δχ² = χ²(point) − χ²(nominal)** for every 1D and 2D point, using raw χ²
+without Bartlett correction. The reference is always the nominal fit, never
+the lowest scan point. The nominal must converge; negative differences are
+retained and reported. Failed points are flagged in CSVs and excluded from curves.
 
-```text
-delta_chi2 = chi2(point) - chi2(nominal)
-```
+- `results/profiles_1d.csv`, `plots/profiles_1d.pdf`: 1D profiles.
+- `results/grids_2d.csv`, `plots/likelihood_2d_profiles.pdf`: 2D profiles.
+- `plots/likelihood_2d_convergence.pdf`: 2D fit status.
 
-This applies to every 1D and 2D point. There is no subtraction of a grid minimum
-or central point, and no Bartlett correction. Negative differences are kept
-and reported: check the nominal minimization if a converged point is lower.
-Missing or failed points remain visible in CSV status fields and are excluded
-from the profile curves. Axes use the configured parameter values.
-
-Outputs are `results/profiles_1d.csv`, `plots/profiles_1d.pdf`,
-`results/grids_2d.csv`, `plots/likelihood_2d_convergence.pdf` and
-`plots/likelihood_2d_profiles.pdf`, as requested. CSVs include `nominal_chi2`.
-The 2D `results/quadratic_fit_summary.txt` uses raw parameter coordinates.
-Check grid coverage and convergence before interpreting intervals.
+Both CSVs include `nominal_chi2`.

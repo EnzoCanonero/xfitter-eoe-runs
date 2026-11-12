@@ -1,12 +1,9 @@
 # Installation and environment
 
-[Project overview](../README.md) · [Study catalog](../runs/README.md) ·
-[Fit workspaces](../runs/fits/README.md) · [HERA study](hera-study.md)
+[Repository](../README.md) · [Workflow guides](../runs/README.md) ·
+[Fit workspaces](../runs/fits/README.md) · [HERA and paper figures](hera-study.md)
 
-Prepare the Python environment to inspect configurations and preview jobs.
-Prepare the scientific runtime before executing fits or plotting results that
-need compiled libraries. Commands below run in Bash from the repository root
-unless stated otherwise.
+Run the commands below in Bash from the repository root.
 
 ## Get the documented checkout
 
@@ -19,9 +16,7 @@ git clone --branch compat/errors-on-errors-20260903 \
 cd xfitter-eoe-runs
 ```
 
-For batch execution, place the checkout on a filesystem visible at the same
-path on the submission host and worker nodes. A clone includes tracked study
-inputs and tools, but no fit outputs, extracted results or plots.
+The checkout includes configurations and tools, but no fit outputs or plots.
 
 ## Python installation
 
@@ -49,159 +44,61 @@ Invoke scans as `python scripts/run-scan`: executing `scripts/run-scan` directly
 selects `/usr/bin/python3`, which may differ from the activated environment.
 For an existing scan configuration, `--dry-run` previews generation without
 writing files. Likelihood scans also prepare their own nominal fit and need
-no previous fit outputs. The [HERA study](hera-study.md) provides a
+no previous fit outputs. The [HERA guide](hera-study.md) provides a
 concrete eight-fit preview using the bundled inputs.
 
-## Scientific runtime
+## xFitter installation
 
-The Python package does not install xFitter, HTCondor, ROOT, LHAPDF or theory
-libraries. Use an xFitter build with the reactions and statistical features
-required by your configuration. The repository supplies no xFitter binaries or
-automated dependency build.
+Follow the official [xFitter installation guide](https://gitlab.cern.ch/fitters/xfitter/-/wikis/Installation-script)
+for xFitter and its theory dependencies. Use a build with the errors-on-errors
+features required by your study.
 
-The supplied execution environment assumes Linux, CERN CVMFS and a shared
-filesystem. Condor descriptors use `should_transfer_files = NO`: the checkout,
-inputs and scientific installation must be accessible on worker nodes.
+## Environment setup
 
-| Task | Additional requirements |
-| --- | --- |
-| Execute fits and scans | Built xFitter, the dependencies of the selected theory setup, HTCondor |
-| Extract and plot scans | Completed scan outputs; Python plotting dependencies |
-| Compare PDFs | Completed fit grids or PDF sets; Python LHAPDF bindings |
-| Plot cross sections | Fit `fittedresults.txt` files, `xfitter-draw`, ROOT, Ghostscript, pdfLaTeX |
-
-### Choose an installation and worktree
-
-Edit the checkout's [`.env`](../.env). Its shipped paths describe the original
-execution site; replace them with the shared paths of your installation. For
-example, an installation could have this layout:
-
-```text
-/shared/xfitter/
-├── setup.sh
-├── deps/
-└── builds/
-    └── study-build/
-        ├── .git
-        ├── bin/xfitter
-        └── lib/
-```
-
-The corresponding `.env` entries are below. Replace the commit placeholder
-with the full lowercase 40-character revision you intend to use:
+Edit [`.env`](../.env) to match your installation, for example:
 
 ```bash
 XFITTER_ROOT=/shared/xfitter
 XFITTER_SETUP_ROOT=/shared/xfitter
-XFITTER_TREE=builds/study-build
-XFITTER_COMMIT="<full lowercase 40-character commit>"
+XFITTER_TREE=xfitter-master
+XFITTER_COMMIT=
 ```
 
-`XFITTER_ROOT` contains the build trees. `XFITTER_SETUP_ROOT` contains the
-installation's `setup.sh` and defaults to `XFITTER_ROOT` when unset.
-`XFITTER_TREE` is a build-directory path, relative to `XFITTER_ROOT` or
-absolute; it is not a branch name. The directory must already contain a built
-`bin/xfitter`. Record the required revision with the study; setting a pin
-checks an existing build and does not check out or compile it.
+`XFITTER_SETUP_ROOT` contains the installer's `setup.sh`. `XFITTER_TREE` is the
+built directory under `XFITTER_ROOT` (or an absolute path), containing
+`bin/xfitter`. Leave `XFITTER_COMMIT` empty, or set it to the full 40-character
+Git commit to require that revision. Study configurations and generated workers
+can override the selected build.
 
-A study can also select its build in `config.yaml` or the worker text generated
-by `condor/submit.sh`. Those explicit selections take precedence over `.env`.
-If you locate a required build elsewhere, adapt its directory selection while
-preserving the intended revision. The tested HERA build and additional theory
-dependencies are documented separately in [HERA fits](hera-fits.md).
-
-### Activate and check the runtime
-
-In a new shell, after configuring `.env`:
+Load the runtime in each new shell:
 
 ```bash
 source scripts/setup-env.sh
 command -v xfitter
-command -v condor_submit
 ```
 
-The setup script reports the selected xFitter tree and checks a configured
-commit pin. It rejects a different `HEAD` or tracked changes in the selected
-xFitter tree; untracked build products do not invalidate the pin. Without
-`XFITTER_COMMIT`, this revision check is not performed.
+The supplied setup and workers use CERN LCG through CVMFS. Batch jobs require
+the repository, inputs and installation at the same shared paths on worker
+nodes. Adapt the setup and worker scripts for other sites.
 
-Before plotting, check the interpreter and components required by that task:
+## Additional dependencies
 
-```bash
-python3 -c "import matplotlib, numpy, pandas, yaml"
-python3 -c "import lhapdf"       # PDF comparisons
-command -v xfitter-draw         # cross-section plots
-command -v root                 # cross-section plots
-command -v gs                   # cross-section PDF assembly
-command -v pdflatex             # cross-section PDF assembly
-```
+Beyond the xFitter installer and this Python package:
 
-Scientific setup scripts can change `PATH` and Python library paths. Use a
-Python environment compatible with the installed LHAPDF/ROOT libraries, and
-install this package there if necessary. The isolated Python environment used
-for command help does not automatically contain those compiled bindings.
+- **HTCondor** is needed to submit fit and scan jobs.
+- **LHAPDF Python bindings** are needed for PDF comparisons. The xFitter
+  installer builds LHAPDF with Python disabled; use bindings provided by your
+  LCG environment or a build with Python support. Check with
+  `python3 -c "import lhapdf"` in the environment used for plotting.
+- **ROOT** is needed for `xfitter-draw`; use the site's LCG environment or a
+  separate ROOT installation.
+- **Ghostscript** (`gs`) assembles `xfitter-draw`'s combined PDF output;
+  `ps2pdf` is used for its optional `--splitplots-pdf` output.
+- **LaTeX** (`pdflatex`) compiles `xfitter-draw`'s summary tables, unless
+  disabled with `--no-tables`.
 
-### Environment overrides and site assumptions
+Use a Python interpreter compatible with the scientific libraries; loading the
+runtime can change the interpreter selected by `PATH`.
 
-Explicit caller or generated-worker `XFITTER_TREE` and `XFITTER_COMMIT` values
-override `.env`. Selecting a tree without a commit suppresses the default-tree
-pin; it does not infer the intended revision. To return an already configured
-shell to the checkout defaults:
-
-```bash
-unset XFITTER_TREE XFITTER_COMMIT
-source scripts/setup-env.sh
-```
-
-Changing `.env` does not rewrite study configurations or previously generated
-workers. A generic `new-fit` launcher uses runtime defaults; a copied or
-customized study launcher may contain an explicit build selection.
-
-| Entry point | Environment behavior |
-| --- | --- |
-| Fit and scan workers | Source `scripts/setup-env.sh`; default LCG_105, EL9, GCC13 |
-| `scripts/plot-scan` | Use available Python plotting modules, otherwise source LCG_106 |
-| `scripts/plot-pdf-comparison` | Use available Python modules including LHAPDF, otherwise source LCG_106 |
-| `scripts/plot-xsec` | Always initialize the selected xFitter build with `setup-env.sh` |
-
-`XFITTER_LCG_SETUP` overrides the setup script's LCG view;
-`LCG_SETUP` overrides the fallback view for scan/PDF plotting wrappers.
-Generated fit workers also contain a CVMFS-specific OpenBLAS compatibility
-shim. These overrides alone do not make the workers portable to a cluster
-without CVMFS; adapt the execution environment and launchers for that site.
-
-## Datasets and custom studies
-
-For a single fit, `scripts/new-fit` accepts a custom configuration directory
-and searches the full repository `datasets/` tree recursively by basename.
-It copies only its supported configuration and data files; see
-[fit creation](../runs/fits/README.md#create-a-workspace-from-your-inputs) for
-handling additional inputs and the current default template.
-
-For scans, set `dataset_root` in each workspace's `config.yaml` and list the
-files to copy under `datafiles`. For example, this configuration fragment uses
-a dataset directory beside the scan workspace:
-
-```yaml
-dataset_root: ../sample-data
-datafiles:
-  - sample-a.dat
-  - sample-b.dat
-```
-
-`scripts/run-scan` resolves a relative `dataset_root` from the directory
-containing `config.yaml`, regardless of the command's working directory.
-Absolute paths and home-directory paths such as `~/data/sample-study` also
-work. The Python [`run_scan` API](../src/xfitter_eoe_runs/scans/runner.py) uses
-the configured root when its `dataset_root` argument is `None`; an explicit
-path argument overrides the configuration.
-
-Choose templates compatible with your data and xFitter setup. Pumplin scans
-require a `plot_parameters` list; λ scans can select an optional
-`parameter_comparison` list. The workflow guides describe these settings and
-their input-format requirements, including likelihood-template compatibility.
-
-Continue with the [study catalog](../runs/README.md) for the workflow families
-or the [HERA study](hera-study.md) for the supplied application. For software
-checks, run `python -m unittest discover -s tests -v` in the environment where
-the package is installed. These tests do not launch real xFitter or Condor jobs.
+Continue with the [workflow guides](../runs/README.md) or the
+[HERA and paper figures](hera-study.md).

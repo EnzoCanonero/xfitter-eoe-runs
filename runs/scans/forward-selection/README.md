@@ -1,105 +1,52 @@
 # Systematic-source ranking
 
-[Repository](../../../README.md) · [Installation](../../../docs/installation.md) ·
-[HERA study](../../../docs/hera-study.md) ·
-[HERA examples](../../../docs/hera-scans.md#forward-selection) ·
-[Paper reproduction](../../../docs/reproducing-paper.md)
+[Workflows](../../README.md) · [Installation](../../../docs/installation.md)
 
-`scan_type: systematic-ranking` compares a base fit with fits that activate
-one additional systematic source at a time. It produces a ranking for one
-specified base. To construct a forward-selection chain, choose a valid candidate
-and prepare another configuration with that source added to the base.
+Fit a base configuration and test one additional EoE source at a time.
+Each round generates its own fits; no previous round's outputs are needed.
 
-## Configuration and inputs
+## Configuration
 
-Create a workspace under `runs/scans/` with a `config.yaml`. The path identifies
-your study; the `scan_type` field selects this implementation.
+Create `config.yaml` under `runs/scans/forward-selection/my-study/`. Add the
+[shared inputs](../../README.md#shared-scan-configuration) and these fields:
 
-| Field | Meaning |
-| --- | --- |
-| `scan_type` | `systematic-ranking` |
-| `template` | Directory name under root `templates/` |
-| `dataset_root` | Dataset directory, relative to the directory containing `config.yaml`; absolute and `~` paths also work |
-| `datafiles` | Dataset filenames copied into each generated fit |
-| `systematics` | Candidate source entries: `name`, `type`, optional `range`, `epsilon`, `init` |
-| `base_systematics` | Optional sources active in every fit; same entry format |
-| `epsilon` | Default EoE strength when an entry does not provide `epsilon` |
-| `n_iterations`, `enable_bartlett`, `q2_cut` | Options passed to the steering template |
-| `doErrors` | Optional error method; Pumplin accepts `errdef` and `iterate` |
-| `xfitter_tree`, `xfitter_commit` | Build directory and optional exact revision for workers |
-| `request_memory` | Condor memory request |
-
-The template supplies `steering.txt.j2`, `parameters.yaml.j2`,
-`constants.yaml` and `unpolarised.wgt`. Source names and types must match the
-selected dataset and xFitter setup. Ranges expand numbered names; candidates
-already present in `base_systematics` are excluded. `init` supplies starting
-values for E-type nuisances, not fixed shifts.
-
-`scripts/run-scan` copies `datafiles` from the configured `dataset_root`.
-The library's `run_scan` uses that root when its `dataset_root` argument is
-`None`; an explicit path overrides it. See
-[installation](../../../docs/installation.md#datasets-and-custom-studies) for
-a path example and the scientific runtime. Generation requires templates and
-data, but does not read a preceding round's fit output.
-
-## Commands
-
-These commands require `workspace` to be set to **your existing scan directory**
-under `runs/scans/`. They are a command template, not a supplied study. For a
-concrete selection and configuration, use the [HERA examples](../../../docs/hera-scans.md#forward-selection).
-Run from the repository root after installation.
-
-Preview without writing files:
-
-```bash
-python scripts/run-scan --dry-run "${workspace:?Set workspace to your scan directory}"
+```yaml
+scan_type: systematic-ranking
+epsilon: 0.6
+base_systematics: []
+systematics:
+  - {name: calibration, type: E}
+  - {name: normalization, type: E}
 ```
 
-Generate inputs and batch files without submitting:
+Replace the source names with candidates from your data.
+[Complete HERA example](herapdf20-nnlo-rtopt/epsilon-0p6/round-01/config.yaml).
+
+- `base_systematics`: sources active in every fit; empty gives a Gaussian base.
+- `systematics`: candidates to test; sources already in the base are skipped.
+- For the next round, add the chosen source to `base_systematics` in a new
+  workspace. Selection and stopping are manual.
+
+## Run
+
+From the repository root, after creating the configuration:
 
 ```bash
-python scripts/run-scan --no-submit "${workspace:?Set workspace to your scan directory}"
+workspace=runs/scans/forward-selection/my-study
+python scripts/run-scan --dry-run "$workspace"    # preview
+python scripts/run-scan --no-submit "$workspace"  # generate
+bash "$workspace/runs/submit.sh"                  # submit
+# After the fits finish:
+scripts/plot-scan "$workspace"
 ```
 
-Submit that generated batch:
+## Outputs
 
-```bash
-bash "${workspace:?Set workspace to your scan directory}/runs/submit.sh"
-```
+- `runs/nominal/`, `runs/<source>/`: base and candidate fits.
+- `results/rankings.csv`: candidates ordered by improvement in corrected χ².
+- `results/chi2.csv`, `results/parameters.csv`: fit statistics and parameters.
+- `plots/chi2_ranking.pdf`, `plots/parameters.pdf`: diagnostic plots.
 
-After the fits finish, extract results and plot:
-
-```bash
-scripts/plot-scan "${workspace:?Set workspace to your scan directory}"
-```
-
-Generation writes the workspace's `runs/` tree; use a new workspace when
-preserving previous inputs/results. Replotting saved fits needs only the last
-command. Omitting both scan flags generates and submits in one operation.
-
-## Outputs and interpretation
-
-The runner creates `runs/nominal/` with only the base sources and
-`runs/<source>/` for each remaining candidate. The base is Gaussian only when
-no EoE sources are active. With *N* candidates after filtering, expect *N + 1*
-entries in `runs/batch/fit_dirs.txt`.
-
-| Output within the workspace | Contents |
-| --- | --- |
-| `runs/batch/batch.log` | Condor events after submission |
-| `runs/<fit>/output/Results.txt`, `minuit.out.txt` | Fit statistic, nuisance information and minimizer output |
-| `runs/<fit>/output/xfitter_provenance.txt` | Worker executable and library provenance |
-| `results/chi2.csv` | Base and candidate statistics and convergence flags |
-| `results/parameters.csv` | Parameter values and errors in wide format |
-| `results/rankings.csv` | Candidates ordered by corrected improvement |
-| `plots/chi2_ranking.pdf`, `plots/parameters.pdf` | Ranking and parameter diagnostics |
-
-`dchi2_corrected` is the base's Bartlett-corrected minimum minus the candidate's
-corrected minimum. Both endpoints use their own correction. The runner does
-not choose a winner, enforce a stopping threshold or construct another round;
-those are study decisions.
-
-Compare extracted rows with the generated inventory. Missing or invalid outputs
-can be omitted; non-converged candidates remain ranked with `non_converged`
-set. Inspect `base_converged`, the worker provenance and final fit status before
-accepting an improvement. A sorted CSV alone does not establish a valid winner.
+`dchi2_corrected = chi2_corrected(base) - chi2_corrected(candidate)`; larger
+values mean greater improvement. Check `base_converged` and `non_converged`
+before choosing a source: failed fits can still appear in the ranking.

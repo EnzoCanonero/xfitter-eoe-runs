@@ -1,71 +1,55 @@
 # Workspaces and workflow guides
 
-[Project overview](../README.md) · [Installation](../docs/installation.md) ·
-[HERA application and catalog](../docs/hera-study.md)
+[Repository](../README.md) · [Installation](../docs/installation.md) ·
+[HERA and paper figures](../docs/hera-study.md)
 
-`runs/` contains study definitions alongside their generated results. A workspace
-identifies one fit, scan or comparison. The scientific configuration determines
-the inputs and calculation; directory names organize the work.
+Run commands from the repository root after installation. Each study has its
+own workspace; use a new one when changing the scientific inputs.
 
 ## Choose a workflow
 
-| Task | Definition | Guide |
-| --- | --- | --- |
-| Standalone fit | xFitter files in `config/`, launcher in `condor/` | [Fit workspaces](fits/README.md) |
-| Rank candidate EoE sources | `scan_type: systematic-ranking` | [Forward selection](scans/forward-selection/README.md) |
-| Scale errors on errors | `scan_type: lambda-scan` | [EoE scans](scans/eoe-scan/README.md) |
-| Profile fitted parameters | `scan_type: likelihood-scan` | [Likelihood profiles](scans/likelihood/README.md) |
-| Vary error-calculation settings | `scan_type: pumplin-stability` | [Pumplin stability](scans/pumplin-stability/README.md) |
-| Compare parton distributions | `type: pdf-comparison` | [PDF comparisons](comparisons/pdf/README.md) |
-| Overlay selected DIS cross sections | `type: xsec-comparison` | [Cross-section comparisons](comparisons/xsec/README.md) |
+- [Fits](fits/README.md): prepare and submit an xFitter fit.
+- [Forward selection](scans/forward-selection/README.md): rank candidate EoE sources.
+- [EoE scans](scans/eoe-scan/README.md): vary source strengths.
+- [Likelihood profiles](scans/likelihood/README.md): scan fixed parameter values.
+- [Pumplin stability](scans/pumplin-stability/README.md): compare uncertainty settings.
+- [PDF comparisons](comparisons/pdf/README.md): overlay PDFs and uncertainty bands.
+- [Cross-section comparisons](comparisons/xsec/README.md): compare predictions with data.
 
-The scan commands require a workspace under `runs/scans/`; comparison commands
-require one under `runs/comparisons/`. Further nesting is allowed. For example:
+## Workspace layout
 
-```text
-runs/
-├── fits/<study>/
-│   ├── config/
-│   ├── condor/submit.sh
-│   └── output/                     # generated
-├── scans/<family>/<study>/
-│   ├── config.yaml
-│   ├── runs/                       # generated fit jobs and batch files
-│   ├── results/                    # extracted numerical results
-│   └── plots/                      # generated figures
-└── comparisons/<family>/<study>/
-    ├── config.yaml
-    └── plots/                      # generated figures
+- `runs/fits/<study>/`: inputs in `config/`, launcher in `condor/`, results in `output/`.
+- `runs/scans/<family>/<study>/`: `config.yaml`, generated fits in `runs/`,
+  extracted data in `results/`, figures in `plots/`.
+- `runs/comparisons/<family>/<study>/`: `config.yaml` and generated `plots/`.
+
+Further nesting is allowed. Git stores study definitions, not generated outputs.
+Scans generate their own fits; comparisons need completed outputs or PDF sets.
+
+## Shared scan configuration
+
+Create a `config.yaml` with these inputs, then add the fields in the chosen
+scan guide. Replace the example template and data paths for your study.
+
+```yaml
+template: hera-baseline
+dataset_root: /path/to/datasets
+datafiles: [sample.dat]
 ```
 
-## Inputs and execution
+- `template` selects a directory in `templates/` with steering and parameter
+  templates, constants and weights.
+- `dataset_root` is absolute or relative to `config.yaml`; `datafiles` lists
+  the files to copy from it.
+- Source names must match the data. Source `init` sets a starting value;
+  `epsilon` can override the source strength individually.
+- Optional settings include `q2_cut`, `n_iterations` for nuisance profiling,
+  and `enable_bartlett`. Ranking and EoE scans also accept `doErrors`.
+- `xfitter_tree`, `xfitter_commit` and `request_memory` select the worker build,
+  optional revision and Condor memory. See [environment setup](../docs/installation.md#environment-setup)
+  and [using your own build](fits/README.md#use-your-own-xfitter-build).
 
-Fit configurations specify the physics calculation and data inputs. Scan
-configurations select a template from `templates/`, source settings and scan
-coordinates. Each scan's `dataset_root` selects its input directory, resolved
-relative to `config.yaml` unless absolute; `~` paths are supported. Its
-`datafiles` list names the files to copy from that directory.
-Comparison configurations select existing fitted outputs or PDF
-sets and the quantities to display. Comparison fit paths are relative to their
-workspace; outputs are written beneath that same workspace.
-
-Preview a configured scan with `python scripts/run-scan --dry-run WORKSPACE`.
-Use `--no-submit` to generate files without sending jobs. Omitting both flags
-generates and submits; a fit's `condor/submit.sh` also submits immediately.
-The guides explain the prerequisites and products for each command.
-
-For changed scientific inputs, use a separate workspace to preserve previous
-results. Replotting completed results only requires the relevant plotting
-command. Generation and plotting can replace existing files at their configured
-destinations.
-
-## Supplied application
-
-The [HERA catalog](../docs/hera-study.md) links all bundled configurations and
-defines their setup and treatment notation. Its fit settings, comparison scales
-and kinematic selections are examples of the workflows above. Consult the
-individual guides for input-format requirements and current implementation
-limits when preparing another application.
-
-Commit study definitions and launchers. Generated fit outputs, scan jobs,
-extracted results, figures and runtime logs are excluded from Git.
+The scan guides show preview, generation, submission and plotting separately.
+`--dry-run` writes nothing; `--no-submit` generates files only. Running
+`python scripts/run-scan WORKSPACE` without either flag generates and submits.
+To replot completed results, run only `scripts/plot-scan WORKSPACE`.

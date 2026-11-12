@@ -6,7 +6,7 @@ Study definitions specify the fit inputs and uncertainty treatment; comparison
 definitions select the curves, scales, kinematic ranges and presentation.
 
 [Installation](docs/installation.md) · [Workflow guides](runs/README.md) ·
-[HERA application](docs/hera-study.md)
+[HERA and paper figures](docs/hera-study.md)
 
 ## What you can do
 
@@ -16,9 +16,8 @@ definitions select the curves, scales, kinematic ranges and presentation.
 - Compare PDF central values and bands at a chosen Q² and x range.
 - Select DIS datasets and Q² slices for cross-section overlays.
 
-The repository includes the tools and a configured
-[HERA application](docs/hera-study.md). Its parametrisations, source selections
-and low-Q² plots are study choices. The comparison commands accept other
+The repository includes the tools and the configurations used for the
+[HERA and paper figures](docs/hera-study.md). The commands accept other
 compatible inputs and kinematic selections.
 
 Fit outputs and generated figures are local products and are **not included in
@@ -36,9 +35,9 @@ python scripts/run-scan --help
 
 This shows the scan command's options without creating files or submitting jobs.
 Choose a workflow below to prepare a study. For a runnable example, use the
-[supplied HERA scan preview](docs/hera-study.md#preview-the-supplied-example).
+[HERA Figure 1 scan preview](docs/hera-study.md#figure-1-common-epsilon).
 Fit execution additionally requires the
-[scientific runtime](docs/installation.md#scientific-runtime).
+[xFitter installation and environment](docs/installation.md#xfitter-installation).
 
 All command examples in the guides run from the repository root. Use
 `python scripts/run-scan` so the scan command uses your selected Python
@@ -58,8 +57,8 @@ environment. Preview, file generation, and job submission are separate steps.
 
 Each guide explains the supported configuration, input format, commands and
 output files. The [workspace index](runs/README.md) describes where new studies
-belong. HERA-specific notation, configurations and manuscript presentation live
-in the [application documentation](docs/hera-study.md).
+belong. The [HERA guide](docs/hera-study.md) links the configurations and
+commands for the paper figures.
 
 ## How the repository works
 
@@ -97,11 +96,6 @@ For development and software validation:
 python -m pip install -e .
 python -m unittest discover -s tests -v
 ```
-
-Scan configurations select their dataset directory and the parameters shown
-in optional λ comparisons and Pumplin diagnostics. The
-[installation](docs/installation.md) and workflow guides describe these fields
-and the input formats required by each workflow.
 
 These tests check the software and workspace conventions. Validate fit quality
 and input compatibility for each scientific application. Commit source code,

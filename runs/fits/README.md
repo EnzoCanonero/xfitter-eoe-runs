@@ -1,155 +1,76 @@
 # Fit workspaces
 
-[Repository](../../README.md) · [Study catalog](../README.md) ·
-[Installation](../../docs/installation.md) · [HERA fits](../../docs/hera-fits.md)
+[Workflows](../README.md) · [Installation](../../docs/installation.md) ·
+[HERA figures](../../docs/hera-study.md)
 
-A fit workspace groups an xFitter configuration, a batch launcher and its
-outputs. Use a separate workspace for each configuration you want to compare.
-The tools can create a workspace from your own xFitter input files; the supplied
-HERA configurations and their physical interpretation are documented in
-[HERA fits](../../docs/hera-fits.md).
+One workspace contains an xFitter configuration, a Condor launcher and the fit
+outputs. Run commands from the repository root.
 
-## Workspace layout
+## Create and configure
 
-```text
-config/                 steering.txt, parameters.yaml and auxiliary inputs
-condor/submit.sh         launcher that generates a worker and submits it
-condor/run_fit.sh        generated worker
-condor/job.sub           generated Condor descriptor
-condor/logs/             Condor event, stdout and stderr logs
-output/                 xFitter results
-```
-
-Keep the scientific inputs and launcher with the study. Generated workers,
-logs and fit outputs are ignored by Git. A fresh clone therefore needs either
-completed outputs supplied separately or a new fit execution before plotting.
-
-## Create a workspace from your inputs
-
-Run from the repository root after [installation](../../docs/installation.md).
-Choose a new path under `runs/fits` and a directory containing your xFitter
-configuration:
+Create a new workspace from your xFitter input directory:
 
 ```bash
 scripts/new-fit my-study/variant-a /absolute/path/to/template/config
 ```
 
-Replace the template path with your own directory. An absolute template path
-can point outside the checkout. A relative template path is resolved under
-`runs/fits`, so an existing fit can also supply the configuration:
+An existing fit can supply the inputs instead:
 
 ```bash
 scripts/new-fit my-study/variant-b my-study/variant-a/config
 ```
 
-These commands create files without submitting a job. The generator refuses
-an existing destination. Its current default, when the second argument is
-omitted, is `runs/fits/herapdf20-nnlo-rtopt/gaussian/config`; give an explicit
-template for a different study.
+Creation does not submit a job. Edit the new workspace's:
 
-The generator copies `steering.txt`, `parameters.yaml`, and, when present,
-`constants.yaml` and `unpolarised.wgt`. It does not copy an arbitrary auxiliary
-file tree or the source workspace's launcher. Supply any other reaction files,
-tables or weights required by your configuration yourself.
+- `config/steering.txt`: datasets, cuts and systematic sources.
+- `config/parameters.yaml`: PDF parametrisation, theory and error calculation.
+- `condor/submit.sh`: batch resources and any study-specific build selection.
 
-For each single-quoted `.dat` filename found in `steering.txt`, the generator
-searches the repository's `datasets/` tree recursively by basename, copies the
-first match into `config/`, and rewrites the steering reference to that bare
-filename. Use distinct basenames for distinct inputs. Missing matches produce
-warnings; they do not stop workspace creation. Check the copied files and
-resolve those warnings before running. Files outside `datasets/` and input
-references not covered by this parser need explicit handling in the workspace.
+The generator copies the main configuration files and finds referenced `.dat`
+files by basename under `datasets/`. Add missing data or other auxiliary files
+yourself. New launchers use the runtime from [`.env`](../../.env); they do not
+inherit the source fit's launcher or build pin. Keep launcher changes in
+`condor/submit.sh`, which regenerates the worker at submission.
 
-## Review the scientific configuration
-
-Review `config/steering.txt` for datasets, cuts, systematic-source treatment and
-output grids, and `config/parameters.yaml` for the parametrisation, theoretical
-treatment, minimizer and error calculation. Confirm that your chosen xFitter
-build supports them. The generator copies settings; it does not validate that
-they describe the study named by the directory.
-
-`OutputDirectory` is replaced with a placeholder during creation. Leave it for
-the launcher to set to the workspace's absolute `output/` path at submission.
-Use the configured error method when interpreting its outputs; for example,
-Pumplin's `ITERATE` setting and nuisance-profiling `n_iterations` control
-separate calculations.
-
-## Select the runtime and batch resources
-
-The generated worker sources [`scripts/setup-env.sh`](../../scripts/setup-env.sh).
-Set the installation paths, chosen xFitter worktree and revision as described in
-[installation](../../docs/installation.md). A newly generated launcher uses
-those runtime defaults; it does not inherit a template fit's build pin.
-
-To retain a study-specific pin, put its `XFITTER_TREE` and `XFITTER_COMMIT`
-exports in the worker text generated by `condor/submit.sh`, before the line
-that sources `setup-env.sh`. Edit the launcher, rather than only a generated
-`run_fit.sh`, which the next submission will replace. Keep the full revision
-with the study so changes to local defaults do not silently change its build.
-
-The default descriptor requests one CPU and 2 GB and sets
-`should_transfer_files = NO`. Adjust the new launcher's resource requests for
-your fit. The checkout, inputs and scientific installation must be visible at
-the same paths on the worker nodes. The supplied worker also uses a
-CVMFS-specific LCG/OpenBLAS setup; it needs adaptation for a different site.
-
-## Reproduce an existing configuration
-
-For an independent reproduction, create a new workspace from the existing
-`config/` and retain its launch settings. For example, after replacing the
-source path with your chosen study:
-
-```bash
-scripts/new-fit my-study/reproduction existing-study/variant/config
-cp runs/fits/existing-study/variant/condor/submit.sh \
-  runs/fits/my-study/reproduction/condor/submit.sh
-```
-
-Review the copied launcher, including any input restoration and resource
-settings. The supplied launchers discover their workspace and repository
-locations at runtime. Copying a configuration alone does not preserve the
-source launcher's build pin or other custom behavior.
-
-If the required outputs already exist, use the
-[comparison tools](../README.md#choose-a-workflow) to replot them; fitting is
-unnecessary for that step.
-
-## Submit explicitly
-
-After reviewing a workspace:
+## Run
 
 ```bash
 workspace=runs/fits/my-study/variant-a
 bash "$workspace/condor/submit.sh"
 ```
 
-**The second command submits a job.** The generated launcher writes
-`run_fit.sh` and `job.sub`, patches `config/parameters.yaml` with the absolute
-output path, then calls `condor_submit`. It has no dry-run mode or protection
-against reusing existing output and log paths. Use a separate workspace when
-preserving a previous result.
+This submits immediately. Use a new workspace to preserve an earlier result.
+The launcher sets `OutputDirectory`; leave its generated placeholder in place.
 
-## Expected outputs and validation
+## Use your own xFitter build
 
-Available files depend on the configuration and error method:
+The supplied fits and scans record the xFitter build they were run with. In a
+fit, `condor/submit.sh` contains:
 
-| File in `output/` | Use |
-| --- | --- |
-| `Results.txt` | Minimized χ², degrees of freedom, dataset terms and nuisance information |
-| `minuit.out.txt` | Minimizer and error-calculation output |
-| `parsout_0` | Parameter values and errors used by the Pumplin parser |
-| `pdfs_q2val_??.txt` | Central PDF grids at configured Q² values |
-| `pdfs_q2val_s*_[0-9][0-9].txt` | Pumplin plus/minus grids, when requested |
-| `fittedresults.txt` | Pointwise data, theory, uncertainties and pulls |
-| LHAPDF set directory | PDF export when enabled; its name follows the configuration |
+```bash
+export XFITTER_TREE=merge-master/xfitter-master
+export XFITTER_COMMIT=67398b15571dff1e9ddce0bc88923554552c9c84
+```
 
-Check the Condor exit state and final worker output, then the final minimizer
-and error-calculation status. A populated directory or an earlier convergence
-message is not enough. Check for a finite minimum and the expected degrees of
-freedom, and valid Bartlett diagnostics when used. Match the result to its
-submitted configuration and build before comparing it with another fit.
+In a scan, `config.yaml` sets the same values as `xfitter_tree` and
+`xfitter_commit`. If your build is elsewhere, the job stops before xFitter
+starts, reporting `no built xfitter` or `commit mismatch`. Either:
 
-For PDF comparisons, verify grids at the requested Q² and complete error-member
-pairs. Cross-section comparisons require `fittedresults.txt`. See
-the [PDF](../comparisons/pdf/README.md) and
-[cross-section](../comparisons/xsec/README.md) guides for their input checks.
+- delete both lines (or fields) to use the build selected in `.env`; or
+- point the tree at your build, relative to `XFITTER_ROOT` or absolute, and set
+  the commit to its revision (`git -C /path/to/build rev-parse HEAD`). Delete
+  the commit line if the build is not a Git checkout.
+
+The commit check also fails if tracked files in the build have uncommitted
+changes. Check the selection with `source scripts/setup-env.sh` before
+submitting. The workers load CERN LCG from CVMFS; other sites need to adapt
+them as described in [installation](../../docs/installation.md#environment-setup).
+
+## Outputs
+
+- `condor/logs/`: job logs; check that the fit completed and converged.
+- `output/Results.txt`, `minuit.out.txt`: fit statistics and minimizer output.
+- PDF grids or LHAPDF sets: inputs for [PDF comparisons](../comparisons/pdf/README.md).
+- `output/fittedresults.txt`: input for [cross-section comparisons](../comparisons/xsec/README.md).
+
+PDF exports and uncertainty grids depend on the chosen fit settings.
