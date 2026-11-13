@@ -8,38 +8,73 @@ reference. The command does not run fits and needs LHAPDF Python bindings.
 
 ## Configuration
 
-Create `runs/comparisons/pdf/my-setup/my-comparison/config.yaml`:
+Create `runs/comparisons/pdf/my-setup/my-comparison/config.yaml`. All options:
 
 ```yaml
 type: pdf-comparison
-Q2: 25.0
-x_min: 0.001
-x_max: 0.7
-observables: [uv, dv, gluon]
-error_type: symmetric
-ratio_reference: Reference
+Q2: 4.0
+x_min: 1.0e-4
+x_max: 0.9
+n_points: 100
+observables: [uv, dv, gluon, sea]
+error_type: asymmetric
+ratio_reference: 0
+ratio_ylim: [0.6, 1.4]
 fits:
-  - {label: Reference, path: ../../../../fits/my-setup/reference, source: xfitter-grid}
-  - {label: Alternative, path: ../../../../fits/my-setup/alternative, source: xfitter-grid}
+  - label: Gaussian
+    path: ../../../../fits/my-setup/gaussian
+    source: xfitter-grid
+    setup: "HERAPDF2.0, NNLO, RTOPT"
+    treatment: Gaussian
+    color: "#1f77b4"
+    linestyle: "-"
+  - label: EoE
+    path: ../../../../fits/my-setup/eoe
+    source: lhapdf
+    set: proton
+    setup: "HERAPDF2.0, NNLO, RTOPT"
+    treatment: EoE
+  # - {label: External, source: lhapdf, lhapdf_set: SET_NAME}
+presentation:
+  title: "HERAPDF2.0, NNLO, RTOPT"
+  use_fit_labels: false
+  ratio_reference_label: Gaussian
+  legend_fontsize: 15
 ```
 
-Replace the fit paths with your outputs. Paths are relative to this workspace,
-or absolute. [Complete HERA example](herapdf20-nnlo-rtopt/gaussian-vs-eoe-selected/config.yaml).
+- `type` (required): `pdf-comparison`.
+- `Q2` (default `10`): scale in GeV². With `xfitter-grid` it must be one of the
+  fit's output scales (`Q2VAL` in the steering); there is no interpolation.
+- `x_min`, `x_max` (default `1e-4`, `0.9`): x range, covered by all inputs.
+- `n_points` (default `100`): number of log-spaced x points.
+- `observables` (default all): pages to draw, in order: `uv` (xuᵥ), `dv`
+  (xdᵥ), `gluon` (xg), `sea` (2x(ū + d̄ + s̄)).
+- `error_type` (default `asymmetric`): Hessian bands, `symmetric` or
+  `asymmetric`.
+- `ratio_reference` (default `0`): fit used as ratio denominator, by index
+  (from 0) or `label`.
+- `ratio_ylim` (default `[0.6, 1.4]`): ratio-panel limits; `null` for automatic.
+- `fits` (required): curves to draw.
+  - `label`: legend label (default: the fit directory or set name).
+  - `source` (default `lhapdf`): `xfitter-grid` reads the fit's
+    `output/pdfs_q2val_*` grids; `lhapdf` reads an LHAPDF set.
+  - `path`: fit directory, relative to this workspace or absolute.
+  - `set` (default `proton`, `lhapdf` only): set directory in the fit's `output/`.
+  - `lhapdf_set` (`lhapdf` only): installed LHAPDF set, instead of `path`.
+  - `setup`, `treatment`: optional; when every fit has both, the shared part
+    becomes the heading and the legend shows what differs.
+  - `color`, `linestyle`: matplotlib styles (default: a colour cycle and `-`).
+- `presentation`: optional overrides of the automatic labels.
+  - `title`: heading; `null` hides it.
+  - `use_fit_labels` (default `false`): legends use `label` instead of
+    `setup`/`treatment`.
+  - `ratio_reference_label`: name of the ratio denominator in the axis label.
+  - `legend_fontsize` (default `15`).
 
-- **Native grids:** `source: xfitter-grid` reads the fit's `output/` grids.
-  Keep the central and uncertainty members at the requested `Q2` (GeV²);
-  there is no interpolation between scales.
-- **LHAPDF:** use `source: lhapdf` with `path` and `set` (default `proton`),
-  or `lhapdf_set: SET_NAME` for an installed set.
-- **Quantities:** `uv`, `dv`, `gluon`, `sea` mean xuᵥ, xdᵥ, xg, 2x(ū + d̄ + s̄).
-- **Bands and ratios:** `error_type` is `symmetric` or `asymmetric` (Hessian,
-  not replica uncertainties). Ratios divide by the reference central PDF.
-- **Display:** `ratio_ylim` sets ratio limits; each fit accepts `color` and
-  `linestyle`. Choose an x range covered by all inputs.
+Ratios divide by the reference central PDF.
+[HERA configuration](herapdf20-nnlo-rtopt/gaussian-vs-eoe-selected/config.yaml).
 
 ## Run
-
-From the repository root:
 
 ```bash
 workspace=runs/comparisons/pdf/my-setup/my-comparison

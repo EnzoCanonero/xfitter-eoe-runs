@@ -14,7 +14,6 @@ definitions select the curves, scales, kinematic ranges and presentation.
 - Study source selection, the size of errors on errors, likelihood profiles,
   and the stability of uncertainty calculations.
 - Compare PDF central values and bands at a chosen Q² and x range.
-- Select DIS datasets and Q² slices for cross-section overlays.
 
 The repository includes the tools and the configurations used for the
 [HERA and paper figures](docs/hera-study.md). The commands accept other
@@ -25,8 +24,8 @@ a clone**. Comparisons read completed fits; they do not rerun them.
 
 ## Start here
 
-Follow [installation](docs/installation.md) to clone the repository and prepare
-Python. From the repository root, in that environment:
+See [installation](docs/installation.md) for the full setup. From the
+repository root:
 
 ```bash
 python -m pip install .
@@ -39,9 +38,8 @@ Choose a workflow below to prepare a study. For a runnable example, use the
 Fit execution additionally requires the
 [xFitter installation and environment](docs/installation.md#xfitter-installation).
 
-All command examples in the guides run from the repository root. Use
-`python scripts/run-scan` so the scan command uses your selected Python
-environment. Preview, file generation, and job submission are separate steps.
+All command examples in the guides run from the repository root. Preview, file
+generation, and job submission are separate steps.
 
 ## Choose a workflow
 
@@ -55,10 +53,10 @@ environment. Preview, file generation, and job submission are separate steps.
 | How do PDF central values and bands change? | [PDF comparisons](runs/comparisons/pdf/README.md) |
 | How do different fits describe selected DIS cross sections? | [Cross-section comparisons](runs/comparisons/xsec/README.md) |
 
-Each guide explains the supported configuration, input format, commands and
-output files. The [workspace index](runs/README.md) describes where new studies
-belong. The [HERA guide](docs/hera-study.md) links the configurations and
-commands for the paper figures.
+Each guide explains its configuration, commands and output files. The
+[workspace index](runs/README.md) describes where new studies belong. The
+[HERA guide](docs/hera-study.md) links the configurations and commands for the
+paper figures.
 
 ## How the repository works
 

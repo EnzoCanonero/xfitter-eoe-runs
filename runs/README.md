@@ -3,8 +3,8 @@
 [Repository](../README.md) · [Installation](../docs/installation.md) ·
 [HERA and paper figures](../docs/hera-study.md)
 
-Run commands from the repository root after installation. Each study has its
-own workspace; use a new one when changing the scientific inputs.
+Each study has its own workspace; use a new one when changing the scientific
+inputs. Commands run from the repository root.
 
 ## Choose a workflow
 
@@ -25,31 +25,3 @@ own workspace; use a new one when changing the scientific inputs.
 
 Further nesting is allowed. Git stores study definitions, not generated outputs.
 Scans generate their own fits; comparisons need completed outputs or PDF sets.
-
-## Shared scan configuration
-
-Create a `config.yaml` with these inputs, then add the fields in the chosen
-scan guide. Replace the example template and data paths for your study.
-
-```yaml
-template: hera-baseline
-dataset_root: /path/to/datasets
-datafiles: [sample.dat]
-```
-
-- `template` selects a directory in `templates/` with steering and parameter
-  templates, constants and weights.
-- `dataset_root` is absolute or relative to `config.yaml`; `datafiles` lists
-  the files to copy from it.
-- Source names must match the data. Source `init` sets a starting value;
-  `epsilon` can override the source strength individually.
-- Optional settings include `q2_cut`, `n_iterations` for nuisance profiling,
-  and `enable_bartlett`. Ranking and EoE scans also accept `doErrors`.
-- `xfitter_tree`, `xfitter_commit` and `request_memory` select the worker build,
-  optional revision and Condor memory. See [environment setup](../docs/installation.md#environment-setup)
-  and [using your own build](fits/README.md#use-your-own-xfitter-build).
-
-The scan guides show preview, generation, submission and plotting separately.
-`--dry-run` writes nothing; `--no-submit` generates files only. Running
-`python scripts/run-scan WORKSPACE` without either flag generates and submits.
-To replot completed results, run only `scripts/plot-scan WORKSPACE`.

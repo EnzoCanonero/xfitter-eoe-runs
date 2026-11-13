@@ -4,7 +4,7 @@
 [HERA figures](../../docs/hera-study.md)
 
 One workspace contains an xFitter configuration, a Condor launcher and the fit
-outputs. Run commands from the repository root.
+outputs.
 
 ## Create and configure
 
@@ -39,8 +39,8 @@ workspace=runs/fits/my-study/variant-a
 bash "$workspace/condor/submit.sh"
 ```
 
-This submits immediately. Use a new workspace to preserve an earlier result.
-The launcher sets `OutputDirectory`; leave its generated placeholder in place.
+This submits immediately. The launcher sets `OutputDirectory`; leave its
+generated placeholder in place.
 
 ## Use your own xFitter build
 
@@ -62,15 +62,11 @@ starts, reporting `no built xfitter` or `commit mismatch`. Either:
   the commit line if the build is not a Git checkout.
 
 The commit check also fails if tracked files in the build have uncommitted
-changes. Check the selection with `source scripts/setup-env.sh` before
-submitting. The workers load CERN LCG from CVMFS; other sites need to adapt
-them as described in [installation](../../docs/installation.md#environment-setup).
+changes.
 
 ## Outputs
 
-- `condor/logs/`: job logs; check that the fit completed and converged.
+- `condor/logs/`: job logs.
 - `output/Results.txt`, `minuit.out.txt`: fit statistics and minimizer output.
 - PDF grids or LHAPDF sets: inputs for [PDF comparisons](../comparisons/pdf/README.md).
 - `output/fittedresults.txt`: input for [cross-section comparisons](../comparisons/xsec/README.md).
-
-PDF exports and uncertainty grids depend on the chosen fit settings.

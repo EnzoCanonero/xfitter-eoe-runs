@@ -8,42 +8,71 @@ Compare existing DIS predictions with data using `xfitter-draw`. Each fit needs
 
 ## Configuration
 
-Create `runs/comparisons/xsec/my-setup/my-comparison/config.yaml`:
+Create `runs/comparisons/xsec/my-setup/my-comparison/config.yaml`. All options:
 
 ```yaml
 type: xsec-comparison
 panels:
   - {dataset: "Sample A", q2: 25.0}
   - {dataset: "Sample B", q2: 100.0}
+# dataset: "Sample A"
+# q2bins: [25.0, 35.0]
 fits:
-  - {label: Reference, path: ../../../../fits/my-setup/reference}
-  - {label: Alternative, path: ../../../../fits/my-setup/alternative}
+  - {label: Gaussian, path: ../../../../fits/my-setup/gaussian, setup: "HERAPDF2.0, NNLO, RTOPT", treatment: Gaussian}
+  - {label: EoE, path: ../../../../fits/my-setup/eoe, setup: "HERAPDF2.0, NNLO, RTOPT", treatment: EoE}
 therr: true
-plots_per_page: 1
+shifts: true
+uncorr_ticks: true
+logo: true
+upband: true
+show_setup_annotation: true
+ratio_to_theory: false
+# ratiorange: "0.9:1.1"
+# xrange: "1e-5:0.02"
+plots_per_page: 4
+filledbands: false
+transparentbands: false
+extra_options: []
+xfitter_tree: xfitter-master
 ```
 
-Replace dataset names, Q² values and paths with your inputs. Fit paths are
-relative to this workspace, or absolute.
-[Complete HERA example](herapdf20-nnlo-rtopt/gaussian-vs-eoe-selected-low-q2/config.yaml).
+- `type` (required): `xsec-comparison`.
+- `panels`: Q² slices to draw; takes precedence over `dataset` and `q2bins`.
+  - `dataset`: substring of the dataset name in `fittedresults.txt`.
+  - `q2`: Q² of the slice, in GeV².
+- `dataset`: without `panels`, substring selecting datasets (default all).
+- `q2bins`: without `panels`, Q² values to draw (default all).
+- `fits` (required): fits to overlay; the first provides the data points.
+  - `label`: legend label.
+  - `path`: fit directory with `fittedresults.txt` in it or in `output/`,
+    relative to this workspace or absolute.
+  - `setup`, `treatment`: optional; when every fit has both, the shared part
+    becomes the heading and the legend shows what differs.
+- `therr` (default `true`): theory-uncertainty bands, when the fits have them.
+- `shifts` (default `true`): dashed theory-plus-shifts curves.
+- `uncorr_ticks` (default `true`): uncorrelated-uncertainty ticks on the data.
+- `logo` (default `true`): xFitter logo.
+- `upband` (default `true`): bands in the upper panel.
+- `show_setup_annotation` (default `true`): shared setup heading.
+- `ratio_to_theory` (default `false`): ratios to theory instead of data.
+- `ratiorange`, `xrange`: optional display limits, as `"min:max"`.
+- `plots_per_page` (default `4`): panels per page.
+- `filledbands`, `transparentbands` (default `false`): band style.
+- `extra_options` (default empty): extra `xfitter-draw` options, e.g.
+  `["--no-tables"]`.
+- `xfitter_tree` (default from `.env`): xFitter build providing `xfitter-draw`.
 
-- `panels` selects dataset-substring/Q² pairs. Alternatively, use `dataset`
-  and `q2bins` to select several slices of the same dataset.
-- `therr` shows theory bands when the input has nonzero theory uncertainties.
-- `xrange` and `ratiorange` set display limits, e.g. `"0.001:0.5"`.
-- `ratio_to_theory: true` changes ratios from data to theory denominators.
-- `extra_options: ["--no-tables"]` omits xFitter's fit-summary tables.
+[HERA configuration](herapdf20-nnlo-rtopt/gaussian-vs-eoe-selected-low-q2/config.yaml).
 
 ## Run
-
-Configure `.env` as in the installation guide, then run from the repository root:
 
 ```bash
 workspace=runs/comparisons/xsec/my-setup/my-comparison
 scripts/plot-xsec "$workspace"
 ```
 
-The command initializes the xFitter environment. Its `xfitter-draw` executable
-uses ROOT and Ghostscript; `pdflatex` is needed when summary tables are enabled.
+The command loads the xFitter environment from `.env`; `xfitter-draw` needs
+ROOT, Ghostscript and, for summary tables, `pdflatex`.
 
 ## Outputs
 

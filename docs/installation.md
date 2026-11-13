@@ -5,47 +5,17 @@
 
 Run the commands below in Bash from the repository root.
 
-## Get the documented checkout
-
-The commands and layout documented here are on
-`compat/errors-on-errors-20260903`:
-
-```bash
-git clone --branch compat/errors-on-errors-20260903 \
-  https://github.com/EnzoCanonero/xfitter-eoe-runs.git
-cd xfitter-eoe-runs
-```
-
-The checkout includes configurations and tools, but no fit outputs or plots.
-
 ## Python installation
 
-Use Python 3.9 or newer. A virtual environment beside the checkout keeps local
-dependencies out of the repository:
+Install the package with Python 3.9 or newer:
 
 ```bash
-python3 -m venv ../xfitter-eoe-venv
-source ../xfitter-eoe-venv/bin/activate
 python -m pip install .
-```
-
-The package installs Jinja2, matplotlib, NumPy, pandas and PyYAML. For
-development, replace the final command with `python -m pip install -e .`.
-
-Check the installed modules and inspect the scan command without creating or
-submitting a study:
-
-```bash
-python -c "import jinja2, matplotlib, numpy, pandas, yaml"
 python scripts/run-scan --help
 ```
 
-Invoke scans as `python scripts/run-scan`: executing `scripts/run-scan` directly
-selects `/usr/bin/python3`, which may differ from the activated environment.
-For an existing scan configuration, `--dry-run` previews generation without
-writing files. Likelihood scans also prepare their own nominal fit and need
-no previous fit outputs. The [HERA guide](hera-study.md) provides a
-concrete eight-fit preview using the bundled inputs.
+This installs Jinja2, matplotlib, NumPy, pandas and PyYAML, and shows the scan
+command's options without creating files or submitting jobs.
 
 ## xFitter installation
 
