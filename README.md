@@ -1,258 +1,111 @@
-# xFitter EoE Runs
+# xFitter errors-on-errors studies
 
-[![Tests](https://github.com/EnzoCanonero/xfitter-eoe-runs/actions/workflows/tests.yml/badge.svg?branch=master)](https://github.com/EnzoCanonero/xfitter-eoe-runs/actions/workflows/tests.yml)
+Tools for configuring and running xFitter errors-on-errors (EoE) studies,
+extracting fit results, and comparing parton distributions and cross sections.
+Study definitions specify the fit inputs and uncertainty treatment; comparison
+definitions select the curves, scales, kinematic ranges and presentation.
 
-Workspace for the xFitter errors-on-errors studies. The repository keeps
-reusable code, commands, templates, datasets, and execution workspaces in
-separate top-level directories. Each scan or comparison configuration lives
-with its generated products under `runs/`; generated results and local
-historical artifacts are not tracked by Git.
+[Installation](docs/installation.md) · [Workflow guides](runs/README.md) ·
+[HERA and paper figures](docs/hera-study.md)
 
-## Layout
+## What you can do
 
-```text
-xfitter-eoe-runs/
-├── src/                         # installable Python package
-│   └── xfitter_eoe_runs/
-│       ├── cli/                 # repository-aware command adapters
-│       ├── comparisons/
-│       └── scans/
-├── scripts/                     # user-facing commands and environment setup
-├── templates/                   # named xFitter scan templates
-├── runs/                        # tracked configurations and local artifacts
-│   ├── fits/                    # manual fit configs, launchers, and outputs
-│   ├── scans/<study>/           # config.yaml, generated fits, results, plots
-│   └── comparisons/<study>/     # config.yaml, generated results and plots
-├── datasets/                    # canonical input data
-├── tests/
-├── legacy-artifacts.yaml        # provenance for local historical material
-└── legacy/                      # ignored local archive; absent in fresh clones
+- Prepare fit workspaces from xFitter configurations and submit them to HTCondor.
+- Study source selection, the size of errors on errors, likelihood profiles,
+  and the stability of uncertainty calculations.
+- Compare PDF central values and bands at a chosen Q² and x range.
+
+The repository includes the tools and the configurations used for the
+[HERA and paper figures](docs/hera-study.md). The commands accept other
+compatible inputs and kinematic selections.
+
+Fit outputs and generated figures are local products and are **not included in
+a clone**. Comparisons read completed fits; they do not rerun them.
+
+## Start here
+
+See [installation](docs/installation.md) for the full setup. From the
+repository root:
+
+```bash
+python -m pip install .
+python scripts/run-scan --help
 ```
 
-Generated directories under `runs/` may be absent in a fresh clone; commands
-create them when needed. The enclosing workspaces and their `config.yaml` files
-are tracked.
+This shows the scan command's options without creating files or submitting jobs.
+Choose a workflow below to prepare a study. For a runnable example, use the
+[HERA Figure 1 scan preview](docs/hera-study.md#figure-1-common-epsilon).
+Fit execution additionally requires the
+[xFitter installation and environment](docs/installation.md#xfitter-installation).
 
-## Boundaries
+All command examples in the guides run from the repository root. Preview, file
+generation, and job submission are separate steps.
 
-- `src/xfitter_eoe_runs/scans/` and `comparisons/` contain the path-agnostic
-  reusable implementation.
-- `src/xfitter_eoe_runs/cli/` contains the repository-aware plotting command
-  adapters. `scripts/` keeps all public commands and environment setup; the
-  plotting wrappers prepare external runtimes and invoke those adapters.
-- `templates/` contains reusable scan inputs only. Generated fits, plots, tables,
-  logs, and results do not belong there.
-- `datasets/` is input-only. Commands may copy data into a run workspace but do
-  not write results back into the dataset tree.
-- `runs/` owns execution workspaces. Each scan and comparison workspace keeps
-  its tracked `config.yaml` beside its ignored runtime products. Comparison
-  configurations and likelihood references may consume fit workspaces under
-  `runs/fits/`; reusable code never lives under `runs/`.
+## Choose a workflow
 
-The flow remains one way: entry points and CLI adapters call reusable code,
-inputs feed executions, and executions write only to their workspace under
-`runs/`.
-
-## Requirements
-
-- Linux with Bash and Python 3.9 or newer.
-- [xFitter](https://gitlab.cern.ch/fitters/xfitter/-/wikis/Installation-script),
-  installed separately in a location visible to worker nodes.
-- HTCondor, with `condor_submit` on `PATH` and access to a configured pool, for
-  submitted runs.
-
-`pip` installs this package and its Python dependencies. It does not install
-xFitter, HTCondor, LHAPDF, ROOT, or custom xFitter build trees. Generated
-xFitter workers and environment-bootstrap wrappers assume the CERN LCG views
-under `/cvmfs/sft.cern.ch` and a shared filesystem. Condor jobs do not transfer
-files, so the checkout, run workspaces, and xFitter installation must all be
-visible to worker nodes.
-
-## Setup
-
-1. Clone the repository to the shared filesystem and enter its root.
-2. Install the package and its Python dependencies:
-
-   ```bash
-   python3 -m pip install .
-   ```
-
-   For development, use an editable installation instead:
-
-   ```bash
-   python3 -m pip install -e .
-   ```
-
-3. Set `XFITTER_ROOT` in `.env` to the xFitter installation visible to Condor
-   worker nodes.
-4. For interactive xFitter use, source the environment:
-
-   ```bash
-   source scripts/setup-env.sh
-   ```
-
-Commands resolve the repository root from their own location, so run them from
-the repository root without creating per-workspace symlinks.
-
-Some workspace configurations set `xfitter_tree` and require that named build
-below `$XFITTER_ROOT`. In particular, the small-x runs require the dedicated
-`xfitter-bartlett-apfel306-hell3` build and its APFEL 3.0.6/HELL 3 dependencies.
-Their retained batch launchers and descriptors contain site-specific absolute
-paths that must be adapted for a different checkout or installation; see the
-[small-x notes](runs/fits/smallx-resummation/README.md).
-
-## Commands
-
-| Command | Purpose |
+| Scientific question or task | Guide |
 | --- | --- |
-| `scripts/new-fit` | Create a manual workspace under `runs/fits/` |
-| `scripts/run-scan` | Preview, generate, or submit a scan workspace |
-| `scripts/plot-scan` | Extract completed scan results and create plots |
-| `scripts/plot-pdf-comparison` | Plot a configured PDF comparison |
-| `scripts/plot-xsec` | Plot a cross-section comparison or create a region table |
-| `scripts/fix-lhapdf-info` | Repair metadata for an existing xFitter LHAPDF output |
+| How do I prepare and run a fit? | [Fit workspaces](runs/fits/README.md) |
+| Which systematic sources benefit from an EoE treatment? | [Forward selection](runs/scans/forward-selection/README.md) |
+| How do results depend on ε or a common scaling factor λ? | [EoE scans](runs/scans/eoe-scan/README.md) |
+| What is the shape of the profiled χ²? | [Likelihood profiles](runs/scans/likelihood/README.md) |
+| How stable are Pumplin uncertainty calculations? | [Pumplin stability](runs/scans/pumplin-stability/README.md) |
+| How do PDF central values and bands change? | [PDF comparisons](runs/comparisons/pdf/README.md) |
+| How do different fits describe selected DIS cross sections? | [Cross-section comparisons](runs/comparisons/xsec/README.md) |
 
-## Manual fits
+Each guide explains its configuration, commands and output files. The
+[workspace index](runs/README.md) describes where new studies belong. The
+[HERA guide](docs/hera-study.md) links the configurations and commands for the
+paper figures.
 
-Fits created by `scripts/new-fit` and the retained HERA workspaces have this
-shape:
-
-```text
-runs/fits/<group>/<fit>/
-├── config/                      # xFitter inputs
-├── condor/submit.sh             # tracked launcher
-└── output/                      # generated and ignored
-```
-
-Create a fit from the retained HERA baseline configuration:
-
-```bash
-scripts/new-fit hera-baseline/my-study/variant-a
-```
-
-Or use another fit configuration as the template:
-
-```bash
-scripts/new-fit \
-  hera-baseline/my-study/variant-b \
-  hera-baseline/baseline-7-sources-bartlett2-pumplin/config
-```
-
-`scripts/new-fit` copies the configuration and required files from `datasets/`.
-The generated `submit.sh` creates the ignored Condor files, sets the absolute
-output path, and submits the job:
-
-```bash
-runs/fits/hera-baseline/my-study/variant-a/condor/submit.sh
-```
-
-The retained small-x studies keep their existing grouped batch launchers under
-`runs/fits/smallx-resummation/`.
-
-## Scan workspaces
-
-Each scan workspace contains its tracked definition and local generated
-products:
+## How the repository works
 
 ```text
-runs/scans/<study>/
-├── config.yaml                  # tracked definition
-├── runs/                        # generated xFitter jobs
-├── results/                     # generated extracted results
-└── plots/                       # generated figures
+Configurations + datasets → xFitter jobs → fit outputs → plots and tables
 ```
 
-Each `config.yaml` selects a named template from root `templates/`. Pass the
-workspace directory directly to the commands:
+| Location | Contents |
+| --- | --- |
+| `runs/` | Study definitions and local generated results |
+| `scripts/` | Commands for preparing, executing, and plotting studies |
+| `src/xfitter_eoe_runs/` | Python implementation |
+| `templates/` | xFitter inputs used to generate scan jobs |
+| `datasets/` | Input data tables; the bundled collection is HERA inclusive DIS |
+| `docs/` | Installation and application-specific documentation |
+| `tests/` | Software tests |
+
+Configurations and launchers are versioned. Generated `output/`, scan `runs/`,
+`results/`, `plots/`, and runtime logs remain local. Dependencies between studies
+are explicit in their configurations; a comparison consumes fit results rather
+than rerunning the fits.
+
+## Requirements and development
+
+Python 3.9 or newer is sufficient for configuration previews and the software
+tests. `pip` installs the Python dependencies. Fit execution additionally needs
+the configured xFitter build and scientific libraries, a shared filesystem, and
+HTCondor. The supplied workers use CERN LCG/CVMFS. PDF plotting needs LHAPDF;
+cross-section plotting needs `xfitter-draw` and ROOT. See
+[installation](docs/installation.md) for the environment required by each task.
+
+For development and software validation:
 
 ```bash
-workspace=runs/scans/lambda/hera-baseline/greedy-selection
-
-scripts/run-scan --dry-run "$workspace"   # preview only
-scripts/run-scan "$workspace"             # generate and submit
-scripts/plot-scan "$workspace"            # extract results and plot
+python -m pip install -e .
+python -m unittest discover -s tests -v
 ```
 
-Use `scripts/run-scan --no-submit "$workspace"` instead of the submission
-command when the run directories should be generated without submitting Condor
-jobs.
+These tests check the software and workspace conventions. Validate fit quality
+and input compatibility for each scientific application. Commit source code,
+configurations, and documentation; keep generated results outside Git.
 
-The existing scan types are:
+## License
 
-- `lambda-scan`: scan epsilon scaling factors.
-- `systematic-ranking`: test systematic sources individually.
-- `likelihood-scan`: profile one- or two-dimensional chi-squared grids around a
-  reference fit.
-- `pumplin-stability`: scan lambda, `ERRDEF`, and `ITERATE` settings.
+The project's code and documentation are available under the [MIT License](LICENSE).
+External scientific software and datasets retain their respective terms.
 
-Likelihood generation requires the configured reference fit's
-`config/steering.txt` and `output/minuit.out.txt`. Outputs are ignored, so the
-reference output must exist locally before running the workspace.
-
-## Comparison workspaces
-
-Each comparison workspace keeps its tracked `config.yaml` beside its ignored
-plots or tables under `runs/comparisons/<study>/`.
-
-The supported definition types and commands are:
-
-- `pdf-comparison` — `scripts/plot-pdf-comparison <workspace-dir>`
-- `xsec-comparison` — `scripts/plot-xsec <workspace-dir>`
-- `xsec-region-table` — `scripts/plot-xsec <workspace-dir>`
-
-PDF comparisons require the LHAPDF Python bindings (`import lhapdf`).
-Cross-section plots require `xfitter-draw` and ROOT. These external components
-are expected from the configured xFitter/LCG environment and are not installed
-by this Python package. `scripts/plot-xsec` defaults to the
-`xfitter-bartlett-fixes` tree; set `XFITTER_TREE` to select another compatible
-built tree when needed.
-
-For example:
-
-```bash
-scripts/plot-pdf-comparison \
-  runs/comparisons/baseline-nominal-vs-7sources
-
-scripts/plot-xsec \
-  runs/comparisons/xsec-nc-cc-nominal-vs-7sources-pumplin
-```
-
-Local fit paths in a comparison config are resolved relative to its workspace.
-A typical entry therefore looks like:
-
-```yaml
-fits:
-  - label: HERA baseline
-    path: ../../fits/hera-baseline/nominal-bartlett2-pumplin
-```
-
-Local comparisons require a populated `<fit>/output/`. Historical directories
-such as `output_legacy_*` or `output_retained_*` are not promoted automatically.
-PDF comparisons write combined, ratio-only, and absolute-only PDFs beneath the
-workspace's `plots/` directory.
-
-## Datasets and historical material
-
-Canonical xFitter tables live under `datasets/`; see `datasets/README` for the
-upstream data repository. Runtime copies belong under `runs/` and are ignored.
-
-Inactive fits, studies, and other historical material are retained locally
-under the ignored `legacy/` tree. `legacy-artifacts.yaml` records their original
-locations and provenance. Historical manifest sections intentionally retain
-the paths that were current when each snapshot was classified.
-
-## Validation
-
-After installing the package, run:
-
-```bash
-python3 -m unittest discover -s tests -v
-```
-
-## Git workflow
-
-- Use a branch per change or study.
-- Keep study rationale in its workspace `config.yaml` comments or a local
-  `README.md`.
-- Commit configurations, templates, source, commands, tests, and documentation.
-- Do not commit outputs, Condor logs, copied data tables, or `legacy/` payloads.
+I designed these tools for general use, but have applied them only to HERA so
+far. Applications to other datasets may require adaptations. If you are
+interested, please open an issue or discussion. I am happy to collaborate and
+help adapt the tools, and to welcome active contributors as project
+collaborators.

@@ -1,0 +1,69 @@
+# Lambda scan for the eight-source Giuli greedy selection reported in the paper.
+# Every selected source is scaled together: lambda=0 is Gaussian and lambda=1
+# is the nominal epsilon=0.6 EoE fit.
+scan_type: lambda-scan
+xfitter_tree: xfitter-master
+xfitter_commit: bd0470d93a433ebfb5d99f6c0fecda9c29141199
+template: giuli-param
+epsilon: 0.6
+lambda: {min: 0.0, max: 1.2, step: 0.1}
+n_iterations: 2
+enable_bartlett: true
+q2_cut: 3.5
+
+doErrors:
+  method: Pumplin
+  errdef: 0.5
+  iterate: 10
+
+dataset_root: ../../../../../datasets/hera/h1zeusCombined/inclusiveDis/1506.06042
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+
+# Warm starts are the joint minimum used by the final Giuli stopping round.
+systematics:
+  - {name: sysHZComb1053, type: E, init: -15.7507, scale_with_lambda: true}
+  - {name: sysHZComb1062, type: E, init: -4.3455,  scale_with_lambda: true}
+  - {name: sysHZComb1111, type: E, init: -2.7083,  scale_with_lambda: true}
+  - {name: sysHZComb1114, type: E, init: 4.5503,   scale_with_lambda: true}
+  - {name: sysHZComb1144, type: E, init: 4.5531,   scale_with_lambda: true}
+  - {name: proc_tb21,     type: E, init: -3.9291,  scale_with_lambda: true}
+  - {name: sysHZComb1064, type: E, init: 7.8065,   scale_with_lambda: true}
+  - {name: sysHZComb1113, type: E, init: 3.6030,   scale_with_lambda: true}
+
+# Parameter order and notation for the optional Gaussian/EoE comparison.
+parameter_comparison:
+  - name: Bg
+    label: "$B_g$"
+  - name: Cg
+    label: "$C_g$"
+  - name: Agp
+    label: "$A'_g$"
+  - name: Bgp
+    label: "$B'_g$"
+  - name: Buv
+    label: "$B_{u_v}$"
+  - name: Cuv
+    label: "$C_{u_v}$"
+  - name: Euv
+    label: "$E_{u_v}$"
+  - name: Bdv
+    label: "$B_{d_v}$"
+  - name: Cdv
+    label: "$C_{d_v}$"
+  - name: CUbar
+    label: "$C_{\\bar U}$"
+  - name: DUbar
+    label: "$D_{\\bar U}$"
+  - name: ADbar
+    label: "$A_{\\bar D}$"
+  - name: BDbar
+    label: "$B_{\\bar D}$"
+  - name: CDbar
+    label: "$C_{\\bar D}$"

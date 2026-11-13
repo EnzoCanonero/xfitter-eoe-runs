@@ -1,11 +1,6 @@
 # Run workspaces retain tracked configurations and launchers, not runtime payloads.
 # Manual fit products are generated beneath their workspace.
 runs/fits/**/output/
-runs/fits/**/output_OLD/
-runs/fits/**/output_bkp*/
-runs/fits/**/bkpref/
-runs/fits/**/output_legacy_*/
-runs/fits/**/output_retained_*/
 runs/fits/**/condor/run_fit.sh
 runs/fits/**/condor/job.sub
 runs/fits/**/condor/logs/
@@ -16,19 +11,11 @@ runs/fits/sandbox/*
 
 # Scan and comparison config.yaml files are tracked in their run workspaces;
 # their generated products are ignored below.
-runs/scans/**/fits/
-runs/scans/**/fits_*/
 runs/scans/**/runs/
-runs/scans/**/runs_*/
-runs/scans/**/runs_output_bkp*.tar.gz
 runs/scans/**/plots/
-runs/scans/**/plots_*/
 runs/scans/**/results/
-runs/scans/**/results_*/
 runs/comparisons/**/plots/
-runs/comparisons/**/plots_*/
 runs/comparisons/**/results/
-runs/comparisons/**/results_*/
 runs/comparisons/**/.xfdraw-staging/
 
 # Python cache
@@ -40,7 +27,3 @@ __pycache__/
 /build/
 /dist/
 *.egg-info/
-
-# Local archive of inactive studies and fits.  The tracked relocation manifest
-# records what was moved; the archived payload itself remains on this workspace.
-/legacy/

@@ -12,39 +12,14 @@ import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.text import Text
 from .config import load_study_config
 from .extract import (extract_scan_results, extract_pumplin_widths,
                       _resolve_ordered_minuit_definitions)
 
-# PDF parameters shown in pumplin-stability plots (free HERAPDF params, sorted).
-_PUMPLIN_PDF_PARAMS = [
-    "ADbar", "Agp", "BDbar", "Bdv", "Bg", "Bgp", "Buv",
-    "CDbar", "CUbar", "Cdv", "Cg", "Cuv", "DUbar", "Euv",
-]
-
-# Standard HERAPDF parameter order and paper notation.  The order follows the
-# PDF sectors introduced in the fit setup rather than the size of the fitted
-# displacement.
-_HERAPDF_PARAMETER_LABELS = [
-    ("Bg", r"$B_g$"),
-    ("Cg", r"$C_g$"),
-    ("Agp", r"$A'_g$"),
-    ("Bgp", r"$B'_g$"),
-    ("Buv", r"$B_{u_v}$"),
-    ("Cuv", r"$C_{u_v}$"),
-    ("Euv", r"$E_{u_v}$"),
-    ("Bdv", r"$B_{d_v}$"),
-    ("Cdv", r"$C_{d_v}$"),
-    ("CUbar", r"$C_{\bar U}$"),
-    ("DUbar", r"$D_{\bar U}$"),
-    ("ADbar", r"$A_{\bar D}$"),
-    ("BDbar", r"$B_{\bar D}$"),
-    ("CDbar", r"$C_{\bar D}$"),
-]
-
 
 def _pumplin_plot_params(config) -> list:
-    params = list(_PUMPLIN_PDF_PARAMS)
+    params = list(config.plot_parameters)
     for syst in getattr(config, 'systematics', []):
         if syst.get('type') == 'E' and syst.get('name') not in params:
             params.append(syst['name'])
@@ -91,17 +66,17 @@ def plot_scan(run_dir: Path, template_root: Path):
         if results.get('scan_1d'):
             scan_rows = []
             for param_name, pdata in results['scan_1d'].items():
-                for sv, chi2, dchi2, conv in zip(
+                for sv, chi2, dchi2, conv, status in zip(
                         pdata['scan_values'], pdata['chi2'],
-                        pdata['delta_chi2'], pdata['converged']):
+                        pdata['delta_chi2'], pdata['converged'], pdata['status']):
                     scan_rows.append({
                         'parameter': param_name,
                         'scan_value': float(sv),
                         'chi2': float(chi2) if not np.isnan(chi2) else None,
                         'delta_chi2': float(dchi2) if not np.isnan(dchi2) else None,
                         'converged': bool(conv),
-                        'ref_value': pdata['value_at_minimum'],
-                        'ref_error': pdata['error'],
+                        'status': status,
+                        'nominal_chi2': results['nominal_chi2'],
                     })
             profiles_file = results_dir / "profiles_1d.csv"
             pd.DataFrame(scan_rows).to_csv(profiles_file, index=False)
@@ -120,7 +95,8 @@ def plot_scan(run_dir: Path, template_root: Path):
                             'chi2': float(pdata['chi2'][i, j]) if np.isfinite(pdata['chi2'][i, j]) else None,
                             'delta_chi2': float(pdata['delta_chi2'][i, j]) if np.isfinite(pdata['delta_chi2'][i, j]) else None,
                             'converged': bool(pdata['converged'][i, j]),
-                            'status': str(pdata.get('status', np.full_like(pdata['converged'], 'unknown', dtype=object))[i, j]),
+                            'status': str(pdata['status'][i, j]),
+                            'nominal_chi2': results['nominal_chi2'],
                         })
             grids_file = results_dir / "grids_2d.csv"
             pd.DataFrame(grid_rows).to_csv(grids_file, index=False)
@@ -162,7 +138,10 @@ def plot_scan(run_dir: Path, template_root: Path):
 
     if config.scan_type == 'lambda-scan':
         _plot_lambda_scan(results, plots_dir, error_label=error_label,
-                          systematics=config.systematics)
+                          systematics=config.systematics,
+                          plot_style=config.get('plot_style'),
+                          parameter_comparison=config.parameter_comparison,
+                          font_size_offset=config.get('plot_font_size_offset', 0))
     elif config.scan_type == 'systematic-ranking':
         config_order = [s['name'] for s in config.systematics]
         _plot_systematic_ranking(results, plots_dir, results_dir, config_order,
@@ -237,24 +216,26 @@ def _save_wide_parameters(results: dict, params_file: Path):
     wide_df.to_csv(params_file, index=False)
 
 
-def _plot_herapdf_parameter_comparison(poi_df: pd.DataFrame,
-                                       chi2_df: pd.DataFrame,
-                                       plots_dir: Path):
-    """Paper-style comparison of the nominal EoE and Gaussian PDF parameters.
+def _plot_parameter_comparison(poi_df: pd.DataFrame,
+                               chi2_df: pd.DataFrame,
+                               plots_dir: Path, parameter_labels: list,
+                               font_size_offset: float = 0):
+    """Compare configured PDF parameters in the nominal EoE and Gaussian fits.
 
     The lambda scan is used only as the source of the Gaussian (lambda=0) and
-    nominal seven-source (lambda=1) fits.  Lambda is deliberately absent from
-    the output notation, which compares the two physical fit configurations.
+    nominal EoE (lambda=1) fits. Parameter order and labels come from the study.
     """
+    if not parameter_labels:
+        return
     reference = poi_df[np.isclose(poi_df['lambda'], 0.0)].set_index('parameter')
     eoe = poi_df[np.isclose(poi_df['lambda'], 1.0)].set_index('parameter')
-    required = [name for name, _ in _HERAPDF_PARAMETER_LABELS]
+    required = [name for name, _ in parameter_labels]
 
     missing = [name for name in required
                if name not in reference.index or name not in eoe.index]
     if missing:
         print("  ! Skipping 7_parameter_comparison.pdf: "
-              f"missing standard HERAPDF parameters {missing}")
+              f"configured parameters missing at lambda=0 or lambda=1: {missing}")
         return
 
     # Pumplin supplies the interval half-widths.  The EoE intervals are then
@@ -270,7 +251,7 @@ def _plot_herapdf_parameter_comparison(poi_df: pd.DataFrame,
     intervals = np.array([
         eoe.loc[name, 'norm_error'] * ci_bartlett for name in required
     ])
-    labels = [label for _, label in _HERAPDF_PARAMETER_LABELS]
+    labels = [label for _, label in parameter_labels]
     y_pos = np.arange(len(required))
 
     extent = max(1.0, float(np.max(np.abs(pulls) + intervals)))
@@ -304,6 +285,7 @@ def _plot_herapdf_parameter_comparison(poi_df: pd.DataFrame,
         handles=[gaussian_band, eoe_intervals], loc='upper center',
         ncol=2, frameon=True, fontsize=12,
     )
+    _increase_plot_text_sizes(fig, font_size_offset)
     fig.tight_layout(pad=0.8)
     output = plots_dir / "7_parameter_comparison.pdf"
     fig.savefig(output)
@@ -311,9 +293,68 @@ def _plot_herapdf_parameter_comparison(poi_df: pd.DataFrame,
     print(f"  ✓ {output.name}")
 
 
+def _increase_plot_text_sizes(fig, offset: float):
+    """Apply a display-only offset to every label, tick and legend text."""
+    if not offset:
+        return
+    fig.canvas.draw()
+    for text in fig.findobj(match=Text):
+        text.set_fontsize(text.get_fontsize() + offset)
+
+
+def _plot_paper_common_epsilon(chi2_df: pd.DataFrame, output: Path,
+                              font_size_offset: float = 0):
+    """Use the original manuscript Figure 1 format with current scan values."""
+    # Preserve the original PDF's page and axis geometry, measured in points.
+    width, height = 555.59952, 361.19952
+    with matplotlib.rc_context({
+        'font.family': 'serif',
+        'font.serif': ['DejaVu Serif'],
+        'mathtext.fontset': 'stix',
+        'pdf.fonttype': 42,
+        'axes.linewidth': 1.0,
+    }):
+        fig = plt.figure(figsize=(width / 72, height / 72))
+        ax = fig.add_axes([66.7625 / width, 45.278125 / height,
+                           481.63702 / width, 303.783895 / height])
+        ax.plot(chi2_df['lambda'], chi2_df['chi2_corrected'],
+                color='#1565a5', linewidth=2.1, marker='o', markersize=6.2,
+                markeredgecolor='white', markeredgewidth=0.65, zorder=3)
+        ax.set_xlim(-0.018, 0.718)
+        ax.set_ylim(1290, 1370)
+        ax.set_xticks(np.arange(0.0, 0.71, 0.1))
+        ax.set_yticks(np.arange(1290, 1371, 10))
+        ax.tick_params(direction='in', top=True, right=True,
+                       length=3.5, width=0.8, labelsize=13)
+        ax.set_axisbelow(True)
+        ax.grid(True, linestyle=':', linewidth=0.75, color='#d9d9d9')
+        ax.set_xlabel(r'Common errors-on-errors parameter $\epsilon$', fontsize=18)
+        ax.set_ylabel(r'Corrected minimum $\chi^2$', fontsize=18)
+        _increase_plot_text_sizes(fig, font_size_offset)
+        if font_size_offset:
+            # Keep the original page size and margin when larger labels need room.
+            margin_x, margin_y = 7.2 / width, 7.2 / height
+            for _ in range(3):
+                fig.canvas.draw()
+                bounds = ax.get_tightbbox(fig.canvas.get_renderer()).transformed(
+                    fig.transFigure.inverted())
+                left = max(0, margin_x - bounds.x0)
+                bottom = max(0, margin_y - bounds.y0)
+                right = max(0, bounds.x1 - (1 - margin_x))
+                top = max(0, bounds.y1 - (1 - margin_y))
+                position = ax.get_position()
+                ax.set_position([position.x0 + left, position.y0 + bottom,
+                                 position.width - left - right,
+                                 position.height - bottom - top])
+        fig.savefig(output)
+        plt.close(fig)
+
+
 def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
-                      systematics: list = None):
-    """Generate 5 standard plots for lambda-scan"""
+                      systematics: list = None, plot_style: str = None,
+                      font_size_offset: float = 0,
+                      parameter_comparison: list = None):
+    """Generate lambda-scan diagnostics and an optional parameter comparison."""
 
     chi2_df = results['chi2']
     params_df = results['parameters']
@@ -323,17 +364,22 @@ def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
     print("\nGenerating lambda-scan plots...")
 
     # 1. Chi2 vs lambda
-    plt.figure(figsize=(10, 6))
     # Bartlett-corrected chi2: the goodness-of-fit statistic that follows a
     # chi2 distribution, so that points at different lambda are comparable.
-    plt.plot(chi2_df['lambda'], chi2_df['chi2_corrected'], 'o-', linewidth=2, markersize=8)
-    plt.xlabel(r'$\lambda$', fontsize=14)
-    plt.ylabel(r'Bartlett-corrected $\chi^2$', fontsize=14)
-    plt.title(r'Bartlett-corrected $\chi^2$ vs $\lambda$', fontsize=16)
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(plots_dir / "1_chi2_vs_lambda.pdf")
-    plt.close()
+    if plot_style == 'paper-common-epsilon':
+        _plot_paper_common_epsilon(chi2_df, plots_dir / "1_chi2_vs_lambda.pdf",
+                                   font_size_offset=font_size_offset)
+    else:
+        plt.figure(figsize=(10, 6))
+        plt.plot(chi2_df['lambda'], chi2_df['chi2_corrected'], 'o-', linewidth=2, markersize=8)
+        plt.xlabel(r'$\lambda$', fontsize=14)
+        plt.ylabel(r'Bartlett-corrected $\chi^2$', fontsize=14)
+        plt.title(r'Bartlett-corrected $\chi^2$ vs $\lambda$', fontsize=16)
+        plt.grid(True, alpha=0.3)
+        _increase_plot_text_sizes(plt.gcf(), font_size_offset)
+        plt.tight_layout()
+        plt.savefig(plots_dir / "1_chi2_vs_lambda.pdf")
+        plt.close()
     print("  ✓ 1_chi2_vs_lambda.pdf")
 
     # 2. Convergence status
@@ -345,6 +391,7 @@ def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
             color=['green', 'red'], alpha=0.7)
     plt.ylabel('Number of fits', fontsize=14)
     plt.title(f'Convergence Status ({converged_count}/{total_count} converged)', fontsize=16)
+    _increase_plot_text_sizes(plt.gcf(), font_size_offset)
     plt.tight_layout()
     plt.savefig(plots_dir / "2_convergence_status.pdf")
     plt.close()
@@ -411,6 +458,7 @@ def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
                  label=r'$(value(\lambda)-value(0))\,/\,\sigma(0)$')
     ax.set_xlabel('Lambda', fontsize=13)
     ax.set_title('Parameter Central Values vs Lambda (normalized to λ=0)', fontsize=14)
+    _increase_plot_text_sizes(fig, font_size_offset)
     plt.tight_layout()
     plt.savefig(plots_dir / "3_parameter_central_values.pdf")
     plt.close()
@@ -430,6 +478,7 @@ def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
                  label=r'$\sigma(\lambda)\,/\,\sigma(0)$')
     ax.set_xlabel('Lambda', fontsize=13)
     ax.set_title(f'Parameter Errors vs Lambda (normalized to λ=0){err_suffix}', fontsize=14)
+    _increase_plot_text_sizes(fig, font_size_offset)
     plt.tight_layout()
     plt.savefig(plots_dir / "4_parameter_errors.pdf")
     plt.close()
@@ -463,6 +512,7 @@ def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
             ax.set_ylabel(p, fontsize=13)
             ax.set_title(f'{p}  —  value(λ) ± σ(λ)', fontsize=14)
             ax.grid(True, alpha=0.3)
+            _increase_plot_text_sizes(fig, font_size_offset)
             plt.tight_layout()
             pdf.savefig(fig)
             plt.close(fig)
@@ -516,15 +566,17 @@ def _plot_lambda_scan(results: dict, plots_dir: Path, error_label: str = None,
                 subtitle += f'  [errors: {error_label}]'
             ax.set_title(f'$\\lambda = {lam:.1f}$\n{subtitle}', fontsize=14)
             ax.grid(axis='x', alpha=0.3)
+            _increase_plot_text_sizes(fig, font_size_offset)
             plt.tight_layout()
             pdf.savefig(fig)
             plt.close(fig)
             n_pages += 1
     print(f"  ✓ 6_parameter_pulls.pdf  ({n_pages} pages)")
 
-    # Additional single-page figure for the nominal seven-source comparison.
-    # The existing lambda diagnostics above are retained unchanged.
-    _plot_herapdf_parameter_comparison(poi_df, chi2_df, plots_dir)
+    # Optional single-page comparison using the study's parameter selection.
+    _plot_parameter_comparison(poi_df, chi2_df, plots_dir,
+                               parameter_labels=parameter_comparison,
+                               font_size_offset=font_size_offset)
 
 
 def _plot_systematic_ranking(results: dict, plots_dir: Path, results_dir: Path,
@@ -810,93 +862,26 @@ def _plot_chi2_lollipop(chi2_df, nominal_chi2, plots_dir, config_order):
 
 
 def _plot_likelihood_scan(results: dict, plots_dir: Path, results_dir: Path):
-    """
-    Generate profile likelihood plots for a likelihood-scan workspace.
-
-    Produces one file:
-      profiles_1d.pdf  — one page per parameter: Δχ² profile + Gaussian reference
-
-    Non-converged points are silently discarded; a terminal message lists them.
-    Δχ² is normalized to the central scan point (closest scan value to ref_val).
-    """
-    scan_1d = results['scan_1d']
-    param_names = list(scan_1d.keys())
-    print(f"\nGenerating likelihood-scan plots ({len(param_names)} parameters)...")
-
-    _BLUE = '#1f77b4'
-    _RED  = '#d62728'
-    _GREY = '#999999'
-
-    profiles_pdf = plots_dir / "profiles_1d.pdf"
-    with PdfPages(profiles_pdf) as pdf:
-        for param_name in param_names:
-            pdata = scan_1d[param_name]
-            x = pdata['scan_values']
-            dchi2 = pdata['delta_chi2']
-            conv = pdata['converged']
-            ref_val = pdata['value_at_minimum']
-            ref_err = pdata['error']
-
-            n_fail = int((~conv).sum())
-            if n_fail:
-                print(f"  {param_name}: discarding {n_fail} non-converged point(s)")
-
-            # Only converged points
-            x_ok    = x[conv]
-            dchi2_ok = dchi2[conv]
-
-            # Parabolic reference over the full scan range
-            x_dense = np.linspace(x[0], x[-1], 300)
-            gauss_ref = ((x_dense - ref_val) / ref_err) ** 2
-
+    """Plot converged profiles relative to the nominal fit."""
+    with PdfPages(plots_dir / 'profiles_1d.pdf') as pdf:
+        for name, data in results['scan_1d'].items():
+            valid = data['converged'] & np.isfinite(data['delta_chi2'])
+            y = np.where(valid, data['delta_chi2'], np.nan)
             fig, ax = plt.subplots(figsize=(8, 5))
-
-            for level, style, label in [(1.0, '--', r'$\Delta\chi^2=1$ (1$\sigma$)'),
-                                         (4.0, ':',  r'$\Delta\chi^2=4$ (2$\sigma$)'),
-                                         (9.0, '-.',  r'$\Delta\chi^2=9$ (3$\sigma$)')]:
-                ax.axhline(level, color=_GREY, linewidth=0.8, linestyle=style, label=label)
-
-            ax.plot(x_dense, gauss_ref, color=_RED, linewidth=1.2, linestyle='--',
-                    label='Parabolic reference')
-
-            if len(x_ok):
-                ax.plot(x_ok, dchi2_ok, 'o-', color=_BLUE, linewidth=1.5,
-                        markersize=5, zorder=3)
-
-            ax.axvline(ref_val, color='black', linewidth=0.8, linestyle=':',
-                       label=f'ref = {ref_val:.4g}')
-
-            # y-axis: derived from converged data; cap top at 12
-            dchi2_finite = dchi2_ok[np.isfinite(dchi2_ok)]
-            ymax = min(float(np.nanmax(dchi2_finite)) * 1.1, 12.0) if len(dchi2_finite) else 12.0
-            ymax = max(ymax, 10.0)
-            ymin_data = float(np.nanmin(dchi2_finite)) if len(dchi2_finite) else 0.0
-            ymin = min(ymin_data, 0.0) - 0.3
-            ax.set_ylim(ymin, ymax)
-
-            ax.set_xlabel(param_name, fontsize=13)
-            ax.set_ylabel(r'$\Delta\chi^2$', fontsize=13)
-            ax.set_title(param_name, fontsize=14)
-            ax.legend(fontsize=9, loc='upper center', framealpha=0.9, ncol=2)
+            ax.plot(data['scan_values'], y, 'o-', markersize=5)
+            for level in (0, 1, 4, 9):
+                ax.axhline(level, color='grey', linewidth=0.8, linestyle=':')
+            ax.set_xlabel(name)
+            ax.set_ylabel(r'$\chi^2 - \chi^2_{\mathrm{nominal}}$')
+            ax.set_title(name)
             ax.grid(True, alpha=0.25)
-            plt.tight_layout()
+            fig.tight_layout()
             pdf.savefig(fig)
             plt.close(fig)
-
-    print(f"  ✓ profiles_1d.pdf  ({len(param_names)} pages)")
-
-
-def _sigma_to_dchi2_2dof(n_sigma: float) -> float:
-    """Δχ² threshold for an n-sigma 2-parameter joint confidence region.
-
-    Coverage P = erf(n/√2); for 2 dof, Δχ² = -2·ln(1 - P)
-    → 1σ=2.30, 2σ=6.18, 3σ=11.83.
-    """
-    p = math.erf(n_sigma / math.sqrt(2.0))
-    return -2.0 * math.log(1.0 - p)
+    print("  ✓ profiles_1d.pdf")
 
 
-def _fit_quadratic_pull_surface(x, y, z):
+def _fit_quadratic_surface(x, y, z):
     """Fit z = c0 + cx*x + cy*y + cxx*x² + cxy*x*y + cyy*y²."""
     if len(z) < 6:
         return None
@@ -930,11 +915,6 @@ def _fit_quadratic_pull_surface(x, y, z):
     }
 
 
-def _eval_quadratic_pull_surface(coeff, x, y):
-    return (coeff[0] + coeff[1] * x + coeff[2] * y +
-            coeff[3] * x * x + coeff[4] * x * y + coeff[5] * y * y)
-
-
 def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
     """2D likelihood diagnostics as status maps and 1D slice profiles.
 
@@ -950,15 +930,15 @@ def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
     profiles_pdf = plots_dir / "likelihood_2d_profiles.pdf"
     summary_lines = [
         "# 2D likelihood quadratic-fit summary",
-        "# Coordinates are normalized pulls: (parameter - reference) / sigma.",
-        "# Delta chi2 is normalized to the reference grid point, not the grid minimum.",
+        "# Coordinates are the configured parameter values.",
+        "# Delta chi2 is relative to the nominal fit.",
         "# Quadratic fits use converged finite points with Delta chi2 <= 10; if fewer",
         "# than 12 points pass that cut, all converged finite points are used.",
         "",
         (
             "pair total converged call_limit failed other fit_points "
             "rho condition flat_angle_deg residual_rms residual_max_abs "
-            "lambda_min lambda_max chi2_ref"
+            "lambda_min lambda_max nominal_chi2"
         ),
     ]
 
@@ -969,33 +949,9 @@ def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
         ys = np.asarray(d['y_values'], dtype=float)
         dchi2 = np.asarray(d['delta_chi2'], dtype=float)
         conv = np.asarray(d['converged'], dtype=bool)
-        status = np.asarray(
-            d.get('status', np.where(conv, 'converged', 'unknown')),
-            dtype=object,
-        ).astype(str)
+        status = np.asarray(d['status']).astype(str)
 
         X, Y = np.meshgrid(xs, ys, indexing='ij')
-        x_ref = d.get('x_ref')
-        y_ref = d.get('y_ref')
-        x_err = d.get('x_err')
-        y_err = d.get('y_err')
-        normalized_axes = all(v is not None for v in (x_ref, y_ref, x_err, y_err))
-        if normalized_axes:
-            x_ref = float(x_ref)
-            y_ref = float(y_ref)
-            x_err = float(x_err)
-            y_err = float(y_err)
-            normalized_axes = x_err > 0.0 and y_err > 0.0
-
-        if normalized_axes:
-            Xfit = (X - x_ref) / x_err
-            Yfit = (Y - y_ref) / y_err
-        else:
-            Xfit, Yfit = X, Y
-            x_ref = y_ref = None
-
-        # Plot in raw parameter coordinates; keep pull coordinates only for the
-        # quadratic summary so users can read the axes directly.
         Xp, Yp = X, Y
         x_label = f"{d['x_name']} value"
         y_label = f"{d['y_name']} value"
@@ -1017,15 +973,15 @@ def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
             fit_mask = conv_mask
         fit_result = None
         if int(fit_mask.sum()) >= 6:
-            fit_result = _fit_quadratic_pull_surface(
-                Xfit[fit_mask], Yfit[fit_mask], dchi2[fit_mask],
+            fit_result = _fit_quadratic_surface(
+                X[fit_mask], Y[fit_mask], dchi2[fit_mask],
             )
 
-        chi2_ref = d.get('chi2_reference', np.nan)
+        nominal_chi2 = results['nominal_chi2']
         if fit_result is None:
             summary_lines.append(
                 f"{pair_key} {n_total} {n_conv} {n_call} {n_fail} {n_other} "
-                f"0 nan nan nan nan nan nan nan {chi2_ref:.8g}"
+                f"0 nan nan nan nan nan nan nan {nominal_chi2:.8g}"
             )
         else:
             summary_lines.append(
@@ -1034,14 +990,13 @@ def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
                 f"{fit_result['condition']:.8g} {fit_result['angle']:.8g} "
                 f"{fit_result['rms']:.8g} {fit_result['max_abs']:.8g} "
                 f"{fit_result['eigvals'][0]:.8g} {fit_result['eigvals'][-1]:.8g} "
-                f"{chi2_ref:.8g}"
+                f"{nominal_chi2:.8g}"
             )
 
         conv_values = dchi2[conv_mask]
         if conv_values.size:
-            y_low = min(0.0, float(np.nanpercentile(conv_values, 1.0)))
-            y_high = float(np.nanpercentile(conv_values, 98.0))
-            y_high = max(4.0, min(80.0, y_high))
+            y_low = min(0.0, float(np.min(conv_values)))
+            y_high = max(4.0, float(np.max(conv_values)))
             if y_high <= y_low:
                 y_high = y_low + 4.0
         else:
@@ -1053,8 +1008,6 @@ def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
             'pair_key': pair_key,
             'd': d,
             'Xp': Xp, 'Yp': Yp, 'dchi2': dchi2,
-            'x_ref': x_ref,
-            'y_ref': y_ref,
             'conv_mask': conv_mask,
             'call_mask': call_mask,
             'failed_mask': failed_mask,
@@ -1088,9 +1041,6 @@ def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
                         kwargs.update({'edgecolors': 'black', 'linewidths': 0.25,
                                        'color': color})
                     ax.scatter(p['Xp'][mask], p['Yp'][mask], **kwargs)
-            if p['x_ref'] is not None and p['y_ref'] is not None:
-                ax.plot(p['x_ref'], p['y_ref'], marker='+', color='black', ms=13, mew=1.8,
-                        label='reference')
             ax.set_xlabel(p['x_label'])
             ax.set_ylabel(p['y_label'])
             ax.set_title(
@@ -1139,11 +1089,9 @@ def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
             sm.set_array([])
             fig.colorbar(sm, ax=ax_y, fraction=0.046, pad=0.04,
                          label=f"fixed {d['x_name']} value")
-            if p['y_ref'] is not None:
-                ax_y.axvline(p['y_ref'], color='#555555', lw=0.8, ls=':')
             ax_y.axhline(0, color='#555555', lw=0.8, ls=':')
             ax_y.set_xlabel(p['y_label'])
-            ax_y.set_ylabel(r'$\Delta\chi^2$')
+            ax_y.set_ylabel(r'$\chi^2 - \chi^2_{\mathrm{nominal}}$')
             ax_y.set_ylim(*p['y_limits'])
             ax_y.set_title(f"Fixed {d['x_name']}; scan {d['y_name']}")
             ax_y.grid(True, alpha=0.22)
@@ -1167,18 +1115,16 @@ def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
             sm.set_array([])
             fig.colorbar(sm, ax=ax_x, fraction=0.046, pad=0.04,
                          label=f"fixed {d['y_name']} value")
-            if p['x_ref'] is not None:
-                ax_x.axvline(p['x_ref'], color='#555555', lw=0.8, ls=':')
             ax_x.axhline(0, color='#555555', lw=0.8, ls=':')
             ax_x.set_xlabel(p['x_label'])
-            ax_x.set_ylabel(r'$\Delta\chi^2$')
+            ax_x.set_ylabel(r'$\chi^2 - \chi^2_{\mathrm{nominal}}$')
             ax_x.set_ylim(*p['y_limits'])
             ax_x.set_title(f"Fixed {d['y_name']}; scan {d['x_name']}")
             ax_x.grid(True, alpha=0.22)
 
             fig.suptitle(
                 f"{d['x_name']} vs {d['y_name']}: converged profile slices only\n"
-                f"Reference point is treated as the minimum; y-range uses the converged 1-98% band",
+                "Delta chi2 relative to the nominal fit",
                 fontsize=12,
             )
             fig.tight_layout(rect=[0, 0, 1, 0.90])
@@ -1188,11 +1134,6 @@ def _plot_likelihood_2d(results: dict, plots_dir: Path, results_dir: Path):
     summary_path = results_dir / "quadratic_fit_summary.txt"
     summary_path.write_text("\n".join(summary_lines) + "\n")
 
-    for stale_name in ("contours_2d.pdf", "likelihood_2d_3d.pdf",
-                       "likelihood_2d_diagnostics.pdf"):
-        stale = plots_dir / stale_name
-        if stale.exists():
-            stale.unlink()
     print(f"  ✓ likelihood_2d_convergence.pdf")
     print(f"  ✓ likelihood_2d_profiles.pdf")
     print(f"  ✓ {summary_path}")

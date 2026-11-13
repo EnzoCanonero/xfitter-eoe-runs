@@ -3,8 +3,11 @@ Jinja2 templating for steering files
 Generates xFitter configuration files from templates
 """
 
+import shlex
+
 from pathlib import Path
 from typing import List, Tuple, Dict, Optional
+
 from jinja2 import Environment, FileSystemLoader, Template
 
 
@@ -50,16 +53,21 @@ class TemplateManager:
         return template.render({'do_errors': do_errors})
 
 
-def _xfitter_tree_export(xfitter_tree: Optional[str]) -> str:
-    """`export XFITTER_TREE=...` line for a generated run script, or ''.
+def _xfitter_environment_exports(xfitter_tree: Optional[str],
+                                 xfitter_commit: Optional[str]) -> str:
+    """Pinned xFitter environment exports for a generated worker.
 
     setup-env.sh honours XFITTER_TREE to pick the build under $XFITTER_ROOT, but
     the condor job does not inherit the submitting shell's environment, so the
-    export has to be written into the script itself. Without it a scan silently
-    uses whatever .env defaults to -- which is how scans were run against the
-    pre-Bartlett-fix build.
+    exports have to be written into the script itself. XFITTER_COMMIT optionally
+    makes setup-env.sh reject a selected tree whose Git HEAD has moved.
     """
-    return f'export XFITTER_TREE={xfitter_tree}\n' if xfitter_tree else ''
+    exports = []
+    if xfitter_tree:
+        exports.append(f'export XFITTER_TREE={shlex.quote(xfitter_tree)}')
+    if xfitter_commit:
+        exports.append(f'export XFITTER_COMMIT={shlex.quote(xfitter_commit)}')
+    return ''.join(f'{line}\n' for line in exports)
 
 
 def create_fit_structure(fit_dir: Path,
@@ -70,7 +78,8 @@ def create_fit_structure(fit_dir: Path,
                          dataset_root: Path,
                          setup_env: Path,
                          do_errors: Optional[str] = None,
-                         xfitter_tree: Optional[str] = None):
+                         xfitter_tree: Optional[str] = None,
+                         xfitter_commit: Optional[str] = None):
     """Create a fit directory from a template folder.
 
     template_dir is selected by the scan config and contains parameters.yaml.j2,
@@ -101,13 +110,14 @@ def create_fit_structure(fit_dir: Path,
 
     submit_script_path = fit_dir / "condor" / "submit.sh"
     submit_script_path.write_text(
-        generate_submit_script(fit_dir, setup_env, xfitter_tree)
+        generate_submit_script(fit_dir, setup_env, xfitter_tree, xfitter_commit)
     )
     submit_script_path.chmod(0o755)
 
 
 def generate_submit_script(fit_dir: Path, setup_env: Path,
-                           xfitter_tree: Optional[str] = None) -> str:
+                           xfitter_tree: Optional[str] = None,
+                           xfitter_commit: Optional[str] = None) -> str:
     setup_env = setup_env.resolve()
     setup_env_assignment = f'SETUP_ENV="{setup_env}"\n'
     return r"""#!/bin/bash
@@ -125,7 +135,7 @@ cat > "$DIR/run_fit.sh" << EOF
 #!/bin/bash
 set -e
 export HOME="\${HOME:-/tmp}"
-""" + _xfitter_tree_export(xfitter_tree) + r"""source "$SETUP_ENV"
+""" + _xfitter_environment_exports(xfitter_tree, xfitter_commit) + r"""source "$SETUP_ENV"
 
 # Record exact executable/library provenance. The selected tree may contain
 # local changes, so its name and Git commit alone are insufficient.
@@ -180,6 +190,7 @@ condor_submit "$DIR/job.sub"
 def generate_batch_submit(fits_dir: Path, fit_dirs: List[Path],
                           setup_env: Path,
                           xfitter_tree: Optional[str] = None,
+                          xfitter_commit: Optional[str] = None,
                           request_memory: str = "2GB") -> Path:
     """
     Generate a single-cluster Condor batch submission for a scan.
@@ -194,7 +205,9 @@ def generate_batch_submit(fits_dir: Path, fit_dirs: List[Path],
         Path to runs/submit.sh
     """
     setup_env = setup_env.resolve()
-    tree_export = _xfitter_tree_export(xfitter_tree)
+    environment_exports = _xfitter_environment_exports(
+        xfitter_tree, xfitter_commit
+    )
     smallx_guard = ""
     smallx_provenance = ""
     if xfitter_tree == "xfitter-bartlett-apfel306-hell3":
@@ -235,7 +248,7 @@ esac
 set -eo pipefail
 FIT_DIR="$1"
 export HOME="${{HOME:-/tmp}}"
-{tree_export}source "{setup_env}"
+{environment_exports}source "{setup_env}"
 
 # Record exact executable/library provenance. The selected tree may be dirty.
 XFITTER_BIN=$(command -v xfitter)

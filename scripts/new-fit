@@ -2,10 +2,10 @@
 # Create a new xfitter fit directory.
 # Usage: scripts/new-fit <path> [template_dir]
 #
-# path:         Nested path under runs/fits/ (e.g. hera-baseline/my-study/variant-a)
+# path:         Nested path under runs/fits/ (e.g. herapdf20-nnlo-rtopt/my-study/variant-a)
 # template_dir: Directory containing steering.txt and parameters.yaml.
 #               Can be an existing fit's config/ dir or an xfitter example dir.
-#               Defaults to the retained HERA nominal Pumplin configuration.
+#               Defaults to the current HERAPDF2.0 Gaussian Pumplin configuration.
 
 set -e
 
@@ -13,7 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 FITSDIR="$REPO_ROOT/runs/fits"
 NAME="$1"
-TEMPLATE="${2:-$FITSDIR/hera-baseline/nominal-bartlett2-pumplin/config}"
+TEMPLATE="${2:-$FITSDIR/herapdf20-nnlo-rtopt/gaussian/config}"
 
 # Resolve relative template paths against FITSDIR
 if [ "${TEMPLATE:0:1}" != "/" ]; then
@@ -23,13 +23,13 @@ fi
 if [ -z "$NAME" ]; then
     echo "Usage: $0 <path> [template_dir]"
     echo ""
-    echo "  path:         Nested path under runs/fits/ (e.g. hera-baseline/my-study/variant-a)"
+    echo "  path:         Nested path under runs/fits/ (e.g. herapdf20-nnlo-rtopt/my-study/variant-a)"
     echo "  template_dir: Directory with steering.txt + parameters.yaml"
-    echo "                (default: hera-baseline/nominal-bartlett2-pumplin/config)"
+    echo "                (default: herapdf20-nnlo-rtopt/gaussian/config)"
     echo ""
     echo "Examples:"
-    echo "  $0 hera-baseline/my-study/variant-a"
-    echo "  $0 hera-baseline/my-study/variant-b hera-baseline/baseline-7-sources-bartlett2-pumplin/config"
+    echo "  $0 herapdf20-nnlo-rtopt/my-study/variant-a"
+    echo "  $0 herapdf20-nnlo-rtopt/my-study/variant-b herapdf20-nnlo-rtopt/eoe-selected/config"
     exit 1
 fi
 

@@ -1,0 +1,42 @@
+xfitter_commit: 67398b15571dff1e9ddce0bc88923554552c9c84
+request_memory: 2GB
+n_iterations: 2
+enable_bartlett: true
+q2_cut: 3.5
+scan_type: systematic-ranking
+xfitter_tree: merge-master/xfitter-master
+template: hera-baseline
+epsilon: 0.6
+
+# Fifth-order forward-selection scan (Q2cut = 3.5, baseline parametrization).
+# The fourth round selects sysHZComb1114 (dchi2_B = 2.91 > 1).
+# sysHZComb1053 + proc_tb21 + sysHZComb1064 + sysHZComb1114 are held ON in every fit
+# (eps 0.6), warm-started at their JOINT converged values from the 4th-order
+# {1053,proc_tb21,1064,1114} fit (../xfitter-eoe-runs-archive/legacy/cleanup-20261111/runs/scans/syst-ranking/hera-baseline/4th-1053-tb21-1064/runs/sysHZComb1114). Every
+# candidate is ranked by its marginal impact on top of those four. The nominal fit is the
+# {1053,proc_tb21,1064,1114}-only fit. All four base sources are auto-excluded from the
+# candidate list.
+base_systematics:
+  - {name: sysHZComb1053, type: E, init: -16.3869}
+  - {name: proc_tb21,     type: E, init: -6.2247}
+  - {name: sysHZComb1064, type: E, init: 8.9421}
+  - {name: sysHZComb1114, type: E, init: 4.0736}
+
+# HERA datafiles (all 7 files)
+dataset_root: ../../../../../../datasets/hera/h1zeusCombined/inclusiveDis/1506.06042
+datafiles:
+  - HERA1+2_NCep_920-thexp.dat
+  - HERA1+2_NCep_820-thexp.dat
+  - HERA1+2_NCep_575-thexp.dat
+  - HERA1+2_NCep_460-thexp.dat
+  - HERA1+2_NCem-thexp.dat
+  - HERA1+2_CCep-thexp.dat
+  - HERA1+2_CCem-thexp.dat
+
+# Candidate systematic sources to rank (the four base sources removed automatically).
+systematics:
+  - {name: sysHZComb, range: "1001-1162", type: E}
+  - {name: proc_nrl, type: E}
+  - {name: proc_tb, range: "21-24", type: E}
+  - {name: proc_gp, type: E}
+  - {name: proc_had, type: E}

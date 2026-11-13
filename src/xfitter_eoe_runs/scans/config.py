@@ -34,6 +34,20 @@ class StudyConfig:
         return self.data.get('datafiles', [])
 
     @property
+    def dataset_root(self) -> Path:
+        """Dataset directory, absolute or relative to this workspace's config."""
+        value = self.data.get('dataset_root')
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(
+                "config.yaml must specify 'dataset_root' as a non-empty path "
+                "(absolute or relative to the workspace)"
+            )
+        path = Path(value).expanduser()
+        if not path.is_absolute():
+            path = self.workspace_dir / path
+        return path.resolve()
+
+    @property
     def template_dir(self) -> Path:
         """Template folder for this scan, selected by name under template_root.
 
@@ -66,6 +80,23 @@ class StudyConfig:
         without this a scan silently runs against whatever .env defaults to.
         """
         return self.data.get('xfitter_tree')
+
+    @property
+    def xfitter_commit(self) -> Optional[str]:
+        """Exact Git HEAD required for the selected xFitter tree (optional).
+
+        Generated workers export this as ``XFITTER_COMMIT``. ``setup-env.sh``
+        compares it with the selected tree's full HEAD before starting xFitter.
+        """
+        commit = self.data.get('xfitter_commit')
+        if commit is None:
+            return None
+        if not isinstance(commit, str) or len(commit) != 40 or any(
+                char not in '0123456789abcdef' for char in commit):
+            raise ValueError(
+                "xfitter_commit must be a full lowercase 40-character Git SHA-1"
+            )
+        return commit
 
     @property
     def do_errors(self) -> Optional[Dict]:
@@ -188,6 +219,29 @@ class LambdaScanConfig(StudyConfig):
         """Get expanded systematics with resolved epsilon and scaling mode."""
         return self._expand_systematics(self.data['systematics'])
 
+    @property
+    def parameter_comparison(self) -> List[tuple]:
+        """Ordered (name, label) pairs for the optional lambda=0/1 comparison."""
+        entries = self.data.get('parameter_comparison', [])
+        if not isinstance(entries, list):
+            raise ValueError("parameter_comparison must be a list of name/label mappings")
+        result = []
+        names = set()
+        for entry in entries:
+            if not isinstance(entry, dict):
+                raise ValueError("parameter_comparison entries must be name/label mappings")
+            name = entry.get('name')
+            label = entry.get('label', name)
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError("parameter_comparison names must be non-empty strings")
+            if not isinstance(label, str) or not label.strip():
+                raise ValueError("parameter_comparison labels must be non-empty strings")
+            if name in names:
+                raise ValueError(f"duplicate parameter_comparison name: {name}")
+            names.add(name)
+            result.append((name, label))
+        return result
+
 
 class SystematicRankingConfig(StudyConfig):
     """Configuration for systematic-ranking workspaces."""
@@ -281,69 +335,49 @@ class PumplinStabilityConfig(StudyConfig):
         return float(self.data.get('errdef_ref', 0.5))
 
     @property
+    def plot_parameters(self) -> List[str]:
+        """Ordered PDF parameter selection for Pumplin diagnostics."""
+        names = self.data.get('plot_parameters')
+        if (not isinstance(names, list) or not names
+                or any(not isinstance(name, str) or not name.strip() for name in names)):
+            raise ValueError("plot_parameters must be a non-empty list of parameter names")
+        if len(set(names)) != len(names):
+            raise ValueError("plot_parameters must not contain duplicate names")
+        return list(names)
+
+    @property
     def systematics(self) -> List[Dict]:
         """Expanded systematics; each entry's epsilon is the base eps (scaled by lambda at fit time)."""
         return self._expand_systematics(self.data['systematics'])
 
 
 class LikelihoodScanConfig(StudyConfig):
-    """Configuration for likelihood-scan workspaces.
-
-    The scan_type field in config.yaml must be 'likelihood-scan'.
-    Use scan_params_1d to list parameters to scan one at a time.
-    A future scan_params_2d key will enable 2D contour scans.
-    """
+    """Manual likelihood grids with an internal nominal fit."""
 
     def __init__(self, config_file: Path, template_root: Path):
         super().__init__(config_file, template_root)
-
-        if self.scan_type != 'likelihood-scan':
-            raise ValueError(f"Expected scan_type='likelihood-scan', got '{self.scan_type}'")
-
-        if 'reference_fit' not in self.data:
-            raise ValueError("likelihood-scan config missing required field: 'reference_fit'")
-        if not any(k in self.data for k in
+        removed = {'reference_fit', 'scan_defaults'} & self.data.keys()
+        if removed:
+            raise ValueError(f"unsupported likelihood settings: {sorted(removed)}; "
+                             "specify explicit ranges and npoints")
+        if not any(self.data.get(key) for key in
                    ('scan_params_1d', 'scan_systematics_1d', 'scan_params_2d')):
-            raise ValueError(
-                "likelihood-scan config must have at least one of "
-                "'scan_params_1d', 'scan_systematics_1d', 'scan_params_2d'"
-            )
-
-    @property
-    def reference_fit(self) -> Path:
-        """Absolute reference fit path, resolved relative to the workspace."""
-        return (self.workspace_dir / self.data['reference_fit']).resolve()
-
-    @property
-    def scan_defaults(self) -> dict:
-        return self.data.get('scan_defaults', {'n_sigma': 3, 'npoints': 31})
+            raise ValueError("likelihood-scan needs at least one scan")
+        for entry in self.scan_params_1d + self.scan_systematics_1d + self.scan_params_2d:
+            if 'n_sigma' in entry:
+                raise ValueError("n_sigma is unsupported; specify explicit ranges")
 
     @property
     def scan_params_1d(self) -> List[Dict]:
-        """PDF parameters to scan: [{name, n_sigma?, npoints?, min?, max?}].
-        Fixed via step=0 in the Parameters block."""
         return self.data.get('scan_params_1d', [])
 
     @property
     def scan_systematics_1d(self) -> List[Dict]:
-        """E-type systematics to scan: [{name, n_sigma?, npoints?, min?, max?}].
-        Fixed via MINUIT SET PAR / FIX commands (xFitter registers them from &Systematics)."""
         return self.data.get('scan_systematics_1d', [])
 
     @property
     def scan_params_2d(self) -> List[Dict]:
-        """Parameter pairs for 2D contour scans:
-        [{pair: [xName, yName], npoints?, n_sigma?, x_range?, y_range?}].
-
-        Each axis name may be a PDF parameter or an E-type systematic; the type is
-        inferred from the systematics block. Both axes are fixed at each grid point
-        (PDF via step=0, E-type via MINUIT SET PAR / FIX) while the rest are profiled."""
         return self.data.get('scan_params_2d', [])
-
-    @property
-    def sigma_levels(self) -> List[float]:
-        """Sigma levels at which to draw 2D joint contours (default [1, 2, 3])."""
-        return [float(s) for s in self.data.get('sigma_levels', [1, 2, 3])]
 
     @property
     def systematics(self) -> List[Dict]:
@@ -351,13 +385,7 @@ class LikelihoodScanConfig(StudyConfig):
 
     @property
     def parameter_overrides(self) -> Dict:
-        """Optional per-parameter overrides: {name: {value?, step?}}.
-
-        Takes precedence over values read from the reference fit.
-        Example in config.yaml:
-            parameter_overrides:
-              DUbar: {value: 1.9, step: 2.5}
-        """
+        """PDF value/step overrides applied to the template in every fit."""
         return self.data.get('parameter_overrides', {})
 
 

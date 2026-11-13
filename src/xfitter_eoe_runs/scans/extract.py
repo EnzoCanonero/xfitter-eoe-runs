@@ -4,11 +4,34 @@ Extracts chi2, parameters, convergence status from fit results
 """
 
 from pathlib import Path
-from typing import Dict, Optional, List, Sequence
+from typing import Dict, Optional, List, Sequence, Tuple
 import json
 import re
 import numpy as np
 import pandas as pd
+
+
+_NUMERIC_FIELD = r'[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[EeDd][-+]?\d+)?'
+_MINIMISED_RESULT_PATTERN = re.compile(
+    rf'^\s*(?:Chi2\s+)?after\s+minimisation\s+'
+    rf'({_NUMERIC_FIELD})(?:\s+([+-]?\d+))?',
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _parse_minimised_result(content: str) -> Tuple[Optional[float], Optional[int]]:
+    """Return minimized chi2 and NDF from either xFitter result heading.
+
+    EoE output uses ``Chi2 after minimisation`` while ordinary fits retain the
+    legacy ``After minimisation`` heading.  Missing fields remain ``None`` so
+    scan callers can preserve their existing conversion to ``numpy.nan``.
+    """
+    match = _MINIMISED_RESULT_PATTERN.search(content)
+    if not match:
+        return None, None
+    chi2 = float(match.group(1).replace('D', 'E').replace('d', 'e'))
+    ndf = int(match.group(2)) if match.group(2) is not None else None
+    return chi2, ndf
 
 
 class MinuitOutputParser:
@@ -137,16 +160,12 @@ class ResultsParser:
         self.lines = self.content.splitlines()
 
     def parse_chi2(self) -> Optional[float]:
-        match = re.search(r'Chi2 after minimisation\s+([\d.]+)', self.content)
-        if match:
-            return float(match.group(1))
-        return None
+        chi2, _ = _parse_minimised_result(self.content)
+        return chi2
 
     def parse_ndf(self) -> Optional[int]:
-        match = re.search(r'Chi2 after minimisation\s+[\d.]+\s+(\d+)', self.content)
-        if match:
-            return int(match.group(1))
-        return None
+        _, ndf = _parse_minimised_result(self.content)
+        return ndf
 
     def parse_partial_chi2s(self) -> pd.DataFrame:
         rows = []
@@ -165,40 +184,70 @@ class ResultsParser:
     def parse_systematic_shifts(self) -> pd.DataFrame:
         """Parse the per-source table of Results.txt.
 
-        The two xfitter trees print different tables, so the field count is what
-        identifies the layout:
+        xFitter prints several table layouts, so punctuation and field count
+        identify them:
 
-          xfitter-bartlett-fixes (9 numbers)
+          extended EoE (9 numbers)
             index name shift error corr_err epsilon r b_tilde b_mutheta
                   gof_contrib lr_contrib type
-          xfitter-master (6 numbers)
+          compact EoE (6 numbers)
             index name shift error corr_err epsilon b_theta gof_contrib type
+          ordinary (``+/-`` separator)
+            index name shift +/- error type
 
-        Both are parseable for diagnostics. Scan extraction nevertheless
+        All are parseable for diagnostics. Scan extraction nevertheless
         requires the extended table for every active EoE fit, preventing stale
         pre-fix outputs from entering a new ranking silently. Columns absent
         from a legacy layout are left as None rather than aliased.
         """
         rows = []
-        pattern = re.compile(
-            r'^\s*(\d+)\s+(\S+)\s+((?:[-\d.eE+]+\s+)+)(:[\w:]+)\s*$'
+        eoe_pattern = re.compile(
+            rf'^\s*(\d+)\s+(\S+)\s+((?:{_NUMERIC_FIELD}\s+)+)(:\S+)\s*$'
+        )
+        ordinary_pattern = re.compile(
+            rf'^\s*(\d+)\s+(\S+)\s+({_NUMERIC_FIELD})\s+'
+            rf'\+/-\s+({_NUMERIC_FIELD})\s+(:\S+)\s*$'
         )
         for line in self.lines:
-            m = pattern.match(line)
-            if not m:
+            ordinary_match = ordinary_pattern.match(line)
+            if ordinary_match:
+                rows.append({
+                    'index': int(ordinary_match.group(1)),
+                    'name': ordinary_match.group(2),
+                    'shift': float(
+                        ordinary_match.group(3).replace('D', 'E').replace('d', 'e')
+                    ),
+                    'error': float(
+                        ordinary_match.group(4).replace('D', 'E').replace('d', 'e')
+                    ),
+                    'corr_err': None, 'epsilon': None,
+                    'b_theta': None, 'r': None, 'b_tilde': None,
+                    'b_mutheta': None, 'gof_contrib': None,
+                    'lr_contrib': None,
+                    'sys_type': ordinary_match.group(5),
+                })
+                continue
+
+            eoe_match = eoe_pattern.match(line)
+            if not eoe_match:
                 continue
             try:
-                nums = [float(x) for x in m.group(3).split()]
+                nums = [
+                    float(x.replace('D', 'E').replace('d', 'e'))
+                    for x in eoe_match.group(3).split()
+                ]
             except ValueError:
                 continue
+            if len(nums) not in (6, 9):
+                continue
             row = {
-                'index': int(m.group(1)),
-                'name': m.group(2),
+                'index': int(eoe_match.group(1)),
+                'name': eoe_match.group(2),
                 'shift': nums[0],
                 'error': nums[1],
                 'corr_err': nums[2],
                 'epsilon': nums[3],
-                'sys_type': m.group(4),
+                'sys_type': eoe_match.group(4),
                 'b_theta': None, 'r': None, 'b_tilde': None,
                 'b_mutheta': None, 'lr_contrib': None,
             }
@@ -207,8 +256,6 @@ class ResultsParser:
                             'gof_contrib': nums[7], 'lr_contrib': nums[8]})
             elif len(nums) == 6:
                 row.update({'b_theta': nums[4], 'gof_contrib': nums[5]})
-            else:
-                continue
             rows.append(row)
         columns = [
             'index', 'name', 'shift', 'error', 'corr_err', 'epsilon',
@@ -483,168 +530,64 @@ def extract_scan_results(run_dir: Path, scan_type: str,
     }
 
 
+def _read_likelihood_result(fit_dir: Path):
+    """Read the raw minimum and the final MIGRAD status."""
+    try:
+        output = fit_dir / 'output'
+        chi2, _ = _parse_minimised_result((output / 'Results.txt').read_text())
+        text = (output / 'minuit.out.txt').read_text()
+        matches = re.findall(
+            rf'FCN=\s*{_NUMERIC_FIELD}\s+FROM MIGRAD\s+STATUS=([A-Z ]+)', text,
+        )
+        if matches:
+            status = '_'.join(matches[-1].lower().split())
+        else:
+            status = ('converged' if 'MIGRAD MINIMIZATION HAS CONVERGED' in text
+                      else 'unknown')
+        return chi2 if chi2 is not None else np.nan, status == 'converged', status
+    except (OSError, ValueError):
+        return np.nan, False, 'missing_or_unreadable'
+
+
 def _extract_likelihood_scan_results(fits_dir: Path) -> Dict:
-    """
-    Extract 1D profile likelihood scan results from scan_manifest.json.
+    """Normalize every likelihood point to the workspace's nominal fit."""
+    manifest = json.loads((fits_dir / 'scan_manifest.json').read_text())
+    if manifest.get('nominal') != 'nominal':
+        raise ValueError("unsupported likelihood manifest; regenerate in a fresh workspace")
+    nominal, converged, status = _read_likelihood_result(fits_dir / 'nominal')
+    if not converged or not np.isfinite(nominal):
+        raise ValueError(f"nominal fit needs a finite chi2 and converged MIGRAD ({status})")
+    print(f"  Nominal chi2: {nominal:g}")
 
-    For each scanned parameter, reads chi2 from each fit's Results.txt and
-    convergence status from minuit.out.txt.
-
-    Returns dict with key 'scan_1d': {param_name: {'scan_values', 'chi2',
-    'delta_chi2', 'converged', 'value_at_minimum', 'error'}}.
-    """
-    manifest_file = fits_dir / "scan_manifest.json"
-    if not manifest_file.exists():
-        raise FileNotFoundError(f"scan_manifest.json not found in {fits_dir}")
-
-    with open(manifest_file) as f:
-        manifest = json.load(f)
+    def collect(names, label):
+        shape = np.asarray(names).shape
+        records = [_read_likelihood_result(fits_dir / name)
+                   for name in np.asarray(names).flat]
+        chi2 = np.array([r[0] for r in records]).reshape(shape)
+        conv = np.array([r[1] for r in records]).reshape(shape)
+        statuses = np.array([r[2] for r in records]).reshape(shape)
+        valid = conv & np.isfinite(chi2)
+        print(f"  {label}: {valid.sum()}/{chi2.size} converged with finite chi2")
+        if np.any(chi2[valid] < nominal - 1e-6):
+            print(f"  WARNING: {label} has points below nominal; negative delta chi2 retained")
+        return {'chi2': chi2, 'delta_chi2': chi2 - nominal,
+                'converged': conv, 'status': statuses}
 
     scan_1d = {}
-
-    for param_name, param_info in manifest.get('scan_1d', {}).items():
-        scan_values = np.array(param_info['scan_values'])
-        fit_dir_names = param_info['fit_dirs']
-        ref_val = param_info['value_at_minimum']
-        ref_err = param_info['error']
-
-        # NB: deliberately the MINIMIZED chi2, not the Bartlett-corrected one.
-        # A likelihood scan measures a delta-chi2 profile, i.e. a
-        # profile-likelihood ratio used for confidence intervals; the GVM
-        # corrects that with b_mu (the c_CI factor), not with the
-        # goodness-of-fit b_q. Applying c_chi2 here would be wrong.
-        chi2s = []
-        converged_flags = []
-
-        for fit_name in fit_dir_names:
-            fit_dir = fits_dir / fit_name
-            try:
-                results_file = fit_dir / "output" / "Results.txt"
-                with open(results_file) as f:
-                    content = f.read()
-                m = re.search(r'Chi2 after minimisation\s+([\d.]+)', content)
-                chi2 = float(m.group(1)) if m else np.nan
-
-                minuit_file = fit_dir / "output" / "minuit.out.txt"
-                conv = False
-                if minuit_file.exists():
-                    with open(minuit_file) as f:
-                        mtxt = f.read()
-                    conv = "MIGRAD MINIMIZATION HAS CONVERGED" in mtxt
-                chi2s.append(chi2)
-                converged_flags.append(conv)
-            except Exception:
-                chi2s.append(np.nan)
-                converged_flags.append(False)
-
-        chi2_arr = np.array(chi2s)
-        # Normalize to the chi2 at the central scan point (closest value to ref_val).
-        central_idx = int(np.argmin(np.abs(scan_values - ref_val)))
-        chi2_central = chi2_arr[central_idx]
-        if np.isnan(chi2_central):
-            chi2_central = np.nanmin(chi2_arr)
-        delta_chi2 = chi2_arr - chi2_central
-
-        scan_1d[param_name] = {
-            'scan_values': scan_values,
-            'chi2': chi2_arr,
-            'delta_chi2': delta_chi2,
-            'converged': np.array(converged_flags),
-            'value_at_minimum': ref_val,
-            'error': ref_err,
+    for name, info in manifest['scan_1d'].items():
+        scan_1d[name] = {
+            'scan_values': np.array(info['scan_values']),
+            **collect(info['fit_dirs'], name),
         }
-
-        n_conv = sum(converged_flags)
-        n_total = len(fit_dir_names)
-        n_nan = int(np.isnan(chi2_arr).sum())
-        print(f"  {param_name}: {n_conv}/{n_total} converged"
-              + (f", {n_nan} missing" if n_nan else ""))
-
-    # ── 2D grid extraction ──────────────────────────────────────────────────
-    def _read_chi2_status(fit_dir: Path):
-        # As above: the MINIMIZED chi2 by design. This feeds a 2D delta-chi2
-        # contour (a confidence region), which the GVM corrects with b_mu, not
-        # with the goodness-of-fit b_q.
-        chi2 = np.nan
-        conv = False
-        status = 'missing'
-        final_fcn = np.nan
-        try:
-            m = re.search(r'Chi2 after minimisation\s+([-+0-9.Ee]+)',
-                          (fit_dir / "output" / "Results.txt").read_text())
-            chi2 = float(m.group(1)) if m else np.nan
-        except Exception:
-            chi2 = np.nan
-        try:
-            mf = fit_dir / "output" / "minuit.out.txt"
-            if mf.exists():
-                text = mf.read_text(errors='replace')
-                matches = re.findall(
-                    r'FCN=\s*([-+0-9.Ee]+)\s+FROM MIGRAD\s+STATUS=([A-Z ]+)',
-                    text,
-                )
-                if matches:
-                    final_fcn = float(matches[-1][0])
-                    status = ' '.join(matches[-1][1].split()).lower().replace(' ', '_')
-                    conv = status == 'converged'
-                elif "MIGRAD MINIMIZATION HAS CONVERGED" in text:
-                    status = 'converged_text_only'
-                    conv = True
-                else:
-                    status = 'no_migrad_status'
-                if not np.isfinite(chi2) and np.isfinite(final_fcn):
-                    chi2 = final_fcn
-        except Exception:
-            conv = False
-            status = 'unreadable_minuit'
-        return chi2, conv, status
-
     scan_2d = {}
-    for pair_key, info in manifest.get('scan_2d', {}).items():
-        xs = np.array(info['x_values'])
-        ys = np.array(info['y_values'])
-        grid = info['fit_grid']  # grid[i][j] -> fit dir name
-        nx, ny = len(xs), len(ys)
-        chi2 = np.full((nx, ny), np.nan)
-        conv = np.zeros((nx, ny), dtype=bool)
-        status = np.full((nx, ny), 'missing', dtype=object)
-        for i in range(nx):
-            for j in range(ny):
-                c, cv, st = _read_chi2_status(fits_dir / grid[i][j])
-                chi2[i, j] = c
-                conv[i, j] = cv
-                status[i, j] = st
-
-        x_ref = info.get('x_ref')
-        y_ref = info.get('y_ref')
-        if x_ref is not None and y_ref is not None:
-            ix_ref = int(np.argmin(np.abs(xs - float(x_ref))))
-            iy_ref = int(np.argmin(np.abs(ys - float(y_ref))))
-            chi2_reference = chi2[ix_ref, iy_ref]
-        else:
-            ix_ref = iy_ref = None
-            chi2_reference = np.nan
-
-        if not np.isfinite(chi2_reference):
-            valid = chi2[conv & np.isfinite(chi2)]
-            chi2_reference = float(np.min(valid)) if valid.size else float(np.nanmin(chi2))
-
-        delta_chi2 = chi2 - chi2_reference
-
-        scan_2d[pair_key] = {
+    for key, info in manifest['scan_2d'].items():
+        scan_2d[key] = {
             'x_name': info['x_name'], 'y_name': info['y_name'],
-            'x_values': xs, 'y_values': ys,
-            'x_ref': x_ref, 'y_ref': y_ref,
-            'x_err': info.get('x_err'), 'y_err': info.get('y_err'),
-            'ix_ref': ix_ref, 'iy_ref': iy_ref,
-            'chi2_reference': chi2_reference,
-            'sigma_levels': info.get('sigma_levels', [1, 2, 3]),
-            'chi2': chi2, 'delta_chi2': delta_chi2,
-            'converged': conv, 'status': status,
+            'x_values': np.array(info['x_values']),
+            'y_values': np.array(info['y_values']),
+            **collect(info['fit_grid'], key),
         }
-        print(f"  {pair_key}: {int(conv.sum())}/{nx * ny} converged")
-
-    return {'scan_1d': scan_1d, 'scan_2d': scan_2d}
+    return {'nominal_chi2': nominal, 'scan_1d': scan_1d, 'scan_2d': scan_2d}
 
 
 # ── Pumplin-stability interval extraction ───────────────────────────────────

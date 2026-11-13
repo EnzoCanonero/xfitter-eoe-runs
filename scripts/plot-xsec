@@ -5,16 +5,15 @@
 # band, Theory+shifts, ratio panel). Panel selection via config.yaml.
 #
 # Needs the xfitter environment (ROOT + the xfitter-draw binary). Sources the
-# repo's scripts/setup-env.sh unless xfitter-draw is already in PATH.
+# repo's scripts/setup-env.sh to select and validate the requested build even
+# when another xfitter-draw is already in PATH.
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-if ! command -v xfitter-draw >/dev/null 2>&1; then
-    if [ -f "$REPO_ROOT/scripts/setup-env.sh" ]; then
-        export XFITTER_TREE="${XFITTER_TREE:-xfitter-bartlett-fixes}"
-        source "$REPO_ROOT/scripts/setup-env.sh" >/dev/null 2>&1
-    fi
+if ! source "$REPO_ROOT/scripts/setup-env.sh" >/dev/null; then
+    echo "plot-xsec: failed to initialize the requested xFitter build" >&2
+    exit 1
 fi
 
 export XFITTER_EOE_REPO_ROOT="$REPO_ROOT"
