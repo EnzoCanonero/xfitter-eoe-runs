@@ -1,8 +1,10 @@
 # Pumplin stability grid for the seven-source HERA greedy selection.
 # The runner also supplies the implicit lambda=0 Gaussian group.
 scan_type: pumplin-stability
-xfitter_tree: xfitter-master
-xfitter_commit: bd0470d93a433ebfb5d99f6c0fecda9c29141199
+# Build note: previously pinned to xFitter bd0470d9.
+# Missing: a run on the merged xFitter master.
+xfitter_tree: merge-master/xfitter-master
+# xfitter_commit: aead2b830305623b73709f748a4db918a0bf136c
 template: hera-baseline
 eps: 0.6
 lambda: [0.5, 1.0]

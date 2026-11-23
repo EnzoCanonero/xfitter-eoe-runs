@@ -1,7 +1,9 @@
 # Profile-likelihood scans for the 14 free HERA PDF parameters without EoE.
 scan_type: likelihood-scan
-xfitter_tree: xfitter-master
-xfitter_commit: bd0470d93a433ebfb5d99f6c0fecda9c29141199
+# Build note: previously pinned to xFitter bd0470d9.
+# Missing: a run on the merged xFitter master.
+xfitter_tree: merge-master/xfitter-master
+# xfitter_commit: aead2b830305623b73709f748a4db918a0bf136c
 template: hera-baseline
 n_iterations: 2
 enable_bartlett: true

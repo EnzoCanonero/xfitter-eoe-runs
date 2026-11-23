@@ -28,7 +28,7 @@ cat > "$DIR/run_fit.sh" << EOF
 #!/bin/bash
 set -e
 export XFITTER_TREE=merge-master/xfitter-master
-export XFITTER_COMMIT=67398b15571dff1e9ddce0bc88923554552c9c84
+# export XFITTER_COMMIT=aead2b830305623b73709f748a4db918a0bf136c
 source "$REPO_ROOT/scripts/setup-env.sh"
 
 # flexiblas shim (condor nodes miss libflexiblas, map to openblas)

@@ -20,8 +20,9 @@ command's options without creating files or submitting jobs.
 ## xFitter installation
 
 Follow the official [xFitter installation guide](https://gitlab.cern.ch/fitters/xfitter/-/wikis/Installation-script)
-for xFitter and its theory dependencies. Use a build with the errors-on-errors
-features required by your study.
+for xFitter and its theory dependencies. Use xFitter master at or after merge
+commit `aead2b830305623b73709f748a4db918a0bf136c` (merge request !407), which
+includes errors-on-errors.
 
 ## Environment setup
 

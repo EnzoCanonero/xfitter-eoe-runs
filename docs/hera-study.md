@@ -12,8 +12,8 @@ an assignment specified in advance.
 Run commands from the repository root after [installation](installation.md).
 Plotting requires completed fits: each comparison's `config.yaml` lists its
 inputs. If they are missing, run those workspaces using the
-[fit guide](../runs/fits/README.md). The supplied launchers select the paper's
-xFitter build; to use yours, see
+[fit guide](../runs/fits/README.md). The supplied launchers select xFitter
+master; to use yours, see
 [using your own build](../runs/fits/README.md#use-your-own-xfitter-build).
 Figure 1 uses its own
 [EoE scan](../runs/scans/eoe-scan/README.md).
