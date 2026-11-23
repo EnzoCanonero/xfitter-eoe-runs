@@ -44,25 +44,32 @@ generated placeholder in place.
 
 ## Use your own xFitter build
 
-The supplied fits and scans record the xFitter build they were run with. In a
-fit, `condor/submit.sh` contains:
+The supplied fits and scans use xFitter master. In a fit, `condor/submit.sh`
+contains:
 
 ```bash
 export XFITTER_TREE=merge-master/xfitter-master
-export XFITTER_COMMIT=67398b15571dff1e9ddce0bc88923554552c9c84
+# export XFITTER_COMMIT=aead2b830305623b73709f748a4db918a0bf136c
 ```
 
-In a scan, `config.yaml` sets the same values as `xfitter_tree` and
-`xfitter_commit`. If your build is elsewhere, the job stops before xFitter
-starts, reporting `no built xfitter` or `commit mismatch`. Either:
+In a scan, `config.yaml` sets the same values as `xfitter_tree` and a commented
+`xfitter_commit`. The job uses whatever commit the tree is checked out at. If
+your build is elsewhere, the job stops before xFitter starts, reporting
+`no built xfitter`. Either:
 
-- delete both lines (or fields) to use the build selected in `.env`; or
-- point the tree at your build, relative to `XFITTER_ROOT` or absolute, and set
-  the commit to its revision (`git -C /path/to/build rev-parse HEAD`). Delete
-  the commit line if the build is not a Git checkout.
+- delete the tree line (or field) to use the build selected in `.env`; or
+- point the tree at your build, relative to `XFITTER_ROOT` or absolute.
 
-The commit check also fails if tracked files in the build have uncommitted
-changes.
+To require an exact revision, uncomment the commit line and set it to the
+build's full commit (`git -C /path/to/build rev-parse HEAD`). The job then
+stops if the build is at another commit (`commit mismatch`) or has uncommitted
+changes to tracked files.
+
+The EoE fit outputs were produced with xFitter `67398b15`, as recorded in their
+Condor logs; the Gaussian fits record no build. In the fitting code, `67398b15`
+differs from the merged master only in how zero-prior `:N` sources count
+towards the degrees of freedom; these fits have none. Scan configurations with a
+build note list what has not been run on master.
 
 ## Outputs
 

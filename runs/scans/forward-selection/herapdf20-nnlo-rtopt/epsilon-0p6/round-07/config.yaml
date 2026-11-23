@@ -1,4 +1,4 @@
-xfitter_commit: 67398b15571dff1e9ddce0bc88923554552c9c84
+# xfitter_commit: aead2b830305623b73709f748a4db918a0bf136c
 request_memory: 2GB
 n_iterations: 2
 enable_bartlett: true

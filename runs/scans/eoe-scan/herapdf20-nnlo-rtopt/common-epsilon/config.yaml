@@ -4,7 +4,7 @@
 # All seven sources remain in the fit; epsilon=0 gives Gaussian constraints.
 scan_type: lambda-scan
 xfitter_tree: merge-master/xfitter-master
-xfitter_commit: 67398b15571dff1e9ddce0bc88923554552c9c84
+# xfitter_commit: aead2b830305623b73709f748a4db918a0bf136c
 template: hera-baseline
 epsilon: 1.0
 lambda: {min: 0.0, max: 0.7, step: 0.1}

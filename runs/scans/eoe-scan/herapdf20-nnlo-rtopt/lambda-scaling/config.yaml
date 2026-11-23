@@ -2,8 +2,10 @@
 # Every selected source is scaled together: lambda=0 is Gaussian and lambda=1
 # is the nominal epsilon=0.6 EoE fit.
 scan_type: lambda-scan
-xfitter_tree: xfitter-master
-xfitter_commit: bd0470d93a433ebfb5d99f6c0fecda9c29141199
+# Build note: previously pinned to xFitter bd0470d9.
+# Missing: a run on the merged xFitter master.
+xfitter_tree: merge-master/xfitter-master
+# xfitter_commit: aead2b830305623b73709f748a4db918a0bf136c
 template: hera-baseline
 epsilon: 0.6
 lambda: {min: 0.0, max: 1.2, step: 0.1}
